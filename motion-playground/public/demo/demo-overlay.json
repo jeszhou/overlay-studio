@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "theme": "dark",
+  "cards": [
+    {
+      "id": "card-1",
+      "kind": "chapter-bar",
+      "start": 0,
+      "end": 28,
+      "params": {
+        "chapters": "动效之痛 0 | 三步出片 5.5 | 你说了算 15 | 一帧不压 21.5",
+        "accent": "blue"
+      }
+    },
+    {
+      "id": "card-2",
+      "kind": "caption-track",
+      "start": 0,
+      "end": 28,
+      "params": {
+        "lines": "0|2.8|口播视频最头疼的,是*后期动效*|Motion graphics is the worst part of talking-head editing\n2.8|5.5|一个个拖*关键帧*,拖到眼花|Dragging keyframes one by one, until your eyes glaze over\n5.5|8.7|Overlay Studio 把它变成*三步*|Overlay Studio turns it into three steps\n8.7|11.9|一整套*做好的动效卡*,即插即用|A full set of ready-made overlay cards, plug and play\n11.9|15|把字幕稿丢给 AI,按*语义*自动编排|Hand the SRT to AI, it arranges by meaning\n15|18.2|在画布上*拖一拖*,改改颜色和大小|Drag on the canvas, tweak color and size\n18.2|21.5|哪张不顺眼,点忽略,*你说了算*|Don't like a card? Ignore it. You decide\n21.5|24.8|导出*透明动效层*,拖进剪映就能用|Export a transparent overlay, drop it into any editor\n24.8|28|原片 4K *一帧不压*,现在就试试|Your 4K footage is never re-encoded. Try it now",
+        "accent": "blue"
+      },
+      "lintOff": [
+        "caption-track"
+      ]
+    },
+    {
+      "id": "card-4",
+      "kind": "pin-board",
+      "start": 0.2,
+      "end": 5.5,
+      "params": {
+        "position": "left",
+        "title": "为什么头疼",
+        "subtitle": "后期动效",
+        "items": "一个个拖关键帧|拖到眼花|新手劝退第一名",
+        "stepMs": 1500,
+        "accent": "blue"
+      }
+    },
+    {
+      "id": "card-6",
+      "kind": "step-timeline",
+      "start": 5.6,
+      "end": 8.7,
+      "params": {
+        "position": "left",
+        "title": "《*三步*出片》",
+        "steps": "丢一份字幕稿|AI 按语义编排|导出透明动效层",
+        "revealed": 3,
+        "accent": "blue"
+      }
+    },
+    {
+      "id": "card-7",
+      "kind": "odometer",
+      "start": 8.7,
+      "end": 11.9,
+      "params": {
+        "position": "left",
+        "kicker": "CARD LIBRARY",
+        "value": 20,
+        "unit": "种",
+        "label": "做好的动效卡 · 即插即用",
+        "accent": "blue"
+      }
+    },
+    {
+      "id": "card-8",
+      "kind": "checklist",
+      "start": 11.9,
+      "end": 15,
+      "params": {
+        "position": "left",
+        "title": "AI 拿到字幕稿之后",
+        "items": "识别内容类型|匹配动效卡|对齐字幕时间",
+        "checked": 3,
+        "stepMs": 850,
+        "accent": "blue"
+      }
+    },
+    {
+      "id": "card-10",
+      "kind": "focus-card",
+      "start": 15.1,
+      "end": 18.2,
+      "params": {
+        "side": "right",
+        "bg": "cream",
+        "items": "拖一拖改位置|换颜色和大小|不顺眼就换卡",
+        "stepMs": 950,
+        "accent": "blue"
+      },
+      "lintOff": [
+        "missing-cam"
+      ]
+    },
+    {
+      "id": "card-11",
+      "kind": "versus-card",
+      "start": 18.2,
+      "end": 21.5,
+      "params": {
+        "aKicker": "别人的工具",
+        "aTitle": "AI 定稿",
+        "aSub": "它排成什么样就是什么样",
+        "bKicker": "这里",
+        "bTitle": "你定稿",
+        "bSub": "拖动 · 换色 · 换卡 · 点忽略",
+        "winner": "b"
+      }
+    },
+    {
+      "id": "card-13",
+      "kind": "stat-proof",
+      "start": 21.6,
+      "end": 24.8,
+      "params": {
+        "position": "left",
+        "kicker": "LOSSLESS EXPORT",
+        "kickerZh": "透明动效层",
+        "value": 0,
+        "suffix": " 帧",
+        "prefix": "",
+        "footEn": "PRORES 4444 · ALPHA",
+        "footZh": "原片压缩损失 · 4K 直出",
+        "countMs": 900,
+        "accent": "blue"
+      }
+    },
+    {
+      "id": "card-14",
+      "kind": "type-shift",
+      "start": 24.8,
+      "end": 28,
+      "params": {
+        "position": "center",
+        "lines": "*免费自用|现在就试试|— Overlay Studio",
+        "shiftAtMs": 1200,
+        "accent": "blue"
+      }
+    }
+  ]
+}

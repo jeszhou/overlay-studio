@@ -1,0 +1,556 @@
+#!/usr/bin/env node
+/**
+ * 导出透明动效层 · PNG 序列
+ * 原理:无头 Chrome + CDP 虚拟时间(Emulation.setVirtualTimePolicy),
+ * 时钟完全由脚本控制,每帧精确推进 1000/fps 毫秒再截图(omitBackground → 透明)。
+ * 用法: node scripts/export-frames.mjs <job.json>
+ * job: { effectId, params, fps, duration, base }
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import puppeteer from "puppeteer";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, "..");
+
+const jobFile = process.argv[2];
+if (!jobFile) {
+  console.error("usage: node export-frames.mjs <job.json>");
+  process.exit(1);
+}
+const job = JSON.parse(fs.readFileSync(jobFile, "utf8"));
+const {
+  mode = "single", // single | timeline
+  effectId,
+  params = {},
+  doc = null, // timeline 模式:整份 overlay JSON
+  scale = 1,
+  speed = 1, // 动画速度倍率(与 Studio「动画速度」滑杆一致)
+  fps = 30,
+  duration = 6,
+  base = "http://localhost:5177",
+  keepFrames = false, // true = 保留 PNG 中间目录(verify-effect 逐帧比对要用)
+  ratio: jobRatio = "h", // 画幅:h = 16:9 横版 / v = 9:16 竖版(single 模式用)
+} = job;
+
+// 画幅:timeline 以编排里的 doc.ratio 为准,single 看 job.ratio
+const RATIO = (mode === "timeline" ? doc?.ratio : jobRatio) === "v" ? "v" : "h";
+const STAGE = RATIO === "v" ? { w: 1080, h: 1920 } : { w: 1920, h: 1080 };
+
+// NTSC 29.97 的真身是 30000/1001(=29.970029970…),写成小数会有微小误差:
+// 帧号/时钟用精确值算,传给 ffmpeg 的帧率用分数字符串,避免它按 2997/100 编码
+const isNTSC = Math.abs(fps - 29.97) < 0.01;
+const FPS = isNTSC ? 30000 / 1001 : fps;
+const FPS_ARG = isNTSC ? "30000/1001" : String(fps);
+
+const totalFrames = Math.max(1, Math.round(duration * FPS));
+const intervalMs = 1000 / FPS;
+
+// 开工前先看磁盘够不够:PNG 序列约 14MB/s、ProRes 4444 约 29MB/s,再留 2GB 余量。
+// 中途写满会得到一个"没有 moov 索引"的半截 MOV —— 剪映只会说"文件损坏",查不出原因。
+// fs.statfsSync 三平台通用(旧实现用 df,Windows 上没这命令,静默返回 Infinity
+// 等于保护失效)。查不到就放行,不为了一个预检卡住导出。
+function freeBytes(dir) {
+  try {
+    const st = fs.statfsSync(dir);
+    return st.bavail * st.bsize;
+  } catch {
+    return Infinity;
+  }
+}
+const needBytes = duration * (14 + 29) * 1024 * 1024 + 2 * 1024 ** 3;
+const gb = (n) => (n / 1024 ** 3).toFixed(1);
+
+// 工作目录 exports/<名称>-<时间戳>/(PNG 序列等中间产物)
+// 成品目录 exports/output/(给剪映用的 MOV/WebM 全部只放这里)
+const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+const name = mode === "timeline" ? "timeline" : effectId;
+const outDir = path.join(ROOT, "exports", `${name}-${stamp}`);
+const finalDir = path.join(ROOT, "exports", "output");
+const freeNow = freeBytes(ROOT);
+if (freeNow < needBytes) {
+  console.error(
+    `\n【导出失败原因】磁盘空间不够:还剩 ${gb(freeNow)}GB,这条 ${Math.round(duration)}s 的片子` +
+      `大约需要 ${gb(needBytes)}GB(PNG 序列 + ProRes 成片 + 余量)。\n` +
+      `先腾地方再导 —— exports/ 里除 output 外的目录都是 PNG 中间产物,成片出来后可以整个删。`,
+  );
+  process.exit(1);
+}
+
+fs.mkdirSync(outDir, { recursive: true });
+fs.mkdirSync(finalDir, { recursive: true });
+
+
+// ---- 卡内视频预抽帧 ----
+// 虚拟时钟下 Chrome 媒体管线完全冻结:<video> 的加载和 seek 永远不完成,
+// 每帧干等超时(导出极慢)且画面为空。先用 ffmpeg 把用到的视频按导出帧率
+// 抽成 JPEG 序列放进 public/_fxframes/,页面在导出模式用 <img> 逐帧换图。
+const VIDEO_RE = /\.(mp4|mov|webm|m4v)(\?|$)/i;
+
+function collectVideoUses() {
+  // { src → 需要抽的秒数 }:camSrc 从时间轴 0 起播,要抽到卡片结束的绝对秒;
+  // 其余(videoSrc/src/img 槽)从卡片 start 起算,抽卡片时长即可
+  const need = new Map();
+  const add = (src, sec) => {
+    if (typeof src === "string" && VIDEO_RE.test(src))
+      need.set(src, Math.max(need.get(src) ?? 0, sec));
+  };
+  // 片段偏移:填了「从第几秒开始播」的槽,需要的是 clip → clip+窗口 这一段。
+  // 只抽前 win 秒的话,clip=24 的素材导出时那一段根本没有帧(画面会是空的)
+  const clipKeyOf = (k) => {
+    if (/^videoSrc$/.test(k)) return "clipStart";
+    const v = k.match(/^videoSrc(\d+)$/);
+    if (v) return `clipStart${v[1]}`;
+    const i = k.match(/^img(\d+)$/);
+    if (i) return `clip${i[1]}`;
+    return "clipStart";
+  };
+  if (mode === "timeline" && doc?.cards) {
+    for (const c of doc.cards) {
+      const win = Math.max(0, (c.end ?? 0) - (c.start ?? 0));
+      // 倍速播放会吃掉更多素材:窗口 8s、2 倍速 → 要抽到素材的第 16 秒
+      const rate = Math.max(0.1, Number(c.params?.vidRate) || 1);
+      for (const [k, v] of Object.entries(c.params ?? {})) {
+        const clip = Math.max(0, Number(c.params?.[clipKeyOf(k)]) || 0);
+        add(v, k === "camSrc" ? (c.end ?? duration) : clip + win * rate);
+      }
+    }
+    if (doc?.cam) add(doc.cam, duration);
+  } else {
+    for (const v of Object.values(params)) add(v, duration);
+  }
+  return need;
+}
+
+function extractVideoFrames() {
+  const need = collectVideoUses();
+  const manifest = {};
+  if (!need.size) return manifest;
+  if (spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status !== 0) {
+    console.log("ffmpeg not found — 卡内视频无法抽帧,视频窗将为空");
+    return manifest;
+  }
+  const cacheRoot = path.join(ROOT, "public", "_fxframes");
+  // 清理 7 天前的旧缓存
+  if (fs.existsSync(cacheRoot)) {
+    for (const d of fs.readdirSync(cacheRoot)) {
+      const p = path.join(cacheRoot, d);
+      if (Date.now() - fs.statSync(p).mtimeMs > 7 * 864e5)
+        fs.rmSync(p, { recursive: true, force: true });
+    }
+  }
+  for (const [src, needSec] of need) {
+    const rel = decodeURIComponent(src.split("?")[0]);
+    const file = path.join(ROOT, "public", rel.replace(/^\//, ""));
+    if (!fs.existsSync(file)) {
+      console.log(`vid-frames: 找不到 ${rel},该视频窗将为空`);
+      continue;
+    }
+    const probe = spawnSync(
+      "ffprobe",
+      ["-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", file],
+      { encoding: "utf8" },
+    );
+    const dur = parseFloat(probe.stdout) || 0;
+    if (!dur) {
+      console.log(`vid-frames: 读不到时长 ${rel},该视频窗将为空`);
+      continue;
+    }
+    const useSec = Math.min(dur, needSec + 0.5);
+    const mtime = Math.floor(fs.statSync(file).mtimeMs / 1000);
+    const key = `${path.basename(file).replace(/[^\w.-]+/g, "_")}-${fps}fps-${mtime}-${Math.ceil(useSec)}s`;
+    const dir = path.join(cacheRoot, key);
+    const manifestFile = path.join(dir, "manifest.json");
+    let count = 0;
+    if (fs.existsSync(manifestFile)) {
+      count = JSON.parse(fs.readFileSync(manifestFile, "utf8")).count; // 命中缓存,免重抽
+    } else {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`extracting video frames: ${rel} (${useSec.toFixed(1)}s @ ${fps}fps)...`);
+      const r = spawnSync(
+        "ffmpeg",
+        ["-y", "-i", file, "-t", String(useSec), "-vf", `fps=${FPS_ARG}`, "-q:v", "4",
+          path.join(dir, "f_%05d.jpg")],
+        { stdio: "ignore" },
+      );
+      count = fs.existsSync(dir)
+        ? fs.readdirSync(dir).filter((f) => f.endsWith(".jpg")).length
+        : 0;
+      if (r.status !== 0 || !count) {
+        console.log(`vid-frames: 抽帧失败 ${rel},该视频窗将为空`);
+        fs.rmSync(dir, { recursive: true, force: true });
+        continue;
+      }
+      fs.writeFileSync(manifestFile, JSON.stringify({ count, fps: FPS, dur }));
+    }
+    manifest[src] = { dir: `/_fxframes/${key}`, fps: FPS, count, dur };
+  }
+  return manifest;
+}
+
+const vidFrames = extractVideoFrames();
+
+// timeline 的整份编排不放 URL:中文转码后网址会超过服务器 16KB 上限(HTTP 431),
+// 改在 page.goto 前用 evaluateOnNewDocument 注入 window.__EXPORT_DOC
+const url =
+  mode === "timeline"
+    ? `${base}/?export=1&mode=timeline&fx=${scale}&spd=${speed}`
+    : `${base}/?export=1&spd=${speed}&ratio=${RATIO}&effect=${encodeURIComponent(effectId)}&p=${encodeURIComponent(
+        JSON.stringify(params),
+      )}`;
+
+function waitBudgetExpired(client) {
+  return new Promise((resolve) =>
+    client.once("Emulation.virtualTimeBudgetExpired", resolve),
+  );
+}
+
+const LAUNCH_OPTS = {
+  headless: "new",
+  args: [
+    "--force-color-profile=srgb",
+    "--disable-background-timer-throttling",
+    "--run-all-compositor-stages-before-draw",
+    "--disable-lcd-text",
+  ],
+};
+
+// puppeteer 捆绑的 Chromium 没下载时(~/.cache/puppeteer 为空,npm 安装时跳过了
+// 下载步骤),launch 会报「must specify executablePath」——退回用本机装的
+// Google Chrome,导出照常跑,不必为此下 150MB。
+let browser;
+try {
+  browser = await puppeteer.launch(LAUNCH_OPTS);
+} catch (err) {
+  if (!/executablePath|Could not find/i.test(String(err?.message))) throw err;
+  // ⚠️ 本机 Chrome 只是最后的救命稻草:实测 Chrome 151 在无头+虚拟时间下
+  // 不推进 CSS 动画时间线,靠 transition/animation 淡入的卡会整张停在
+  // opacity:0(2026-08-27 踩过:导出成片里字幕和大半动效全不见)。
+  // 正解是装匹配版:npx puppeteer browsers install chrome
+  console.warn(
+    "[export] ⚠️ 捆绑 Chromium 缺失,退回本机 Chrome —— 动效可能丢失!\n" +
+      "         请执行:npx puppeteer browsers install chrome  然后重新导出",
+  );
+  browser = await puppeteer.launch({ ...LAUNCH_OPTS, channel: "chrome" });
+}
+
+try {
+  const page = await browser.newPage();
+
+  // ⚠️ 钉死 CSS 动画钟校正系数(2026-08-28,勿删)。
+  // ExportView 会在开跑瞬间实测一个 __fxClockRate,再每帧把所有动画的 playbackRate
+  // 乘上它。实测这个值在不同运行里会落在 1~5.5 之间;一旦落到 5 附近,
+  // 进场过渡就整个卡死在第一帧 —— 卡片挂上了、is-in 也加了,但内层 opacity 恒为 0,
+  // 短卡(<2s)从头到尾看不见,长卡晚好几秒才出现。
+  // 这就是"同一份编排、同一份代码,有的导出好有的丢卡"的真正原因(排查见 8/28 记录)。
+  // 实测 forced=1 时 126.7s 空镜卡内层 opacity 0→0.92、133s VERDICT 0→0.64,进场恢复正常。
+  await page.evaluateOnNewDocument(() => {
+    let _r = 1;
+    Object.defineProperty(window, "__fxClockRate", {
+      get: () => _r,
+      set: () => {},           // 屏蔽实测值写入
+      configurable: true,
+    });
+    void _r;
+  });
+  await page.setViewport({ width: STAGE.w, height: STAGE.h, deviceScaleFactor: 1 });
+  const client = await page.createCDPSession();
+
+  // 记录页面里的 JS 报错,失败时给出人话原因
+  const pageErrors = [];
+  page.on("pageerror", (e) => pageErrors.push(String(e).split("\n")[0]));
+
+  // 页面底色透明(截图 omitBackground 的前提)
+  await client.send("Emulation.setDefaultBackgroundColorOverride", {
+    color: { r: 0, g: 0, b: 0, a: 0 },
+  });
+
+  // 整份编排在页面脚本运行前注入(见上面 url 处注释)
+  if (mode === "timeline") {
+    await page.evaluateOnNewDocument((s) => {
+      window.__EXPORT_DOC = s;
+    }, JSON.stringify(doc));
+  }
+  // 视频帧序列清单:页面 __seekVideos 按它逐帧换 img.src
+  await page.evaluateOnNewDocument((m) => {
+    window.__VID_FRAMES = m;
+  }, vidFrames);
+
+  // 正常时间加载页面(动效被 __startExport 闸住,不会提前播)
+  await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 }).catch((e) => {
+    throw new Error(
+      `导出页面加载超时(30s)。常见原因:某张卡引用的录屏/图片文件已被删除,或素材过大。原始错误:${String(e).split("\n")[0]}`,
+    );
+  });
+
+  // 就绪检测:TimelineExport 挂载后才有 __startExport;
+  // 没有 = 编排解析失败(页面上会显示红字原因)或页面 JS 崩溃
+  await page
+    .waitForFunction("typeof window.__startExport === 'function'", { timeout: 15000 })
+    .catch(async () => {
+      const hint = await page
+        .evaluate(() => (document.body.innerText || "").trim().slice(0, 200))
+        .catch(() => "");
+      throw new Error(
+        `导出页面未就绪:${hint || pageErrors[0] || "页面白屏(JS 报错)"}`,
+      );
+    });
+
+  // 自定义字体加载完再开闸,避免前几帧渲染成回退字体
+  await page.evaluate(() => document.fonts.ready).catch(() => {});
+
+  // 冻结时钟 → 开闸 → 从 t=0 逐帧推进
+  await client.send("Emulation.setVirtualTimePolicy", { policy: "pause" });
+  await page.evaluate(() => window.__startExport());
+
+  // 逐帧渲染真正开跑的时刻。进度浮窗的「预计还需」要从这里起算 ——
+  // 从任务启动起算的话,前面抽帧/启浏览器那几分钟会被摊进「每帧耗时」,
+  // 开头能报出好几十分钟然后一路往下掉(客户看到的「50 分钟」就是这么来的)。
+  console.log(`rendering frames: ${totalFrames}`);
+
+  for (let i = 1; i <= totalFrames; i++) {
+    // 先下发本帧精确时间(卡片挂载/节拍全跟它走)+ 换视频帧图,再推时钟:
+    // 推进期间页面完成渲染与绘制,截图即为 t=(i-1)/fps 的画面。
+    // 帧覆盖的是 [0, duration) 而不是 (0, duration]:以前从 1/fps 起步,开头丢了
+    // t=0 那一帧、结尾多出 t=duration 那一帧 —— 而卡片可见区间是左闭右开
+    // (t < end),末帧正好踩在 end 上,于是成片最后一帧是全空的。
+    await page
+      .evaluate((t) => {
+        if (window.__setExportT) window.__setExportT(t);
+        if (window.__seekVideos) window.__seekVideos(t);
+      }, (i - 1) / fps)
+      .catch(() => {});
+    // 换 src 后帧图在真实时间里加载(本地静态文件,通常几毫秒):就绪再推帧
+    for (let k = 0; k < 20; k++) {
+      const pending = await page
+        .evaluate(() => (window.__pendingVidFrames ? window.__pendingVidFrames() : 0))
+        .catch(() => 0);
+      if (!pending) break;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    const p = waitBudgetExpired(client);
+    await client.send("Emulation.setVirtualTimePolicy", {
+      policy: "advance",
+      budget: intervalMs,
+    });
+    await p;
+    // ⚠️ 确定性动画步进(2026-08-28,勿删)。CSS 过渡/动画的钟在无头虚拟时间下
+    // 快慢不定(实测同一台机器不同一次运行,偏差 1x~5.4x;偏差大时进场过渡
+    // 整个卡死在第一帧,短卡全程隐形 —— 就是"同一编排有的导出好有的丢卡"的根源)。
+    // 从本版起不再信任任何钟:每推进一帧虚拟时间,就把页面里所有动画显式
+    // 暂停并手动 +intervalMs。动画进度与时间轴逐帧锁死,与机器负载无关。
+    await page.evaluate((ms) => {
+      for (const a of document.getAnimations()) {
+        try {
+          if (a.playState !== "paused") a.pause();
+          a.currentTime = Number(a.currentTime ?? 0) + ms;
+        } catch { /* 已结束/已移除的动画,跳过 */ }
+      }
+    }, intervalMs);
+    await page.screenshot({
+      path: path.join(outDir, `frame_${String(i).padStart(6, "0")}.png`),
+      omitBackground: true,
+    });
+    if (i % 30 === 0 || i === totalFrames) {
+      console.log(`progress ${i}/${totalFrames}`);
+    }
+  }
+
+  // 烤入人物的时间段(导出页按「卡有没有 camSrc 控件」算好挂在 window 上)。
+  // 趁浏览器还开着取出来,后面写进「合成说明」。
+  const camSegs = await page.evaluate(() => window.__CAM_SEGMENTS ?? []).catch(() => []);
+
+  // ---- PNG 序列 → 自动合成透明视频(需要本机 ffmpeg;没有则跳过,只留 PNG) ----
+  const result = { ok: true, dir: outDir, frames: totalFrames, fps, mov: null, webm: null };
+  const hasFfmpeg = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status === 0;
+  if (hasFfmpeg) {
+    const seq = path.join(outDir, "frame_%06d.png");
+    // 1) 剪映友好:ProRes 4444 透明 MOV(编码快,文件较大)→ 成品放 exports/output/
+    console.log("composing MOV (ProRes 4444 alpha)...");
+    const mov = path.join(finalDir, `${name}-${stamp}.mov`);
+    const r1 = spawnSync(
+      "ffmpeg",
+      ["-y", "-framerate", FPS_ARG, "-i", seq,
+        // 预乘 alpha(2026-08-28 定案,勿再删)。剪映按**预乘**合成 ProRes 4444:
+        // 它算的是 dst*(1-a) + c,而不是 dst*(1-a) + c*a。所以必须先把 RGB 乘上 alpha。
+        //
+        // 8/27 曾以"预乘会把半透明压暗一倍"为由删掉这行 —— 那次测法是错的:
+        // 拿 MOV 的 RGB 通道直接叠黑底比亮度(120 vs 58),那测的是文件里的裸颜色,
+        // 不是剪映合出来的画面;预乘后 RGB 本来就该变暗,合成时 alpha 不再乘第二遍才对得上。
+        //
+        // 8/28 用真成片回归验证(45s 整帧、按 alpha 分档比对预测值与实际像素):
+        //   alpha 档     直通模型误差 / 预乘模型误差
+        //   ≈全透明        16.58 / 1.78
+        //   很淡           78.11 / 2.28
+        //   半透明(玻璃)     8.08 / 0.90
+        //   较实            4.93 / 2.97
+        // 每一档都是预乘模型胜。不预乘的后果:全透明区的 RGB 是近白垃圾值,
+        // 会被直接加进画面 —— ambient-wash 的羽化带因此在成片里烧成一圈椭圆白环。
+        "-vf", "premultiply=inplace=1",
+        "-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le", "-vendor", "apl0",
+        // 色彩空间标记:不写的话 ffprobe 三项都是 unknown,剪映只能猜,
+        // 猜错就整条偏色(2026-08-27 实测:导进剪映后整条颜色不对)。原片是 bt709,对齐它。
+        "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", mov],
+      { stdio: "ignore" },
+    );
+    if (r1.status === 0 && fs.existsSync(mov)) {
+      result.mov = mov;
+    } else {
+      // 失败多半是写到一半磁盘满了:半截 MOV 没有 moov 索引,留着只会被误当成成片
+      fs.rmSync(mov, { force: true });
+      result.ok = false;
+      result.error = `MOV 合成失败(磁盘还剩 ${gb(freeBytes(ROOT))}GB),半截文件已删除`;
+      console.error(`\n【导出失败原因】${result.error}`);
+    }
+    // 2) 小体积:VP9 透明 WebM(编码稍慢;剪映不认 WebM 透明,给网页/达芬奇用)
+    console.log("composing WebM (VP9 alpha)...");
+    const webm = path.join(finalDir, `${name}-${stamp}.webm`);
+    const r2 = spawnSync(
+      "ffmpeg",
+      ["-y", "-framerate", FPS_ARG, "-i", seq,
+        "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "32",
+        "-deadline", "good", "-cpu-used", "4", "-row-mt", "1", "-auto-alt-ref", "0", webm],
+      { stdio: "ignore" },
+    );
+    if (r2.status === 0 && fs.existsSync(webm)) result.webm = webm;
+    else fs.rmSync(webm, { force: true });
+  } else {
+    console.log("ffmpeg not found — skip video composing, PNG sequence only");
+  }
+
+  // ---- 音效烤入:按每张卡的出现时刻把音效混成音轨,直接封进 MOV ----
+  // 每卡可用参数 sfx 覆盖:留空 = 按类型自动;"none" = 静音;其余 = public/sfx/<名>.mp3
+  if (mode === "timeline" && doc?.cards?.length && result.mov && hasFfmpeg) {
+    const SFX_DIR = path.join(ROOT, "public", "sfx");
+    const KIND_SFX = {
+      // 计数/数据 → 数字上升
+      "stat-proof": "rise", odometer: "rise", "number-beats": "rise", "ring-metric": "rise",
+      "metric-focus": "rise", "bar-race": "rise", "rank-bars": "rise", "compare-split": "rise",
+      "growth-curve": "rise", "diverge-lines": "rise",
+      // 盖章/落锤/爆点/巨字 → 重击
+      "strike-flip": "impact", "rule-card": "impact", "win-lose": "impact", "versus-card": "impact", "icon-veto": "impact",
+      "word-flank": "impact", "burst-halo": "impact", "char-assemble": "impact",
+      // 满屏运镜/转场 → 嗖
+      "screen-demo": "whoosh", "focus-card": "whoosh", "focus-takeover": "whoosh",
+      "punch-zoom": "whoosh", "cam-pan": "whoosh-soft", "doc-scroll": "whoosh-soft",
+      "light-sweep": "sparkle", "glow-badges": "sparkle",
+      // 照片/截图 → 快门;多图弹入 → 连环 pop
+      "cover-stack": "shutter", "proof-shot": "shutter", "quote-cite": "shutter",
+      "project-window": "shutter", "phone-shot": "shutter", "ui-callout": "shutter",
+      "photo-halo": "pop-cluster", "magic-bento": "pop-cluster", "icon-pop": "pop", "formula-pill": "pop",
+      // 打字/代码/故障
+      "terminal-3d": "type", "type-shift": "type", "decrypt-text": "glitch", "letter-glitch": "glitch",
+      // 结构/步骤/清单/名牌
+      "chapter-bar": "chime", checklist: "ding", "step-timeline": "click", "stepper-flow": "click",
+      "timeline-h": "click", "outline-tree": "click", "flow-chart": "click",
+      "entity-chips": "click", "info-board": "click", "section-head": "whoosh-soft",
+      // 氛围层不配音效
+      "ambient-wash": null, "caption-track": null,
+    };
+    const DEFAULT_SFX = "pop-light";
+    const points = doc.cards
+      .map((c) => {
+        const chosen = c.params?.sfx === "none"
+          ? null
+          : (c.params?.sfx || (c.kind in KIND_SFX ? KIND_SFX[c.kind] : DEFAULT_SFX));
+        if (!chosen) return null;
+        const file = path.join(SFX_DIR, `${chosen}.mp3`);
+        if (!fs.existsSync(file)) return null;
+        return { t: c.start, file, sfx: chosen, kind: c.kind };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.t - b.t);
+    if (points.length) {
+      console.log(`baking ${points.length} sfx into MOV...`);
+      // 1) 静音底轨(定全长)+ 每个音效裁 3.2s 渐出、延迟到卡片出现时刻,混成一条音轨
+      const mixFile = path.join(outDir, "sfx-mix.m4a");
+      const args = ["-y", "-f", "lavfi", "-t", String(duration), "-i", "anullsrc=r=44100:cl=stereo"];
+      for (const p of points) args.push("-i", p.file);
+      const ms = (t) => Math.max(0, Math.round(t * 1000));
+      const chains = points.map(
+        (p, i) =>
+          `[${i + 1}]atrim=0:3.2,afade=t=out:st=2.7:d=0.5,volume=0.8,adelay=${ms(p.t)}|${ms(p.t)}[s${i}]`,
+      );
+      const mixIn = points.map((_, i) => `[s${i}]`).join("");
+      args.push(
+        "-filter_complex",
+        `${chains.join(";")};[0]${mixIn}amix=inputs=${points.length + 1}:duration=first:normalize=0[out]`,
+        "-map", "[out]", "-c:a", "aac", "-b:a", "192k", mixFile,
+      );
+      const rMix = spawnSync("ffmpeg", args, { stdio: "ignore" });
+      // 2) 音轨封进 MOV(视频流原样拷贝,不重编码)
+      if (rMix.status === 0 && fs.existsSync(mixFile)) {
+        const tmp = result.mov.replace(/\.mov$/, "-audio.mov");
+        const rMux = spawnSync(
+          "ffmpeg",
+          ["-y", "-i", result.mov, "-i", mixFile,
+            // 音轨转 PCM 再封进 MOV。剪映读 .mov 里的 AAC 不稳:2026-08-28 这次导出
+            // 音轨齐全(40 个点、max 0dB)但剪映里就是没声音,转成 pcm_s16le 后立刻正常。
+            // 以前的导出同样是 AAC 且能出声(上一版成片 18.55/19.75/21.35s 都能测到音效),
+            // 所以这不是必现问题 —— 但 PCM 是 MOV 的通用选择,只多约 30MB,直接默认给它。
+            "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "pcm_s16le", tmp],
+          { stdio: "ignore" },
+        );
+        if (rMux.status === 0 && fs.existsSync(tmp)) {
+          fs.renameSync(tmp, result.mov);
+          result.sfxBaked = points.length;
+          console.log(`sfx baked: ${points.length} points`);
+        }
+      }
+      // 3) 清单:记录烤了什么(想换音效:选中卡片 → 「音效」下拉 → 重导)
+      const fmt = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
+      const sheet = [
+        `音效清单 · ${name}-${stamp}(已直接混入 MOV,无需手动加)`,
+        "想调整:回 Studio 选中卡片 → 节奏组「音效」下拉换一个(选中即试听)或选「无音效」,重新导出。",
+        "整条音效轨的音量在剪映里对 MOV 轨道统一调(建议比人声低,约 -12~-18dB)。",
+        "",
+        ...points.map((p) => `${fmt(p.t)}  ${p.kind.padEnd(14)}  ${p.sfx}`),
+      ].join("\n");
+      const sheetPath = path.join(finalDir, `${name}-${stamp}-音效清单.txt`);
+      fs.writeFileSync(sheetPath, sheet, "utf8");
+      result.sfxSheet = sheetPath;
+    }
+  }
+
+  // ---- 合成说明:只在真的烤了人物时才生成 ----
+  // 这几段的透明层里已经有一份人物画面,剪映里必须把原始口播轨盖住,
+  // 否则会看到两层人。说明放在成品旁边,而不是 README —— 用户打开
+  // exports/output/ 拿 MOV 的那一刻,正好是他要去剪映的前一秒。
+  if (camSegs.length && result.mov) {
+    const fmt2 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
+    const note = [
+      `合成说明 · ${name}-${stamp}`,
+      "",
+      "这条动效层里有 " + camSegs.length + " 段把口播人物烤了进去(运镜/取景类卡片)。",
+      "剪映里这几段要把【原始口播轨盖住】,否则会看到两层人:",
+      "",
+      ...camSegs.map((s) => `  ${fmt2(s.start)} — ${fmt2(s.end)}   ${s.kind}`),
+      "",
+      "做法:把 MOV 放在最上层轨道,上面这几个时间段把下面的原始口播轨切开、静音或删掉画面",
+      "(声音要留)。其余时间段照常,MOV 盖在原片上即可。",
+    ].join("\n");
+    const notePath = path.join(finalDir, `${name}-${stamp}-合成说明.txt`);
+    fs.writeFileSync(notePath, note, "utf8");
+    result.camNote = notePath;
+  }
+
+  // ---- 清理 PNG 中间目录:成片(MOV)到手后这几 GB 就没用了,默认删掉 ----
+  // 合成失败或没装 ffmpeg 时保留:PNG 是几分钟渲染的成果,留着可手动重合成。
+  if (result.mov && !keepFrames) {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    result.dir = null;
+    console.log("cleaned PNG frames dir");
+  }
+
+  console.log(JSON.stringify(result));
+} catch (e) {
+  // 人话原因放在 stderr 结尾(接口取尾部展示给用户)
+  console.error(String(e?.stack ?? e));
+  console.error(`\n【导出失败原因】${String(e?.message ?? e).split("\n")[0]}`);
+  process.exitCode = 1;
+} finally {
+  await browser.close();
+}

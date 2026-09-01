@@ -1,0 +1,326 @@
+:root {
+  /* ---- 设计令牌:A1 瑞士编辑部(Vignelli/IBM 信息建筑) ----
+     信息层级靠网格和 hairline;唯一信号色 #ff4b1f 只给「正在发生的事」:
+     播放头/选中/主按钮/实时数值。直角,无阴影,无渐变。 */
+  --bg-app: #0f0f11;
+  --bg-panel: #131316;
+  --bg-canvas: #0b0b0d;
+  --bg-elev: #1a1a1e;
+
+  --ink: #f2f2ee;          /* 主文字 */
+  --ink-muted: rgba(242, 242, 238, 0.62);
+  --ink-faint: rgba(242, 242, 238, 0.38);
+  --hairline: #26262a;
+  --hairline-strong: #3a3a40;
+  --fill-subtle: rgba(242, 242, 238, 0.05);
+  --fill-hover: rgba(242, 242, 238, 0.09);
+
+  --accent: #ff4b1f;       /* 信号橙红:只给正在发生的事 */
+  --on-accent: #0f0f11;
+  --danger: #e88686;       /* 危险操作:删卡按钮/错误计数 */
+  /* 墙纸:只有「玻璃」风格会把它垫在最底层透上来,其他风格用不到 */
+  --wallpaper: linear-gradient(135deg, #1a1a20 0%, #262632 45%, #16161c 100%);
+
+  --font-sans: "IBM Plex Sans SC", -apple-system, BlinkMacSystemFont,
+    "SF Pro Display", "Helvetica Neue", "PingFang SC", "Microsoft YaHei",
+    system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", "JetBrains Mono", ui-monospace,
+    Menlo, Consolas, monospace;
+
+  color-scheme: dark;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- 配色:一份令牌取值表 = 一个配色,挂在 <html data-palette> 上 ----
+   配色只管颜色,不管形状 —— 形状是另一根轴(<html data-form>,规则在 App.css)。
+   两根轴可以任意组合,比如 iOS 骨架 + 象牙陶土配色。
+   画布(--bg-canvas)所有配色保持深色:那是视频舞台,和导出所见一致。
+   画布上的浮层(参考线/导出进度/检查器浮窗)同理固定深色玻璃,不随配色走。
+   data-palette 缺省 = 上面 :root 里的「瑞士·暗」。 */
+
+/* 瑞士·亮:同一套骨架的纸白版,信号橙加深一档保对比 */
+:root[data-palette="light"] {
+  --bg-app: #f4f2ec;
+  --bg-panel: #faf9f5;
+  --bg-canvas: #101013;
+  --bg-elev: #ffffff;
+  --ink: #1c1c1a;
+  --ink-muted: rgba(28, 28, 26, 0.64);
+  --ink-faint: rgba(28, 28, 26, 0.4);
+  --hairline: #ddd9cf;
+  --hairline-strong: #c3bfb2;
+  --fill-subtle: rgba(28, 28, 26, 0.05);
+  --fill-hover: rgba(28, 28, 26, 0.08);
+  --accent: #e03a0e;
+  --on-accent: #ffffff;
+  --danger: #b8433a;
+  --wallpaper: linear-gradient(135deg, #eae7dd 0%, #f7f5ef 45%, #e2ded1 100%);
+  color-scheme: light;
+}
+
+/* 象牙陶土:暖象牙底 + 陶土红棕,和小红书卡片的 Fable 编辑风同宗 */
+:root[data-palette="clay"] {
+  --bg-app: #f1ebe0;
+  --bg-panel: #f8f4eb;
+  --bg-canvas: #15100c;
+  --bg-elev: #fffdf7;
+  --ink: #2b241f;
+  --ink-muted: rgba(43, 36, 31, 0.66);
+  --ink-faint: rgba(43, 36, 31, 0.42);
+  --hairline: #e0d5c3;
+  --hairline-strong: #c6b89f;
+  --fill-subtle: rgba(43, 36, 31, 0.05);
+  --fill-hover: rgba(43, 36, 31, 0.09);
+  --accent: #b0522b;
+  --on-accent: #fff8ef;
+  --danger: #a4453a;
+  --wallpaper: linear-gradient(135deg, #ece0cd 0%, #f8f1e4 45%, #e4d5be 100%);
+  color-scheme: light;
+}
+
+/* 终端荧光:近黑墨绿底 + 荧光绿,广播控制台 */
+:root[data-palette="hud"] {
+  --bg-app: #070b07;
+  --bg-panel: #0b110b;
+  --bg-canvas: #050705;
+  --bg-elev: #101810;
+  --ink: #cdeccd;
+  --ink-muted: rgba(205, 236, 205, 0.6);
+  --ink-faint: rgba(205, 236, 205, 0.36);
+  --hairline: #1c2b1c;
+  --hairline-strong: #2e452e;
+  --fill-subtle: rgba(102, 255, 153, 0.05);
+  --fill-hover: rgba(102, 255, 153, 0.09);
+  --accent: #33ff66;
+  --on-accent: #04150a;
+  --danger: #ff8262;
+  --wallpaper: linear-gradient(135deg, #071308 0%, #0d2211 45%, #061006 100%);
+  color-scheme: dark;
+}
+
+/* 经典灰蓝:传统剪辑软件的中性灰 + 系统蓝,大众习惯审美 */
+:root[data-palette="pro"] {
+  --bg-app: #212226;
+  --bg-panel: #26272c;
+  --bg-canvas: #17181b;
+  --bg-elev: #2d2e34;
+  --ink: #e8e9ec;
+  --ink-muted: rgba(232, 233, 236, 0.64);
+  --ink-faint: rgba(232, 233, 236, 0.4);
+  --hairline: #35363c;
+  --hairline-strong: #46474f;
+  --fill-subtle: rgba(232, 233, 236, 0.06);
+  --fill-hover: rgba(232, 233, 236, 0.1);
+  --accent: #4c8dff;
+  --on-accent: #ffffff;
+  --danger: #e5695f;
+  --wallpaper: linear-gradient(135deg, #26282f 0%, #33363f 45%, #202228 100%);
+  color-scheme: dark;
+}
+
+/* 线框手账:深靛蓝底 + 奶油描边 + 橙青撞色,复古 UI 图鉴 */
+:root[data-palette="sketch"] {
+  --bg-app: #2a3149;
+  --bg-panel: #313853;
+  --bg-canvas: #141828;
+  --bg-elev: #3a4160;
+  --ink: #f2ead9;
+  --ink-muted: rgba(242, 234, 217, 0.66);
+  --ink-faint: rgba(242, 234, 217, 0.42);
+  --hairline: rgba(242, 234, 217, 0.18);
+  --hairline-strong: rgba(242, 234, 217, 0.52);
+  --fill-subtle: rgba(242, 234, 217, 0.06);
+  --fill-hover: rgba(242, 234, 217, 0.11);
+  --accent: #e0632f;
+  --on-accent: #fdf6e7;
+  --danger: #e88a7a;
+  --wallpaper: linear-gradient(135deg, #2b3250 0%, #3b4368 45%, #232941 100%);
+  color-scheme: dark;
+}
+
+/* 冷灰白:银白底,原「琉璃拟态」的配色部分 */
+:root[data-palette="frost"] {
+  --bg-app: #e6e7ea;
+  --bg-panel: #f2f3f5;
+  --bg-canvas: #101114;
+  --bg-elev: #ffffff;
+  --ink: #26282d;
+  --ink-muted: rgba(38, 40, 45, 0.62);
+  --ink-faint: rgba(38, 40, 45, 0.4);
+  --hairline: #d5d7dc;
+  --hairline-strong: #bfc2c9;
+  --fill-subtle: rgba(38, 40, 45, 0.04);
+  --fill-hover: rgba(38, 40, 45, 0.07);
+  --accent: #f2600c;
+  --on-accent: #ffffff;
+  --danger: #c4473c;
+  --wallpaper: linear-gradient(135deg, #dde1e8 0%, #eef1f5 45%, #d4d9e2 100%);
+  color-scheme: light;
+}
+
+/* 荒漠:暖炭底 + 沙色文字,原「荒漠户外」的配色部分 */
+:root[data-palette="desert"] {
+  --bg-app: #23201b;
+  --bg-panel: #1b1916;
+  --bg-canvas: #121110;
+  --bg-elev: #2c2822;
+  --ink: #ebe3d3;
+  --ink-muted: rgba(235, 227, 211, 0.64);
+  --ink-faint: rgba(235, 227, 211, 0.4);
+  --hairline: #35302a;
+  --hairline-strong: #4a4239;
+  --fill-subtle: rgba(235, 227, 211, 0.05);
+  --fill-hover: rgba(235, 227, 211, 0.09);
+  --accent: #cfa568;
+  --on-accent: #1b1916;
+  --danger: #e08770;
+  --wallpaper: linear-gradient(135deg, #272219 0%, #3a3226 45%, #201c15 100%);
+  color-scheme: dark;
+}
+
+/* 雾林:墨绿森林底 + 雾青点缀,Karelia 式安静编辑排版 */
+:root[data-palette="forest"] {
+  --bg-app: #12201a;
+  --bg-panel: #182b22;
+  --bg-canvas: #0b1410;
+  --bg-elev: #22382c;
+  --ink: #dce8de;
+  --ink-muted: rgba(220, 232, 222, 0.62);
+  --ink-faint: rgba(220, 232, 222, 0.38);
+  --hairline: #24392d;
+  --hairline-strong: #375542;
+  --fill-subtle: rgba(222, 230, 222, 0.05);
+  --fill-hover: rgba(222, 230, 222, 0.08);
+  --accent: #a3c4ab;
+  --on-accent: #14201a;
+  --danger: #d98f7e;
+  --wallpaper: linear-gradient(135deg, #14241c 0%, #1e3628 45%, #101c16 100%);
+  color-scheme: dark;
+}
+
+/* 系统蓝·浅:iPhone 设置页那套,分组灰底 + 白卡 + #007aff */
+:root[data-palette="blue-light"] {
+  --bg-app: #f2f2f7;
+  --bg-panel: #ffffff;
+  --bg-canvas: #0b0b0d;
+  --bg-elev: #ffffff;
+  --ink: #1c1c1e;
+  --ink-muted: rgba(60, 60, 67, 0.6);
+  --ink-faint: rgba(60, 60, 67, 0.32);
+  --hairline: rgba(60, 60, 67, 0.16);
+  --hairline-strong: rgba(60, 60, 67, 0.28);
+  --fill-subtle: rgba(118, 118, 128, 0.12);
+  --fill-hover: rgba(118, 118, 128, 0.2);
+  --accent: #007aff;
+  --on-accent: #ffffff;
+  --danger: #ff3b30;
+  --wallpaper: linear-gradient(135deg, #dde6f4 0%, #eef2f9 45%, #d5e0f0 100%);
+  color-scheme: light;
+}
+
+/* 系统蓝·暗:iOS 深色模式。蓝换 #0a84ff —— 苹果在深色下就是换这支,
+   纯 #007aff 压在纯黑上对比不够。 */
+:root[data-palette="blue-dark"] {
+  --bg-app: #000000;
+  --bg-panel: #1c1c1e;
+  --bg-canvas: #08080a;
+  --bg-elev: #2c2c2e;
+  --ink: #ffffff;
+  --ink-muted: rgba(235, 235, 245, 0.6);
+  --ink-faint: rgba(235, 235, 245, 0.3);
+  --hairline: rgba(84, 84, 88, 0.6);
+  --hairline-strong: rgba(120, 120, 128, 0.5);
+  --fill-subtle: rgba(118, 118, 128, 0.24);
+  --fill-hover: rgba(118, 118, 128, 0.38);
+  --accent: #0a84ff;
+  --on-accent: #ffffff;
+  --danger: #ff453a;
+  --wallpaper: linear-gradient(135deg, #0c1320 0%, #16202f 45%, #080e18 100%);
+  color-scheme: dark;
+}
+
+/* 深空紫:近黑底 + 面板抬高一档 + 高饱和紫。参照当代网页版剪辑器那一路
+   (Torenno / CapCut Web 那种「深色卡片浮岛」),配「浮岛」风格是原配。 */
+:root[data-palette="void"] {
+  --bg-app: #0a0a0d;
+  --bg-panel: #141419;
+  --bg-canvas: #08080a;
+  --bg-elev: #1e1e26;
+  --ink: #f3f3f7;
+  --ink-muted: rgba(243, 243, 247, 0.62);
+  --ink-faint: rgba(243, 243, 247, 0.38);
+  --hairline: rgba(255, 255, 255, 0.06);
+  --hairline-strong: rgba(255, 255, 255, 0.13);
+  --fill-subtle: rgba(255, 255, 255, 0.05);
+  --fill-hover: rgba(255, 255, 255, 0.1);
+  --accent: #8b5cf6;
+  --on-accent: #ffffff;
+  --danger: #ff5a6e;
+  --wallpaper: linear-gradient(135deg, #14102a 0%, #1d1638 45%, #0d0a1c 100%);
+  color-scheme: dark;
+}
+
+/* Material 紫:谷歌 M3 的基线配色。浅紫白底 + 主色 #6750a4,
+   配「Material」风格是原配,但换到任何风格上也成立。 */
+:root[data-palette="md-violet"] {
+  --bg-app: #fef7ff;
+  --bg-panel: #f7f2fa;
+  --bg-canvas: #0b0b0d;
+  --bg-elev: #f3edf7;
+  --ink: #1d1b20;
+  --ink-muted: #49454f;
+  --ink-faint: #79747e;
+  --hairline: #cac4d0;
+  --hairline-strong: #79747e;
+  --fill-subtle: rgba(103, 80, 164, 0.08);
+  --fill-hover: rgba(103, 80, 164, 0.14);
+  --accent: #6750a4;
+  --on-accent: #ffffff;
+  --danger: #b3261e;
+  --wallpaper: linear-gradient(135deg, #ece4f5 0%, #f8f2fc 45%, #e4dbf0 100%);
+  color-scheme: light;
+}
+
+/* ---- 字体属于「风格」不属于「配色」:iOS 和玻璃两套骨架走苹果系统字 ---- */
+:root[data-form="ios"],
+:root[data-form="glass"] {
+  --font-sans: -apple-system, "SF Pro Text", "SF Pro Display", "PingFang SC",
+    "Helvetica Neue", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

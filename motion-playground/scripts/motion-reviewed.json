@@ -1,0 +1,14 @@
+{
+  "src/effects/hud/hud.css#cdb9b68622e4": {
+    "file": "src/effects/hud/hud.css",
+    "owner": ".cbar-fill",
+    "text": "transition: width 300ms linear;",
+    "why": "章节进度条:填充宽度代表的是「过去了多少时间」,时间本身就是匀速的。这里加缓动会让进度条谎报进度。"
+  },
+  "src/effects/hud/hud.css#7cde80bf9693": {
+    "file": "src/effects/hud/hud.css",
+    "owner": ".cbar-prog",
+    "text": "transition: width 300ms linear;",
+    "why": "章节进度条:填充宽度代表的是「过去了多少时间」,时间本身就是匀速的。这里加缓动会让进度条谎报进度。"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "_": "没显式写 vTier 的老卡,豁免不返工。新卡必须写,不许往这加。补上 vTier 后跑 --accept 会自动划掉。",
+  "ids": [
+    "blur-text",
+    "caption-track",
+    "chapter-bar",
+    "entity-chips",
+    "focus-card",
+    "odometer",
+    "punch-pill",
+    "type-shift",
+    "ui-callout",
+    "versus-card"
+  ]
+}

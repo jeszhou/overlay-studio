@@ -1,0 +1,2006 @@
+/* 【此文件经过构建改写】它和上游源码不完全一致,你的改动需要手工搬运。
+   在这里改的东西,下次发布时不会自动跟着走。 */
+/* ============================================================
+   HUD 特效族 · 共享地基
+   配色:钴蓝(数据/信任) 亮粉(身份/观点) 薰衣草(替代灰)
+   两套主题:dark 暗底 / light 亮底  ·  通透玻璃 · 无渐变无光晕
+   ============================================================ */
+
+/* ---- 画幅令牌:画布逻辑尺寸。Canvas / ExportView 按 doc.ratio 写内联值,
+        这里的兜底供效果库单卡预览等没写变量的场合(横版) ---- */
+.stage {
+  --stage-w: 1920px;
+  --stage-h: 1080px;
+}
+.stage[data-ratio="v"] {
+  --stage-w: 1080px;
+  --stage-h: 1920px;
+}
+
+/* ---- 竖版人像让位:特效卡在场时把口播画面推开 ----
+   默认满屏(不加 class);半让 = 人下沉到下方,上半屏给特效;
+   全让 = 人缩成右下小窗,特效近乎占满。
+   过渡靠 .stage-video 自带的 1050ms 缓动,和运镜卡是同一条曲线。
+   ⚠ 这几个数是初版提案,拿真素材看过再定。 ---- */
+.stage[data-ratio="v"] {
+  /* 半让:人像占下方这一块(上边缘 = 特效区下界) */
+  --vhalf-top: 700px;
+  /* 全让:右下小窗 3:4 */
+  --vfull-w: 360px;
+  --vfull-h: 480px;
+  --vfull-right: 48px;
+  --vfull-bottom: 80px;
+}
+/* ---- 竖版锚点:half 档的卡从顶部挂,不居中 ----
+   共享锚点 .hud-anchor--center/left/right 写的是 top: 50%。横版下 50% = y540,安全;
+   竖版下 50% = y960,**正好是人脸**。实测 40 张声明 half 的卡里有 35 张卡在这个位置上。
+
+   为什么从顶部挂而不是在特效区(0~--vhalf-top)里居中:居中要靠 translateY(-50%),
+   比特效区还高的卡就会往上顶出屏幕 —— 实测 8 张(action-band 高 1214px、
+   compare-bars 1028px 等)会跑到 y 负数去。它们声明 half 本来就不对(塞不进半让区),
+   但布局规则不该因为一张卡填错档就把画面顶穿。从顶部挂则任何高度都不会越上界,
+   填错档的卡会被量尺照常报成「该改 full」。
+
+   96px 用的是库里 .hud-anchor--top-left 的既有顶锚点值,不是新拍的数。
+
+   只管声明 half 的卡:full 档人已缩成小窗、整屏可用,居中是对的;
+   still 档的卡本该待在上下安全带里,位置不对是那张卡自己的事,不在这里替它决定。 */
+.stage[data-ratio="v"] [data-card-vtier="half"] :is(
+  .hud-anchor--center,
+  .hud-anchor--left,
+  .hud-anchor--right
+) {
+  top: 96px;
+  --anchor-tf: translate(0, 0);
+}
+/* center 还要保留水平居中,只去掉纵向那一半 */
+.stage[data-ratio="v"] [data-card-vtier="half"] .hud-anchor--center {
+  --anchor-tf: translateX(-50%);
+}
+
+.stage[data-ratio="v"] .stage-video.is-vhalf {
+  left: 0;
+  top: var(--vhalf-top);
+  width: var(--stage-w);
+  height: calc(var(--stage-h) - var(--vhalf-top));
+  border-radius: 0;
+}
+.stage[data-ratio="v"] .stage-video.is-vfull {
+  left: auto;
+  right: var(--vfull-right);
+  top: auto;
+  bottom: var(--vfull-bottom);
+  width: var(--vfull-w);
+  height: var(--vfull-h);
+  border-radius: 24px;
+  z-index: 5; /* 缩成小窗后压在特效之上,和运镜卡的小窗一致 */
+}
+
+/* ---- 主题令牌(挂在 .stage 上,由 Canvas 写 data-theme;
+        卡片包装层写 data-card-theme 可逐卡覆盖亮/暗) ---- */
+.stage[data-theme="dark"],
+[data-card-theme="dark"] {
+  --hud-canvas:
+    radial-gradient(80% 70% at 50% 8%, rgba(60, 70, 110, 0.26), transparent 60%),
+    linear-gradient(160deg, #15151d 0%, #0e0e14 60%, #0b0b10 100%);
+  --hud-ink: var(--hud-ink-doc, #ffffff);
+  --hud-muted: var(--hud-muted-doc, rgba(255, 255, 255, 0.70));
+  --hud-faint: var(--hud-faint-doc, rgba(255, 255, 255, 0.44));
+  --hud-blue: #5fa0fa;
+  --hud-teal: #45c6cf;
+  --hud-violet: #8f86ea;
+  --hud-pink: #f87bac;
+  --hud-lav: #b9b2ee;
+  --hud-alert: #e88686;
+  --hud-green: #6fd08c;
+  --hud-orange: #f0a24f;
+  --hud-glass: linear-gradient(160deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.045));
+  --hud-glass-brd: rgba(255, 255, 255, 0.22);
+  --hud-track: rgba(255, 255, 255, 0.16);
+  --hud-person: rgba(210, 214, 230, 0.10);
+  --hud-node: #12121a;
+  --hud-sh: 0 2px 12px rgba(0, 0, 0, 0.4);
+  --hud-card-sh: 0 30px 70px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.stage[data-theme="light"],
+[data-card-theme="light"] {
+  /* 摄影棚白 + 三团品牌氛围光(粉/紫/蓝):给毛玻璃"可透的内容" */
+  --hud-canvas:
+    radial-gradient(52% 44% at 18% 10%, rgba(224, 50, 111, 0.11), transparent 62%),
+    radial-gradient(56% 48% at 86% 16%, rgba(99, 83, 214, 0.11), transparent 58%),
+    radial-gradient(64% 56% at 72% 92%, rgba(30, 99, 216, 0.09), transparent 60%),
+    linear-gradient(168deg, #faf8f6 0%, #f1ece7 55%, #e9e2dc 100%);
+  --hud-ink: var(--hud-ink-doc, #1a2540);
+  --hud-muted: var(--hud-muted-doc, rgba(26, 37, 64, 0.66));
+  --hud-faint: var(--hud-faint-doc, rgba(26, 37, 64, 0.42));
+  --hud-blue: #1e63d8;
+  --hud-teal: #0a95a6;
+  --hud-violet: #6353d6;
+  --hud-pink: #e0326f;
+  --hud-lav: #837bc4;
+  --hud-alert: #cf5555;
+  --hud-green: #1f9d55;
+  --hud-orange: #d97a1c;
+  /* 真毛玻璃:半透明白渐变,透出背景氛围光,科技感 */
+  --hud-glass: linear-gradient(160deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.20));
+  --hud-glass-brd: rgba(255, 255, 255, 0.85);
+  --hud-track: rgba(26, 37, 64, 0.13);
+  --hud-person: rgba(70, 58, 66, 0.20);
+  --hud-node: #ece6e0;
+  --hud-sh: 0 2px 10px rgba(0, 0, 0, 0.08);
+  /* 柔和大投影:亮底立体感的关键 */
+  --hud-card-sh: 0 22px 54px rgba(88, 70, 104, 0.16), 0 3px 10px rgba(88, 70, 104, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* 预览用的暗色垫底:亮画面上给玻璃卡压出对比。
+   导出模式下 --hud-glass 本身已换成 94% 实底(见下),再叠这层会黑成一块,
+   所以导出时把它清成透明。(2026-08-27:流水线卡导出后变黑块,就是漏了这条) */
+.stage { --fx-scrim: rgba(12, 14, 22, 0.52); }
+/* 2026-08-28 删掉了 .export-mode .stage { --fx-scrim: transparent }。
+   和 8/27 对 --hud-glass 的结论同理:MOV 是叠在原片上的,导出时背景会回来,
+   垫层必须保留,否则 clip-flow / chat-volley 的格子在成片里比编辑台浅一大截
+   (8/28 反馈"clipflow 的颜色和编辑台不一样")。 */
+
+/* ---- 导出模式:玻璃跟随背景 ----
+   曾经在这里把玻璃换成 94% 实底,理由是"透明导出时背后没画面可模糊"。
+   2026-08-27 实测发现前提只对了一半:渲染那一刻背后确实空的,但 MOV 是
+   **叠在原片上**用的,合成后背景就回来了——玻璃保持半透明,明暗自然跟着画面走。
+   实测 30.7s 三处玻璃元素与编辑台的色差:
+     实底 0.94 → 7 / 28 / 2      跟随背景 → 0 / 8 / 8
+   所以导出不再覆盖 --hud-glass,直接沿用预览值。
+   仍有差异的只剩 backdrop-filter 的模糊(渲染时无背景可糊,导出丢失):
+   明暗一致,但卡片背后是清晰画面而非磨砂。 */
+
+/* 光晕总开关(默认关):开了字会发虚——左栏「文字光晕」开了才有上面的光晕。
+   关掉时连各卡自己写的彩色字光一起清(全量兜底,52 处 text-shadow 一键归零) */
+.stage.no-glow .hud,
+.stage.no-glow .hud *,
+.stage.no-glow [data-card-theme] .hud,
+.stage.no-glow [data-card-theme].hud {
+  text-shadow: none !important;
+}
+
+/* 导出模式:半透明药丸底转实底。2026-07-14 加,理由是「视频叠字可读性」——
+   药丸压在花背景上时,半透明底会让字糊掉。
+   2026-08-28 复核:有反馈说"编辑台白、导出黑"。核对既往成片与本次导出,
+   药丸都是同一个深棕实底 —— 这不是新回归,是 7/14 起就存在的
+   「编辑台 vs 导出」长期不一致。要不要改成跟预览一致是产品决定,别当 bug 顺手删。 */
+.export-mode .pp-pill {
+  background: color-mix(in srgb, var(--hud-acc) 16%, var(--hud-node));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* HUD 主题下换画布底色与人物占位 */
+.stage.is-hud { background: var(--hud-canvas) !important; }
+/* 科技点阵网格:给底色一层精密感(在所有内容之下) */
+.stage.is-hud::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--hud-grid) 1.6px, transparent 1.6px);
+  background-size: 44px 44px;
+}
+.stage[data-theme="dark"] { --hud-grid: rgba(255, 255, 255, 0.045); }
+.stage[data-theme="light"] { --hud-grid: rgba(26, 37, 64, 0.075); }
+.stage.is-hud .person-body,
+.stage.is-hud .person-body::before { background: var(--hud-person); border-color: transparent; }
+.stage.is-hud .person-tag { color: var(--hud-faint); }
+
+/* ---- 通透玻璃 ---- */
+.hud-glass {
+  background: var(--hud-glass);
+  border: 1px solid var(--hud-glass-brd);
+  backdrop-filter: blur(28px) saturate(1.3);
+  -webkit-backdrop-filter: blur(28px) saturate(1.3);
+  border-radius: 20px;
+  box-shadow: var(--hud-card-sh);
+}
+
+/* ---- 落位锚点(避开中间人物安全区) ---- */
+/* 锚点做粗定位,--hud-ox/oy 做参数面板里的精细微调,两者叠加 */
+.hud-anchor {
+  position: absolute; display: flex; color: var(--hud-ink);
+  transform: translate(var(--hud-ox, 0px), var(--hud-oy, 0px)) var(--anchor-tf, translate(0, 0))
+    scale(var(--hud-scale, 1));
+}
+/* 左列脊柱:左锚点卡从左边缩放,放大不外凸——所有左列卡自动共享同一条左边线 */
+.hud-anchor--left, .hud-anchor--top-left { transform-origin: left center; }
+.hud-anchor--top-left { transform-origin: left top; }
+.hud-anchor--top-left  { left: 120px;  top: 96px; }
+.hud-anchor--top-right { right: 120px; top: 96px; flex-direction: row-reverse; }
+.hud-anchor--left  { left: 120px;  top: 50%; --anchor-tf: translateY(-50%); }
+/* 整卡靠右,但卡内文字保持左对齐(更规整) */
+.hud-anchor--right { right: 120px; top: 50%; --anchor-tf: translateY(-50%); }
+.hud-anchor--top    { left: 50%; top: 110px; --anchor-tf: translateX(-50%); }
+.hud-anchor--bottom { left: 50%; bottom: 120px; --anchor-tf: translateX(-50%); }
+.hud-anchor--center { left: 50%; top: 50%; --anchor-tf: translate(-50%, -50%); }
+
+/* ---- 共享进场动画 ---- */
+.hud { --ease: cubic-bezier(0.22, 1, 0.36, 1); }
+/* 全局字体(Studio 左栏选,存进编排):等宽/衬线元素各自显式声明不受影响 */
+.hud { font-family: var(--hud-font, inherit); }
+.hud-fade {
+  opacity: 0; transform: translateY(14px);
+  transition: opacity 640ms var(--ease), transform 640ms var(--ease);
+}
+.hud.is-in .hud-fade { opacity: 1; transform: none; }
+.tl-bar {
+  width: 5px; border-radius: 3px; margin-top: 2px; align-self: stretch;
+  background: var(--tl-accent);
+  transform: scaleY(0); transform-origin: top;
+  transition: transform 620ms var(--ease);
+}
+.hud.is-in .tl-bar { transform: scaleY(1); }
+.tl-kicker {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 22px; letter-spacing: 0.40em; font-weight: 700;
+  color: var(--hud-muted); text-transform: uppercase;
+}
+.tl-title {
+  font-size: 46px; font-weight: 800; letter-spacing: -0.01em;
+  margin-top: 12px; line-height: 1.15;
+}
+.tl-title .tl-key { color: var(--tl-accent); }
+
+/* ============ StepTimeline 步骤时间线卡 ============ */
+.st { flex-direction: column; }
+.st-title {
+  display: flex; align-items: center; gap: 18px;
+  font-size: 52px; font-weight: 800; letter-spacing: -0.01em;
+  line-height: 1.1; margin-bottom: 34px; color: var(--hud-ink);
+}
+.st-title .st-bar {
+  width: 6px; height: 1.05em; border-radius: 3px; background: var(--st-hl); flex: none;
+  transform: scaleY(0); transform-origin: top;
+  transition: transform 560ms var(--ease);
+}
+.hud.is-in .st-title .st-bar { transform: scaleY(1); }
+.st-title .st-key { color: var(--st-hl); }
+
+.st-list { position: relative; display: flex; flex-direction: column; gap: 22px; }
+/* 竖向虚线导轨(在节点列背后) */
+.st-list::before {
+  content: ""; position: absolute; left: 11px; top: 18px; bottom: 18px;
+  border-left: 2px dotted var(--hud-track);
+}
+.st-step {
+  display: grid; grid-template-columns: 24px 1fr; gap: 24px; align-items: center;
+  opacity: 0; transform: translateX(var(--st-dx, 48px));
+  transition: opacity 560ms var(--ease), transform 560ms var(--ease);
+}
+.hud.is-in .st-step { opacity: 1; transform: none; }
+
+.st-node {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid var(--st-c); background: var(--hud-node);
+  display: flex; align-items: center; justify-content: center;
+  transform: scale(0); transition: transform 460ms var(--ease);
+}
+.st-node::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--st-c); }
+.hud.is-in .st-node { transform: scale(1); }
+
+.st-chip {
+  border: 2px solid var(--st-c); border-radius: 15px;
+  padding: 16px 30px; min-width: 320px; min-height: 74px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px; font-weight: 800; letter-spacing: 0.02em; color: var(--hud-ink);
+  background: var(--hud-glass);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--hud-card-sh);
+}
+/* 还没讲到的章节:留空的淡色轮廓 */
+.st-chip.is-empty { border-color: var(--hud-glass-brd); opacity: 0.5; }
+
+/* ---- HUD 通用小标题(带彩点的 mono kicker) ---- */
+.hud-kicker {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 20px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--hud-muted); font-weight: 600; margin-bottom: 28px;
+}
+.hud-kicker::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--hud-acc); }
+
+/* ============ RankBars 数据条 ============ */
+.rb { flex-direction: column; min-width: 560px; }
+.rb-row {
+  margin-bottom: 24px;
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 560ms var(--ease), transform 560ms var(--ease);
+}
+.rb-row:last-child { margin-bottom: 0; }
+.hud.is-in .rb-row { opacity: 1; transform: none; }
+.rb-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 11px; }
+.rb-name { font-size: 27px; font-weight: 500; color: var(--hud-ink); }
+.rb-val { font-family: "SF Mono", ui-monospace, monospace; font-size: 32px; font-weight: 600; color: var(--hud-ink); }
+.rb-track { height: 6px; width: 100%; border-radius: 6px; background: var(--hud-track); overflow: hidden; }
+.rb-fill {
+  height: 100%; border-radius: 6px; background: var(--hud-lav);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 900ms var(--ease);
+}
+.hud.is-in .rb-fill { transform: scaleX(var(--rb-frac, 0)); }
+/* 第一名:强调色;其余:降调 */
+.rb-row.is-top .rb-val { color: var(--hud-acc); }
+.rb-row.is-top .rb-fill { background: var(--hud-acc); }
+.rb-row.is-dim .rb-name, .rb-row.is-dim .rb-val { color: var(--hud-muted); }
+
+/* ============ ChipCluster 胶囊组(2026-07 改:发光圆徽) ============ */
+.cc { flex-direction: column; }
+.hud.is-in .cc-chip { opacity: 1; transform: none; }
+
+/* ============ PunchPill 金句药丸 ============ */
+.pp { }
+.pp-pill {
+  display: inline-flex; align-items: center; gap: 14px;
+  padding: 15px 32px; border-radius: 100px;
+  border: 2px solid var(--hud-acc);
+  background: color-mix(in srgb, var(--hud-acc) 14%, transparent);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  font-size: 30px; font-weight: 700; color: var(--hud-ink);
+  opacity: 0; transform: scale(0.9);
+  transition: opacity 420ms var(--ease), transform 460ms var(--ease);
+}
+.hud.is-in .pp-pill { opacity: 1; transform: none; }
+.pp-dot { width: 13px; height: 13px; border-radius: 50%; background: var(--hud-acc); flex: none; }
+.export-mode .pn {
+  background: rgba(14, 13, 20, 0.82);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.pn.hud, .pn.hud * { text-shadow: none !important; }
+.hud.is-in .pn-item { opacity: 1; transform: none; }
+.hud.is-in .pn-rule { transform: scaleX(1); }
+.hud.is-in .pn-result { opacity: 1; transform: none; }
+
+/* ============ TermCard 术语解释卡 ============ */
+.tc { }
+.tc-card {
+  max-width: 620px; padding: 34px 38px; border-radius: 22px;
+  border-left: 5px solid var(--hud-acc);
+  opacity: 0; transform: translateY(16px) scale(0.98);
+  transition: opacity 520ms var(--ease), transform 520ms var(--ease);
+}
+.hud.is-in .tc-card { opacity: 1; transform: none; }
+.tc-en {
+  font-family: "SF Mono", ui-monospace, monospace; font-size: 20px;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--hud-muted); margin-bottom: 10px;
+}
+.tc-term { font-size: 52px; font-weight: 800; color: var(--hud-acc); letter-spacing: -0.01em; }
+.tc-def { font-size: 30px; line-height: 1.45; color: var(--hud-ink); margin-top: 18px; }
+
+/* ============ Checklist 步骤打勾 ============ */
+.ck { flex-direction: column; }
+.ck-item {
+  display: flex; align-items: center; gap: 18px; margin-bottom: 22px;
+  font-size: 32px; font-weight: 500; color: var(--hud-ink);
+  opacity: 0; transform: translateX(var(--ck-dx, -20px));
+  transition: opacity 480ms var(--ease), transform 480ms var(--ease);
+}
+.hud.is-in .ck-item { opacity: 1; transform: none; }
+.ck-box {
+  width: 38px; height: 38px; border-radius: 10px; flex: none;
+  border: 2px solid var(--hud-glass-brd); color: transparent;
+  display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800;
+  transition: background 300ms var(--ease), border-color 300ms var(--ease), color 300ms var(--ease);
+}
+.ck-item.is-done .ck-box { background: var(--hud-acc); border-color: var(--hud-acc); color: #fff; }
+.ck-item.is-todo { color: var(--hud-muted); }
+.hud.is-in .qc-card { opacity: 1; transform: none; }
+.qc-avatar--img { object-fit: cover; font-size: 0; }
+/* 人物介绍模式(引用内容为空):只剩头像+名字+身份,整体放大一档 */
+.qc-card--intro { padding: 30px 40px; }
+.qc-card--intro .qc-foot { gap: 20px; }
+.qc-card--intro .qc-avatar { width: 84px; height: 84px; font-size: 36px; }
+.qc-card--intro .qc-author { font-size: 34px; font-weight: 700; }
+.qc-card--intro .qc-source { font-size: 22px; margin-top: 3px; }
+.hud.is-in .mk-key { background-size: 100% 46%; }
+/* 下划线变体 */
+.mk.is-underline .mk-key {
+  background-color: transparent; background-image: linear-gradient(var(--hud-acc), var(--hud-acc));
+  background-position: 0 100%; background-size: 0% 6px;
+}
+.hud.is-in.mk.is-underline .mk-key { background-size: 100% 6px; }
+/* 红笔画圈变体:不涂底,手绘椭圆描边动画 = 老师下笔圈重点 */
+.mk.is-circle .mk-key { background-image: none; }
+.hud.is-in .mk-ring path { stroke-dashoffset: 0; }
+
+/* ============ Terminal3D 3D 终端打字机 ============ */
+/* 终端本体始终是暗色玻璃(真实感),语法色用固定亮版,配色仍是你的家族 */
+.t3 { perspective: 1700px; }
+.t3-card {
+  width: 760px; border-radius: 18px; overflow: hidden;
+  background: linear-gradient(158deg, rgba(24, 27, 38, 0.82), rgba(13, 16, 24, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: 0 46px 100px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  transform: rotateY(-9deg) rotateX(4.5deg) scale(0.94);
+  opacity: 0;
+  transition: transform 720ms var(--ease), opacity 560ms var(--ease);
+}
+.hud.is-in .t3-card { transform: rotateY(-9deg) rotateX(4.5deg) scale(1); opacity: 1; }
+.t3-bar {
+  height: 52px; display: flex; align-items: center; gap: 9px; padding: 0 22px;
+  background: rgba(255, 255, 255, 0.045); border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.t3-dot { width: 12px; height: 12px; border-radius: 50%; }
+.t3-dot.r { background: #d98b8b; } .t3-dot.y { background: #d9c07f; } .t3-dot.g { background: #8fc79f; }
+.t3-file {
+  margin-left: 16px; font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 19px; letter-spacing: 0.04em; color: rgba(255, 255, 255, 0.44);
+}
+.t3-body {
+  padding: 34px 34px 42px; height: 520px;
+  overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  /* 顶部渐隐:被滚上去的旧行柔和淡出,不会生硬切断 */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 44px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 44px);
+  font-family: "SF Mono", ui-monospace, monospace; font-size: 26px; line-height: 1.9;
+  color: #e9ecf3;
+}
+/* 内容短时贴顶;超出固定高度后底部对齐,旧行自动往上滚出 */
+/* flex-shrink: 0 关键:不加的话超高内容会被压缩回容器高度,在底部被裁掉而不是往上滚 */
+.t3-scroll { width: 100%; min-height: 100%; flex-shrink: 0; }
+.t3-line { white-space: pre-wrap; word-break: break-word; }
+.tk-prompt { color: #45c6cf; } /* 提示符 = 青 */
+.tk-flag { color: #6ea8ff; }   /* 参数/flag = 蓝 */
+.tk-str { color: #f489b0; }    /* 字符串 = 粉 */
+.tk-cmt { color: rgba(255, 255, 255, 0.42); } /* 注释 */
+.tk-ok { color: #8fd6a8; }     /* ✓ 结果 = 绿(克制) */
+.tk-bad { color: #ef8f8f; }    /* ✗ 失败 = 红(拉扯对话:"还是不对") */
+.t3-caret {
+  display: inline-block; width: 13px; height: 1.05em; vertical-align: -0.16em;
+  background: #45c6cf; margin-left: 2px;
+  animation: t3blink 1.06s steps(1) infinite;
+}
+@keyframes t3blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+/* ============ RingMetric 指标环 ============ */
+.rm { flex-direction: column; align-items: center; gap: 26px; }
+.rm-kicker {
+  font-family: "SF Mono", ui-monospace, monospace; font-size: 20px;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--hud-muted); font-weight: 600;
+}
+.rm-ring { position: relative; width: 320px; height: 320px; }
+.rm-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.rm-track { fill: none; stroke: var(--hud-track); }
+.rm-prog {
+  fill: none; stroke: var(--hud-acc); stroke-linecap: round;
+  transition: stroke-dashoffset 1100ms var(--ease);
+}
+.rm-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+}
+.rm-num {
+  font-family: "SF Mono", ui-monospace, monospace; font-weight: 300;
+  font-size: 92px; line-height: 1; letter-spacing: -0.02em; color: var(--hud-ink);
+  display: flex; align-items: baseline;
+}
+.rm-unit { font-size: 40px; color: var(--hud-muted); margin-left: 4px; }
+.rm-label { font-size: 26px; color: var(--hud-muted); }
+.hud.is-in .eh-line { stroke-dashoffset: 0; stroke: var(--eh-c); }
+.hud.is-in .eh-node { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.hud.is-in .fc-node { opacity: 1; transform: none; }
+.hud.is-in .fc-link { transform: scaleY(1); }
+.hud.is-in .pw-win { opacity: 1; transform: none; }
+.pw-dot.r { background: #d98b8b; } .pw-dot.y { background: #d9c07f; } .pw-dot.g { background: #8fc79f; }
+.hud.is-in .pw-row { opacity: 1; transform: none; }
+.hud.is-in .sh-card { opacity: 1; transform: none; }
+.hud.is-in .sh-point { opacity: 1; transform: none; }
+
+/* ============ TimelineH 横版时间线 ============ */
+.th { flex-direction: column; align-items: stretch; width: 1500px; }
+.hud.is-in .th-rail-fill { transform: scaleX(1); }
+.hud.is-in .th-stop { opacity: 1; transform: none; }
+
+/* ============ VersusCard VS 对比卡增强版 ============ */
+.vs { align-items: center; gap: 0; }
+.vs-side {
+  width: 520px; border-radius: 24px; padding: 44px 40px;
+  background: var(--hud-glass); border: 2px solid var(--vs-c);
+  backdrop-filter: blur(24px) saturate(1.3); -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  box-shadow: var(--hud-card-sh);
+  display: flex; flex-direction: column; gap: 18px;
+  opacity: 0; transition: opacity 560ms var(--ease), transform 560ms var(--ease);
+}
+.vs-side.a { transform: translateX(-48px); }
+.vs-side.b { transform: translateX(48px); }
+.hud.is-in .vs-side { opacity: 1; transform: none; }
+.vs-side.is-dim { border-color: var(--hud-glass-brd); }
+.vs-side.is-dim .vs-title { color: var(--hud-muted); }
+.vs-kicker {
+  font-family: "SF Mono", ui-monospace, monospace; font-size: 19px;
+  letter-spacing: 0.16em; text-transform: uppercase; font-weight: 700; color: var(--vs-c);
+}
+.vs-side.is-dim .vs-kicker { color: var(--hud-muted); }
+.vs-title { font-size: 48px; font-weight: 800; color: var(--hud-ink); letter-spacing: -0.01em; }
+.vs-sub { font-size: 24px; line-height: 1.5; color: var(--hud-muted); }
+.vs-badge {
+  width: 84px; height: 84px; border-radius: 50%; flex: none; z-index: 2; margin: 0 -42px;
+  background: var(--hud-acc); color: #fff; align-self: center;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 800; letter-spacing: 0.04em;
+  border: 5px solid var(--hud-node);
+  opacity: 0; transform: scale(0.5);
+  transition: opacity 420ms var(--ease) 500ms, transform 460ms var(--ease) 500ms;
+}
+.hud.is-in .vs-badge { opacity: 1; transform: scale(1); }
+
+/* ============ UICallout 界面标注 ============ */
+.uc-box { position: relative; }
+.uc-line {
+  fill: none; stroke: var(--hud-acc); stroke-width: 2.5;
+  stroke-dasharray: var(--len); stroke-dashoffset: var(--len);
+  transition: stroke-dashoffset 620ms var(--ease) 220ms;
+}
+.hud.is-in .uc-line { stroke-dashoffset: 0; }
+.uc-ring {
+  position: absolute; border: 2.5px solid var(--hud-acc); border-radius: 14px;
+  opacity: 0; transform: scale(1.12);
+  transition: opacity 460ms var(--ease), transform 460ms var(--ease);
+}
+.hud.is-in .uc-ring { opacity: 1; transform: scale(1); }
+.uc-tag {
+  position: absolute; padding: 14px 26px; border-radius: 14px;
+  background: var(--hud-glass); border: 1px solid var(--hud-glass-brd);
+  border-left: 4px solid var(--hud-acc);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--hud-card-sh);
+  font-size: 27px; font-weight: 600; color: var(--hud-ink); white-space: nowrap;
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 460ms var(--ease) 620ms, transform 460ms var(--ease) 620ms;
+}
+.hud.is-in .uc-tag { opacity: 1; transform: none; }
+.hud.is-in .ls-band { animation: lsweep 1150ms cubic-bezier(0.6, 0, 0.3, 1) forwards; }
+@keyframes lsweep {
+  from { left: -30%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  to { left: 115%; opacity: 0; }
+}
+.hud.is-in .cv-node {
+  left: var(--x2); top: var(--y2);
+  opacity: 1; transform: translate(-50%, -50%) scale(1);
+}
+
+/* ============ 亮底主题适配:参考线 / 运镜框 ============ */
+/* 亮底下白色参考线不可见 → 换成深色系 */
+.stage[data-theme="light"].is-hud .guide-safe {
+  border-color: rgba(26, 37, 64, 0.24);
+}
+.stage[data-theme="light"].is-hud .guide-safe::after {
+  color: rgba(26, 37, 64, 0.35);
+}
+.stage[data-theme="light"].is-hud .guide-slot {
+  border-color: rgba(26, 37, 64, 0.14);
+}
+/* 亮底运镜框:亮卡 + 柔投影(不再是深色框) */
+.stage[data-theme="light"].is-hud .cam-frame {
+  background: linear-gradient(165deg, #f2ede8 0%, #e6e0da 100%);
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 34px 80px rgba(88, 70, 104, 0.24);
+}
+.stage[data-theme="light"].is-hud .cam-frame .cam-video rect {
+  fill: #eae4de;
+}
+.stage[data-theme="light"].is-hud .cam-frame .cam-video circle,
+.stage[data-theme="light"].is-hud .cam-frame .cam-video path {
+  fill: rgba(70, 58, 66, 0.18);
+}
+.stage[data-theme="light"].is-hud .cam-tag {
+  color: rgba(26, 37, 64, 0.45);
+}
+.sf-a.is-up { opacity: 1; transform: none; }
+.sf.show-b .sf-b { opacity: 1; transform: none; }
+.nb-num.is-out { opacity: 0; transform: translateY(-40px); }
+
+/* ============ OutlineTree 结构树 ============ */
+.ot { flex-direction: column; }
+.hud.is-in .ot-root { opacity: 1; transform: none; }
+.hud.is-in .ot-kid.is-on .ot-elbow::before { transform: scaleY(1); }
+.hud.is-in .ot-kid.is-on .ot-elbow::after { transform: scaleX(1); }
+.hud.is-in .ot-kid.is-on .ot-kid-text { opacity: 1; transform: none; }
+
+/* ============ CharAssemble 字符聚拢 ============ */
+.ca { flex-direction: column; align-items: center; gap: 26px; }
+.hud.is-in .ca-lead { opacity: 1; }
+.hud.is-in.is-word .ca-ch { opacity: 1; transform: none; filter: blur(0); }
+
+/* ============ TypeShift 排版流 ============ */
+.ts { flex-direction: column; align-items: center; }
+.ts-line {
+  color: var(--hud-ink); text-shadow: var(--hud-sh); white-space: nowrap;
+  font-size: 40px; font-weight: 500; line-height: 1.6;
+  opacity: 0;
+  transition:
+    opacity 420ms var(--ease),
+    transform 620ms cubic-bezier(0.25, 0.9, 0.3, 1),
+    font-size 620ms cubic-bezier(0.25, 0.9, 0.3, 1),
+    color 500ms ease, letter-spacing 620ms var(--ease);
+}
+.ts-line.is-in { opacity: 1; }
+/* 阶段A:像草稿一样左错落 */
+.ts.pA .ts-line { transform: translateX(var(--ts-rag)); }
+/* 阶段B:"啪"地重排成杂志层级 */
+.ts.pB .ts-line { transform: translateX(0); }
+.ts.pB .ts-line[data-role="hero"] {
+  font-size: 84px; font-weight: 800; color: var(--hud-acc); letter-spacing: -0.01em; line-height: 1.3;
+}
+.ts.pB .ts-line[data-role="mid"] { font-size: 44px; font-weight: 600; }
+.ts.pB .ts-line[data-role="small"] { font-size: 28px; color: var(--hud-muted); letter-spacing: 0.16em; }
+
+/* ============ BlurText 模糊浮现(React Bits 风格 · 情绪款) ============ */
+.bt { }
+.bt-line {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 0 0.30em;
+  font-size: 64px; font-weight: 800; line-height: 1.5; max-width: 1240px;
+  color: var(--hud-ink); text-shadow: var(--hud-sh); text-align: center;
+}
+.bt-w {
+  filter: blur(11px); opacity: 0; transform: translateY(18px);
+  transition: filter 640ms var(--ease), opacity 640ms var(--ease), transform 640ms var(--ease);
+}
+.bt-w.is-on { filter: blur(0); opacity: 1; transform: none; }
+.bt-w i { font-style: normal; }
+.bt-w .bt-key,
+.bt-w.bt-key { color: var(--hud-acc); }
+.dt-ch.is-scramble { color: var(--hud-faint); }
+.dt-ch.is-locked { color: inherit; }
+.dt-ch.dt-key.is-locked { color: var(--hud-acc); }
+.tf-w.is-focus { filter: none; opacity: 1; }
+
+/* ============ Odometer 翻牌计数器(React Bits Counter 风格) ============ */
+.od { flex-direction: column; align-items: center; gap: 16px; }
+.od-kicker {
+  font-family: "SF Mono", ui-monospace, monospace; font-size: 20px;
+  letter-spacing: 0.22em; text-transform: uppercase; color: var(--hud-muted); font-weight: 600;
+}
+.od-row { display: flex; align-items: baseline; gap: 6px; }
+.od-slot {
+  height: 1.15em; overflow: hidden; display: inline-block;
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 150px; font-weight: 300; line-height: 1.15; color: var(--hud-ink);
+  text-shadow: var(--hud-sh);
+}
+.od-reel { display: flex; flex-direction: column; transition: transform 900ms cubic-bezier(0.2, 0.85, 0.25, 1); }
+.od-d { height: 1.15em; }
+.od-sep { font-size: 150px; font-weight: 300; color: var(--hud-faint); font-family: "SF Mono", ui-monospace, monospace; }
+.od-unit { font-size: 56px; color: var(--hud-acc); font-weight: 600; margin-left: 8px; }
+.od-label { font-size: 26px; color: var(--hud-muted); }
+.sp-node.is-done .sp-dot { border-color: var(--hud-acc); background: var(--hud-acc); color: #fff; }
+.sp-node.is-act .sp-dot {
+  border-color: var(--hud-acc); color: var(--hud-acc); transform: scale(1.12);
+}
+.sp-node.is-act .sp-lb, .sp-node.is-done .sp-lb { color: var(--hud-ink); }
+.sp-link.is-done .sp-link-fill { transform: scaleX(1); }
+.mb-cell.is-big { grid-column: span 2; grid-row: span 1; }
+.hud.is-in .mb-cell { opacity: 1; transform: none; }
+/* 无光标场景:高亮框逐格巡游,替代原版的鼠标 spotlight */
+.mb-cell.is-spot { border-color: var(--hud-acc); }
+.mf-card .hud-kicker { margin-bottom: 20px; }
+.hud.is-in .mf-bar { transform: scaleX(1); }
+.cp-card .hud-kicker { margin-bottom: 26px; }
+.hud.is-in .cp-fill { transform: scaleX(var(--cp-frac, 0)); }
+
+/* ============ QuoteLockup 金句定格(升级为 HUD 风格) ============ */
+.ql { }
+.ql-card {
+  padding: 42px 52px 44px; max-width: 640px;
+  display: flex; flex-direction: column; align-items: flex-start;
+}
+.ql-mark {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 110px; line-height: 0.6; height: 52px;
+  color: var(--hud-acc); font-weight: 400;
+}
+.ql-body { font-size: 48px; line-height: 1.32; font-weight: 700; letter-spacing: -0.01em; color: var(--hud-ink); }
+.ql-line { display: block; overflow: hidden; }
+.ql-line > span {
+  display: block; transform: translateY(112%);
+  transition: transform 760ms var(--ease);
+}
+.hud.is-in .ql-line > span { transform: none; }
+.ql-rule {
+  height: 4px; width: 92px; border-radius: 3px; background: var(--hud-acc);
+  margin: 30px 0 0;
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 700ms var(--ease) 260ms;
+}
+.hud.is-in .ql-rule { transform: scaleX(1); }
+.ql-author {
+  margin-top: 18px; font-size: 23px; letter-spacing: 0.14em;
+  color: var(--hud-muted); text-transform: uppercase;
+}
+.hud.is-in .sd-win {
+  opacity: 1;
+  transform: rotateY(var(--sd-ry, -5deg)) rotateX(2.2deg);
+}
+.sd-dot.r { background: #d98b8b; } .sd-dot.y { background: #d9c07f; } .sd-dot.g { background: #8fc79f; }
+.hud.is-in .sd-ring { opacity: 1; }
+/* ---- 竖版:横版的「左右分」改成「上下分」 ----
+   录屏窗占上半屏(16:9 录屏满宽最舒服),人降到下半屏。
+   横版那套 left/right/bottom 全部让位,只覆盖差异。 ---- */
+.stage[data-ratio="v"] {
+  /* 演示窗:上边距 / 高度;人像上边缘 = 窗底 + 间隙 */
+  --sdv-top: 168px;
+  --sdv-h: 632px;
+  --sdv-camtop: 840px;
+}
+.stage[data-ratio="v"] .sd-win {
+  left: 48px;
+  right: 48px;
+  top: var(--sdv-top);
+  bottom: auto;
+  height: var(--sdv-h);
+  /* 竖版画面窄,3D 侧倾会让窗看着歪;收成正面,只留一点点 */
+  --sd-ry: -2deg;
+}
+/* 角落提示环:横版用来标「人会缩到这个角」,竖版人像满宽落在下半屏,
+   框它等于框半个屏幕,没有指示意义 —— 直接不画 */
+.stage[data-ratio="v"] .sd-ring { display: none; }
+/* 预览里的口播落位:不再缩右下角,改成占下半屏满宽 */
+.stage[data-ratio="v"] .stage-video.is-pip-br,
+.stage[data-ratio="v"] .stage-video.is-pip-bl {
+  left: 0;
+  top: var(--sdv-camtop);
+  width: var(--stage-w);
+  height: calc(var(--stage-h) - var(--sdv-camtop));
+  border-radius: 0;
+}
+/* 竖版烤入:同样是「满屏起步 → 落位」,只是落到下半屏而不是右下角。
+   两个 corner 共用一条 —— 竖版满宽落位,左右角没有区别了。 */
+.stage[data-ratio="v"] .sd[data-corner="br"] .sd-cam,
+.stage[data-ratio="v"] .sd[data-corner="bl"] .sd-cam {
+  animation-name: sd-cam-v;
+}
+@keyframes sd-cam-v {
+  to {
+    left: 0;
+    top: var(--sdv-camtop);
+    width: var(--stage-w);
+    height: calc(var(--stage-h) - var(--sdv-camtop));
+    border-radius: 0;
+  }
+}
+.cpn.is-in[data-motion="in"]      .cpn-move { animation: cpn-in      var(--cp-sec) cubic-bezier(0.32, 0, 0.3, 1) forwards; }
+.cpn.is-in[data-motion="out"]     .cpn-move { animation: cpn-out     var(--cp-sec) cubic-bezier(0.32, 0, 0.3, 1) forwards; }
+.cpn.is-in[data-motion="drift-l"] .cpn-move { animation: cpn-drift-l var(--cp-sec) cubic-bezier(0.36, 0, 0.36, 1) forwards; }
+.cpn.is-in[data-motion="drift-r"] .cpn-move { animation: cpn-drift-r var(--cp-sec) cubic-bezier(0.36, 0, 0.36, 1) forwards; }
+.cpn.is-in[data-motion="tilt"]    .cpn-move { animation: cpn-tilt    var(--cp-sec) cubic-bezier(0.32, 0, 0.3, 1) forwards; }
+@keyframes cpn-in {
+  from { transform: scale(1.02); }
+  to   { transform: scale(var(--cp-z, 1.18)); }
+}
+@keyframes cpn-out {
+  from { transform: scale(var(--cp-z, 1.18)); }
+  to   { transform: scale(1.02); }
+}
+@keyframes cpn-drift-l {
+  from { transform: scale(var(--cp-z, 1.18)) translateX(3.5%); }
+  to   { transform: scale(var(--cp-z, 1.18)) translateX(-3.5%); }
+}
+@keyframes cpn-drift-r {
+  from { transform: scale(var(--cp-z, 1.18)) translateX(-3.5%); }
+  to   { transform: scale(var(--cp-z, 1.18)) translateX(3.5%); }
+}
+@keyframes cpn-tilt {
+  from { transform: scale(calc(var(--cp-z, 1.18) * 1.04)) rotateX(0.001deg); }
+  to   {
+    transform: scale(calc(var(--cp-z, 1.18) * 1.18)) rotateX(7deg) rotateZ(-6.5deg)
+      translate(-2.5%, 1.5%);
+  }
+}
+
+/* ============ FocusCard 人物聚焦运镜 ============ */
+/* 满屏布局卡:纯色底 + 左侧口播落位框 + 右侧要点胶囊,不吃 --hud-scale */
+/* 前缀 fcd(fc 已被 FlowChart 占用,勿混用) */
+.fcd {
+  position: absolute; inset: 0; color: var(--hud-ink);
+  transform: translate(var(--hud-ox, 0px), var(--hud-oy, 0px)) scale(var(--hud-scale, 1));
+  transform-origin: center bottom;
+  pointer-events: none;
+}
+.ctrack-cue { pointer-events: auto; } /* 字幕块可拖可滚轮缩放 */
+.fcd-bg {
+  position: absolute; inset: 0;
+  opacity: 0; transition: opacity 520ms var(--ease);
+}
+.fcd.is-in .fcd-bg { opacity: 1; }
+.fcd[data-bg="cream"] .fcd-bg {
+  background: linear-gradient(168deg, #f7eddd 0%, #f2e6d2 60%, #ecdec6 100%);
+}
+.fcd[data-bg="mist"] .fcd-bg {
+  background: linear-gradient(168deg, #f7f7f9 0%, #efeff2 60%, #e8e8ec 100%);
+}
+.fcd[data-bg="dark"] .fcd-bg {
+  background: linear-gradient(168deg, #1a1a22 0%, #131318 60%, #0e0e13 100%);
+}
+/* 口播落位框:圆角方框,成片时口播画面对齐这里(几何走 --fcd-* 变量,可在参数面板调) */
+.fcd-ring {
+  position: absolute;
+  left: var(--fcd-x, 110px); top: var(--fcd-y, 190px);
+  width: var(--fcd-w, 700px); height: var(--fcd-h, 700px);
+  border-radius: 36px; border: 3px solid var(--hud-acc);
+  pointer-events: auto;
+  opacity: 0; transition: opacity 560ms var(--ease) 380ms;
+}
+.fcd.is-in .fcd-ring { opacity: 1; }
+/* 口播烤入导出:满屏起步 → 缩进圆角方框 */
+.fcd-cam {
+  position: absolute; left: 0; top: 0; width: var(--stage-w); height: var(--stage-h);
+  object-fit: cover; z-index: 6; border-radius: 0; pointer-events: none;
+  animation: fcd-cam 1050ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes fcd-cam {
+  to {
+    left: var(--fcd-x, 110px); top: var(--fcd-y, 190px);
+    width: var(--fcd-w, 700px); height: var(--fcd-h, 700px);
+    border-radius: 36px;
+  }
+}
+/* 右侧要点:深色胶囊逐条右滑弹入(米/白底上都压得住) */
+.fcd-list {
+  position: absolute; left: 940px; right: 110px; top: 50%;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: stretch; gap: 34px;
+  pointer-events: auto;
+}
+.fcd-chip {
+  display: flex; align-items: center; gap: 22px;
+  padding: 30px 38px; border-radius: 16px;
+  background: linear-gradient(160deg, rgba(44, 42, 46, 0.94), rgba(30, 29, 33, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 14px 34px rgba(70, 55, 30, 0.18);
+  color: #fff; font-size: 36px; font-weight: 700; letter-spacing: 0.01em;
+  opacity: 0; transform: translateX(52px);
+  transition: opacity 620ms var(--ease), transform 620ms var(--ease);
+}
+.fcd[data-bg="dark"] .fcd-chip {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.06));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+}
+.fcd.is-in .fcd-chip { opacity: 1; transform: none; }
+.fcd-ic { color: var(--hud-acc); font-size: 30px; flex: none; }
+.hud-anchor--right .cvs-item { --cvs-from: 120%; }
+.cvs.is-in .cvs-item { opacity: 1; transform: none; }
+
+/* ============================================================
+   常驻层 · 章节导航条 ChapterBar (.cbar)
+   整期视频的地图:贴顶全宽,当前章高亮 + 章内进度线
+   ============================================================ */
+.cbar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--stage-w);
+  height: 48px;
+  display: flex;
+  align-items: stretch;
+  z-index: 70;
+  background: color-mix(in srgb, var(--hud-node) 88%, transparent);
+  border-bottom: 1px solid var(--hud-glass-brd);
+  transform: translateY(-110%);
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cbar.is-in { transform: translateY(0); }
+.cbar-item {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--hud-faint);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+/* 章节之间的分隔竖线 */
+.cbar-item + .cbar-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 1px;
+  background: var(--hud-glass-brd);
+}
+.cbar-item.is-done { color: var(--hud-muted); }
+.cbar-item.is-on { color: var(--hud-ink); }
+.cbar-item.is-on .cbar-lb { font-weight: 800; }
+/* 整条进度:整根 bar 从左往右上色(已讲完的章整格、当前章半格),
+   半透明只为和底色分开,文字仍在它上层(item 是定位元素,DOM 在后=画在上) */
+.cbar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--cbar-prog, var(--hud-acc)) var(--cbar-alpha, 25%), transparent);
+  transition: width 300ms linear;
+}
+/* 进度前沿一道亮边:让"往前走"看得出方向 */
+.cbar-fill::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--cbar-prog, var(--hud-acc));
+  opacity: 0.9;
+}
+/* 章内进度线:当前章底部随时间填满 */
+.cbar-prog {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--hud-acc);
+  transition: width 300ms linear;
+}
+/* 导出:实底,保证叠进剪映清晰 */
+.export-mode .cbar {
+  background: color-mix(in srgb, var(--hud-node) 96%, transparent);
+}
+
+/* ============================================================
+   常驻层 · 双语字幕 CaptionTrack (.ctrack)
+   中文主行(*关键词*点亮) + 英文小字,底部居中
+   ============================================================ */
+.ctrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 44px;
+  z-index: 65;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  transform: translate(var(--hud-ox, 0px), var(--hud-oy, 0px));
+  pointer-events: none;
+}
+.ctrack-cue {
+  max-width: 1500px;
+  /* 字幕不做淡入:上一条消失、下一条从透明淡起,中间必然有个透明度低谷,
+     成片里就是"底部闪一下"(2026-08-27 实测反馈)。字幕直接切换才干脆。 */
+}
+.ctrack-zh {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1.35;
+  /* 字幕永远压在画面上:固定白字 + 三层柔和黑晕,黑底白底都清楚 */
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-shadow: var(--cap-shadow,
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 14px rgba(0, 0, 0, 0.55),
+    0 6px 28px rgba(0, 0, 0, 0.45));
+}
+/* 中文行的每段文字都包在 span/i 里(关键词点亮用),会被上面
+   「.no-glow .hud *」的清零规则直接命中 —— 必须连子元素一起救回来,
+   否则只有纯文本的英文行有描边、中文行没有 */
+.stage.no-glow .ctrack[data-stroke="on"] .ctrack-zh,
+.stage.no-glow .ctrack[data-stroke="on"] .ctrack-zh * {
+  text-shadow: var(--cap-shadow) !important;
+}
+.ctrack-kw { font-style: normal; color: var(--hud-acc); }
+/* 底部暗纱已移除:字幕切换时两条之间有空档,整个字幕层(含暗纱)会消失一帧,
+   在成片里就是"画面底部闪一下"(2026-08-27 实测 24-25s 闪光)。
+   字幕本身有描边+黑晕,不需要暗纱兜底。 */
+.ctrack-en {
+  margin-top: 8px;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: var(--cap-shadow-en, 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5));
+}
+.stage.no-glow .ctrack[data-stroke="on"] .ctrack-en,
+.stage.no-glow .ctrack[data-stroke="on"] .ctrack-en * {
+  text-shadow: var(--cap-shadow-en) !important;
+}
+
+/* ============================================================
+   证据实证族 · 四件套解剖:EN kicker + 中文小注 + 主体 + 注脚
+   ============================================================ */
+
+/* ---- StatProof 数字实证 (.spf):裸排版滚动计数 ---- */
+.spf-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 600ms ease, transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hud.is-in .spf-box { opacity: 1; transform: none; }
+.spf-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--hud-acc);
+}
+.spf-bar { width: 5px; height: 20px; background: var(--hud-acc); flex: none; }
+.spf-kicker-zh { font-size: 20px; color: var(--hud-muted); letter-spacing: 0.06em; }
+.spf-num {
+  font-size: 150px;
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  color: var(--hud-ink);
+  font-variant-numeric: tabular-nums;
+}
+.spf-fix { color: var(--hud-acc); }
+.spf-suffix { font-size: 0.62em; vertical-align: 0.28em; }
+.spf-foot-en {
+  margin-top: 4px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--hud-acc);
+}
+.spf-foot-zh { font-size: 20px; color: var(--hud-muted); letter-spacing: 0.05em; }
+.hud.is-in .psh-box { opacity: 1; transform: none; }
+.hud.is-in .wnl-win { opacity: 1; transform: none; }
+.hud.is-in .wnl-lose { opacity: 0.6; transform: scale(0.93); transition-delay: 350ms; }
+.hud.is-in .rlc-box { opacity: 1; transform: none; }
+.hud.is-in .rlc-ban { opacity: 1; transform: none; }
+.hud.is-in .brc-box { opacity: 1; transform: none; }
+.brc-fill.is-top { background: var(--hud-orange); }
+.hud.is-in .brc-val { opacity: 1; }
+.brc-val.is-top { color: var(--hud-orange); }
+.hud.is-in .bhl-ring { animation: bhl-pulse 1500ms ease-out infinite; }
+.hud.is-in .bhl-r2 { animation-delay: 550ms; }
+@keyframes bhl-pulse {
+  0% { transform: scale(0.5); opacity: 0.95; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+.hud.is-in .bhl-spoke { animation: bhl-flick 900ms ease-in-out infinite; }
+@keyframes bhl-flick {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 1; }
+}
+.hud.is-in .bhl-text { opacity: 1; transform: translateX(-50%) scale(1); transition-delay: 250ms; }
+.hud.is-in .bhl-meter { opacity: 1; transform: none; }
+.hud.is-in .bhl-bars i { animation: bhl-eq 700ms ease-in-out infinite alternate; }
+@keyframes bhl-eq {
+  from { height: 22%; }
+  to { height: 100%; }
+}
+/* 预览角标(仅编辑台可见,导出不渲染) */
+.pz-hint {
+  position: absolute;
+  right: 40px;
+  bottom: 130px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hud-node) 90%, transparent);
+  border: 1px solid var(--hud-glass-brd);
+  color: var(--hud-muted);
+  font-size: 15px;
+  z-index: 40;
+}
+.pz-hint-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--hud-acc); }
+.awh.is-in { opacity: var(--awh-str, 0.28); animation: awh-breathe 6s ease-in-out infinite alternate; }
+@keyframes awh-breathe {
+  from { opacity: calc(var(--awh-str, 0.28) * 0.75); }
+  to { opacity: var(--awh-str, 0.28); }
+}
+.awh--edges { background: radial-gradient(100% 100% at 50% 50%, transparent 42%, var(--hud-acc) 98%); }
+.awh--left { background: linear-gradient(90deg, var(--hud-acc), transparent 55%); }
+.awh--right { background: linear-gradient(-90deg, var(--hud-acc), transparent 55%); }
+.awh--top { background: linear-gradient(180deg, var(--hud-acc), transparent 52%); }
+.hud-anchor--left .phs-body { transform: translateX(-48px) rotate(-2deg); }
+.hud.is-in .phs-body { opacity: 1; transform: none; }
+.has-glow .phs-frame {
+  box-shadow:
+    0 0 90px color-mix(in srgb, var(--hud-acc) 42%, transparent),
+    var(--hud-card-sh);
+}
+.phs-img.is-in { opacity: 1; transform: none; }
+.hud.is-in .dsc-box { opacity: 1; transform: none; }
+.hud.is-in .dsc-img {
+  animation: dsc-roll var(--dsc-ms, 8000ms) ease-in-out 800ms forwards;
+}
+@keyframes dsc-roll {
+  to { transform: translateY(calc(var(--dsc-dist, 0px) * -1)); }
+}
+.fst--bottom-left { left: 110px; bottom: 150px; }
+.fst--left { left: 110px; top: 50%; transform: translateY(-50%); }
+.fst--bottom-right { right: 110px; bottom: 150px; }
+.fst--left { transform: translateY(-50%) translate(var(--hud-ox, 0px), var(--hud-oy, 0px)); }
+.hud.is-in .fst-pill { opacity: 1; transform: none; }
+.hud.is-in .brc-verdict { opacity: 1; transform: rotate(-2deg); }
+
+/* ---- Checklist:打过勾的条目变暗(注意力永远在当前条) ---- */
+.ck-item.is-done { opacity: 0.55; }
+/* 导出没有背景可模糊:玻璃转高不透明实底,叠进剪映仍是深色透出一点画面 */
+.export-mode .qmp-panel {
+  background: rgba(14, 13, 20, 0.82);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.qmp.is-in .qmp-panel { opacity: 1; transform: none; }
+.qmp-cell--dark.is-on { background: #1b1a17; }
+.qmp-cell--dark .qmp-draw rect { stroke: rgba(255, 255, 255, 0.45); }
+/* 第四格黑底反白(和原图一致) */
+.qmp-cell--dark .qmp-en { color: #f4f2ec; }
+.qmp-cell--dark .qmp-sub { color: rgba(244, 242, 236, 0.6); }
+.qmp-cell--dark .qmp-ic { color: rgba(244, 242, 236, 0.55); }
+.qmp-cell--dark .qmp-zh { color: #f4f2ec; }
+.qmp-cell--dark .qmp-desc { color: rgba(244, 242, 236, 0.6); }
+/* 纸图上的文字不需要视频对比度光晕(压过 stage 级主题光晕规则) */
+.qmp.hud, .qmp.hud * { text-shadow: none !important; }
+.export-mode .mpt-panel {
+  background: rgba(14, 13, 20, 0.82);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.mpt.is-in .mpt-panel { opacity: 1; transform: none; }
+.mpt.on-map .mpt-side--map { opacity: 1; transform: none; }
+.mpt.on-terr .mpt-side--terr { opacity: 1; transform: none; }
+.mpt-paper--terr { background: #f7f4ec; }
+/* 起点橙点 / 终点空心圈:线画到才亮 */
+.mpt-dot { fill: var(--hud-acc); opacity: 0; transition: opacity 0.3s ease; }
+.mpt-end { opacity: 0; transition: opacity 0.4s ease; }
+.mpt.on-map .mpt-reveal--map { transition: stroke-dashoffset 1.5s ease-in-out 0.35s; stroke-dashoffset: 0; }
+.mpt.on-map .mpt-side--map .mpt-dot { opacity: 1; transition-delay: 0.25s; }
+.mpt.on-map .mpt-side--map .mpt-end { opacity: 1; transition-delay: 1.75s; }
+.mpt.on-terr .mpt-side--terr .mpt-dot { opacity: 1; transition-delay: 0.4s; }
+.mpt.on-terr .mpt-side--terr .mpt-end { opacity: 1; transition-delay: 2.6s; }
+/* 面板下方三行:EN 衬线 / 中文名 / 小注 */
+.mpt-en {
+  margin-top: 18px; text-align: center;
+  font-family: Georgia, "Times New Roman", "Songti SC", serif;
+  font-size: 30px; font-weight: 700; color: #f4f2ec;
+}
+.mpt-zh { margin-top: 6px; text-align: center; font-size: 21px; font-weight: 700; color: rgba(244, 242, 236, 0.92); }
+.mpt-sub { margin-top: 3px; text-align: center; font-size: 16px; color: rgba(244, 242, 236, 0.6); }
+.mpt.on-gap .mpt-gap { opacity: 1; transform: none; }
+/* 纸图文字同样不要光晕 */
+.mpt.hud, .mpt.hud * { text-shadow: none !important; }
+.mpt.on-diff .mpt-diff { opacity: 0.24; animation: mpt-breathe 2.2s ease-in-out 0.8s infinite; }
+@keyframes mpt-breathe {
+  0%, 100% { opacity: 0.24; }
+  50% { opacity: 0.4; }
+}
+.mpt.on-diff .mpt-diff-q { opacity: 1; }
+/* 填色时把地图那侧稍稍压暗,视线聚到疆域的落差上 */
+.mpt-side--map { transition: opacity 0.45s ease, transform 0.45s ease, filter 0.6s ease; }
+.mpt.on-diff .mpt-side--map { filter: brightness(0.82); }
+
+/* 口播缩右侧:左侧留白(自己叠动效)/放要点。几何统一走 --fcd-* 变量(组件按侧别算好基准) */
+.fcd[data-side="right"] .fcd-ring { left: var(--fcd-x, 1110px); }
+.fcd[data-side="right"] .fcd-list { left: 110px; right: 980px; }
+.fcd[data-side="right"] .fcd-chip { transform: translateX(-52px); }
+.fcd[data-side="right"].is-in .fcd-chip,
+.fcd[data-side="right"] .fcd-chip.is-shown { transform: none; }
+.export-mode .gbd[data-bg="dark"] { background: rgba(14, 13, 20, 0.82); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.export-mode .gbd[data-bg="light"] { background: rgba(255, 255, 255, 0.9); backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* 有底板时字不需要光晕(底板已经保证了对比度);无底板时交回左栏「文字光晕」开关管 */
+.gbd:not([data-bg="none"]).hud, .gbd:not([data-bg="none"]).hud * { text-shadow: none !important; }
+.export-mode .qmp-note { background: rgba(14, 13, 20, 0.82); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.ibd.hud, .ibd.hud * { text-shadow: none !important; }
+.export-mode .ibd-panel { background: rgba(14, 13, 20, var(--ibd-bg-alpha, 0.82)); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.ibd--nobg .ibd-panel { background: none; border: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* 白玻璃底板(bg=light):亮片期用;墨色与强调色自带亮色系配方,黑白两版逐卡切换 */
+.ibd--light {
+  --hud-blue: #1e63d8; --hud-teal: #0a95a6; --hud-violet: #6353d6; --hud-pink: #e0326f;
+  --hud-lav: #837bc4; --hud-alert: #cf5555; --hud-green: #1f9d55; --hud-orange: #d97a1c;
+}
+.ibd--light .ibd-panel {
+  background: rgba(255, 255, 255, var(--ibd-bg-alpha, 0.68));
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 56px rgba(88, 70, 104, 0.16);
+  --ibd-ink: #1a2540; --ibd-mut: rgba(26, 37, 64, 0.62); --ibd-faint: rgba(26, 37, 64, 0.38);
+  --ibd-gold: #b8860b;
+}
+.export-mode .ibd--light .ibd-panel { background: rgba(255, 255, 255, var(--ibd-bg-alpha, 0.93)); backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* 白底上的白系细节翻深 */
+.ibd--light .ibd-ent-img { border-color: rgba(26, 37, 64, 0.22); }
+.ibd--light .ibd-ent-ph { background: rgba(26, 37, 64, 0.06); border-color: rgba(26, 37, 64, 0.3); }
+.ibd--light .ibd-bar-track { background: rgba(26, 37, 64, 0.12); }
+.ibd--light .ibd-line-track { background: rgba(26, 37, 64, 0.16); }
+.ibd--light .ibd-line-dot { box-shadow: 0 0 0 4px rgba(26, 37, 64, 0.08); }
+.ibd--light .ibd-line-note { background: rgba(26, 37, 64, 0.06); }
+.ibd--light .ibd-img-ph { border-color: rgba(26, 37, 64, 0.25); }
+.ibd--light .ibd-chip { border-color: rgba(26, 37, 64, 0.25); }
+.ibd--light .ibd-ringrow-bg { stroke: rgba(26, 37, 64, 0.14); }
+.ibd--light .ibd-cmp-b { background: rgba(26, 37, 64, 0.16); }
+
+/* 行强调方式(rowFx):讲到某行时 点亮(默认)/稍微放大/点亮+放大 */
+.ibd--fx-zoom .ibd-row.is-on:not(.is-past),
+.ibd--fx-both .ibd-row.is-on:not(.is-past) {
+  transform: scale(1.06);
+  transform-origin: left center;
+}
+/* 纯放大模式:不靠明暗区分,讲过的行保持全亮,当前行也不做呼吸高亮(只靠大小区分) */
+.ibd--fx-zoom .ibd-row.is-past { opacity: 1; transform: scale(1); }
+.ibd--fx-zoom .ibd-row.is-on:not(.is-past) { animation: none; }
+
+/* ============ EntityChips 实体名牌(人物/公司锚定,滑入后常驻) ============ */
+.etc { align-items: flex-start; }
+.etc.hud, .etc.hud * { text-shadow: none !important; }
+.etc-row { display: flex; align-items: stretch; gap: 20px; }
+.etc-chip {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 16px 28px; border-radius: 12px;
+  opacity: 0; transform: translateX(-30px);
+  transition: opacity 0.5s var(--ease), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3);
+}
+.etc.is-in .etc-chip { opacity: 1; transform: none; }
+.etc-chip--light { background: rgba(255, 255, 255, 0.94); }
+.etc-chip--light .etc-name { color: #16181d; }
+.etc-chip--light .etc-sub { color: rgba(22, 24, 29, 0.62); }
+.etc-chip--dark {
+  background: rgba(20, 19, 28, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.export-mode .etc-chip--dark { background: rgba(14, 13, 20, 0.92); }
+.etc-chip--dark .etc-name { color: #f4f2ec; }
+.etc-chip--dark .etc-sub { color: var(--hud-acc); }
+.etc-name { font-size: 30px; font-weight: 900; letter-spacing: 0.04em; }
+.etc-sub {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 15px; font-weight: 700; letter-spacing: 0.2em; margin-top: 5px;
+}
+.etc-note {
+  display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  opacity: 0; transform: translateX(-20px);
+  transition: opacity 0.5s var(--ease), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.etc.is-in .etc-note { opacity: 1; transform: none; }
+.etc-note-a { font-size: 22px; font-weight: 800; color: rgba(255, 255, 255, 0.85); }
+.etc-note-b { font-size: 17px; font-weight: 600; color: rgba(255, 255, 255, 0.5); }
+.export-mode .dcw { background: rgba(14, 13, 20, 0.82); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.dcw.hud, .dcw.hud * { text-shadow: none !important; }
+.pho.hud, .pho.hud * { text-shadow: none !important; }
+.pho.is-in .pho-card { opacity: 1; transform: scale(1); }
+.wfk.hud, .wfk.hud * { text-shadow: none !important; }
+.wfk--acc .wfk-word {
+  color: var(--hud-acc);
+  text-shadow: 0 10px 0 rgba(0, 0, 0, 0.4), 0 22px 40px rgba(0, 0, 0, 0.4) !important;
+}
+.wfk.is-in .wfk-word { opacity: 1; transform: translate(-50%, -50%) rotate(var(--wfk-rot)) scale(1); }
+.fto.is-in { opacity: 1; }
+.fto.hud, .fto.hud * { text-shadow: none !important; }
+.fto-tick--t { left: 50%; top: -26px; width: 3px; height: 20px; transform: translateX(-50%); }
+.fto-tick--b { left: 50%; bottom: -26px; width: 3px; height: 20px; transform: translateX(-50%); }
+.fto-tick--l { top: 50%; left: -26px; height: 3px; width: 20px; transform: translateY(-50%); }
+.fto-tick--r { top: 50%; right: -26px; height: 3px; width: 20px; transform: translateY(-50%); }
+.fto-cor--tl { left: 26px; top: 26px; border-right: none; border-bottom: none; }
+.fto-cor--tr { right: 26px; top: 26px; border-left: none; border-bottom: none; }
+.fto-cor--bl { left: 26px; bottom: 26px; border-right: none; border-top: none; }
+.fto-cor--br { right: 26px; bottom: 26px; border-left: none; border-top: none; }
+.icp.hud, .icp.hud * { text-shadow: none !important; }
+.icp--left .icp-card { left: 24%; }
+.icp--right .icp-card { left: 76%; }
+.icp.is-in .icp-card {
+  opacity: 1; transform: translate(-50%, -50%) scale(var(--hud-scale, 1));
+  animation: icp-bob 2.4s ease-in-out 0.6s infinite alternate;
+}
+@keyframes icp-bob {
+  from { margin-top: 0; }
+  to { margin-top: calc(var(--icp-amp) * -1); }
+}
+.sd.is-in .sd-backdrop { opacity: 1; }
+
+/* ============ GrowthCurve 增长曲线(平滑曲线画出+渐变面积+峰值计数) ============ */
+.gcv-box {
+  display: flex; flex-direction: column; gap: 4px; width: 640px;
+  padding: 26px 30px 20px; border-radius: 22px;
+  background: var(--hud-glass);
+  backdrop-filter: blur(28px) saturate(1.3);
+  -webkit-backdrop-filter: blur(28px) saturate(1.3);
+  box-shadow: var(--hud-card-sh);
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 550ms ease, transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hud.is-in .gcv-box { opacity: 1; transform: none; }
+.gcv-head { display: flex; align-items: flex-start; justify-content: space-between; }
+.gcv-kicker {
+  display: flex; align-items: center; gap: 10px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 18px; font-weight: 600; letter-spacing: 0.14em;
+  color: var(--hud-acc); text-transform: uppercase;
+}
+.gcv-kicker i { width: 22px; height: 4px; border-radius: 2px; background: var(--hud-acc); }
+.gcv-kicker-zh { margin-top: 6px; font-size: 27px; font-weight: 800; color: var(--hud-ink); }
+.gcv-peak {
+  font-size: 62px; font-weight: 900; line-height: 1; color: var(--hud-acc);
+  font-variant-numeric: tabular-nums;
+}
+.gcv-peak em { font-style: normal; font-size: 26px; font-weight: 700; margin-left: 4px; color: var(--hud-muted); }
+.gcv-svg { display: block; margin-top: 4px; }
+.gcv-line { fill: none; stroke: var(--hud-acc); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.gcv-dot { fill: var(--hud-acc); stroke: var(--hud-ink); stroke-width: 2; }
+.gcv-val { font-size: 25px; font-weight: 800; fill: var(--hud-ink); }
+.gcv-lb { font-size: 21px; font-weight: 600; fill: var(--hud-muted); }
+.gcv-cap { font-size: 21px; color: var(--hud-muted); text-align: right; }
+
+/* ---- 讲过变浅(参考片语法):dimAt 秒后整卡压暗让位,在场但不抢戏 ----
+   用 filter 而不是 opacity:不跟卡片自己的进场透明度动画打架 */
+[data-past="1"]:not([data-dim-mode="shrink"]) .hud,
+[data-past="1"]:not([data-dim-mode="shrink"]) .slot > * {
+  filter: opacity(0.45) saturate(0.7);
+  transition: filter 0.9s ease;
+}
+
+/* 退场淡出:卡片在 end 前的最后一小段整卡溶解。
+   可见区间左闭右开,走到 end 直接卸载 —— 不淡的话时间轴末尾好几张卡会在同一帧
+   一起消失,成片看着就是闪一下。不透明度由 outroFade() 逐帧算好写进 --fx-outro,
+   刻意不加 transition:导出走虚拟时间,过渡不可信。 */
+[data-outro] .hud,
+[data-outro] .slot > * {
+  opacity: var(--fx-outro, 1);
+}
+
+/* ---- 语义微动(参考片心得):只有"正在讲"的焦点呼吸,讲过的不动 ----
+   info-board 全板禁 text-shadow,所以统一用 filter 呼吸(亮度+点缀色微光) */
+@keyframes hud-focus-breathe {
+  from { filter: brightness(1) drop-shadow(0 0 0px var(--hud-acc)); }
+  to { filter: brightness(1.12) drop-shadow(0 0 9px var(--hud-acc)); }
+}
+/* 光晕总开关关闭时:呼吸只留亮度微动,去掉 drop-shadow 光环(文字不再发亮) */
+@keyframes hud-focus-breathe-noglow {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.12); }
+}
+.stage.no-glow .ibd-row.is-on:not(.is-past),
+.stage.no-glow .spf-num,
+.stage.no-glow .gcv-peak {
+  animation-name: hud-focus-breathe-noglow;
+}
+/* 数字焦点:实证卡/增长曲线的峰值大数字,计数落定后轻微呼吸 */
+.spf-num,
+.gcv-peak {
+  animation: hud-focus-breathe 2.8s ease-in-out 1.4s infinite alternate;
+}
+/* 整卡进入"讲过变浅"后,内部焦点也停止呼吸 */
+[data-past="1"] .ibd-row.is-on:not(.is-past),
+[data-past="1"] .spf-num,
+[data-past="1"] .gcv-peak {
+  animation: none;
+}
+.ibd-line-dot.is-no { background: #e5484d; }
+.ibd-line-dot.is-yes { background: #46a758; }
+.ibd-line-note.is-no { color: #ff9296; background: rgba(229, 72, 77, 0.18); }
+.ibd-line-note.is-yes { color: #7fd792; background: rgba(70, 167, 88, 0.18); }
+.hud.is-in .shd-num { opacity: 1; transform: none; }
+.hud.is-in .shd-bar { transform: none; }
+.hud.is-in .shd-en { opacity: 1; transform: none; }
+.hud.is-in .shd-src { opacity: 1; }
+.hud.is-in .shd-zh { opacity: 1; transform: none; }
+.hud.is-in .shd-sub.is-on { opacity: 1; transform: none; }
+.hud.is-in .djv-box { opacity: 1; transform: none; }
+.djv-box.is-bare { background: none; border: none; box-shadow: none; padding: 0; }
+.djv-line--a { stroke: var(--djv-a, #46d07c); filter: drop-shadow(0 0 7px color-mix(in srgb, var(--djv-a, #46d07c) 55%, transparent)); }
+.djv-line--b { stroke: var(--djv-b, #ef5350); filter: drop-shadow(0 0 7px color-mix(in srgb, var(--djv-b, #ef5350) 50%, transparent)); }
+.djv-dot--a { fill: var(--djv-a, #46d07c); filter: drop-shadow(0 0 9px color-mix(in srgb, var(--djv-a, #46d07c) 80%, transparent)); }
+.djv-dot--b { fill: var(--djv-b, #ef5350); filter: drop-shadow(0 0 9px color-mix(in srgb, var(--djv-b, #ef5350) 75%, transparent)); }
+.djv-tag--a { color: var(--djv-a, #46d07c); }
+.djv-tag--b { color: var(--djv-b, #ef5350); }
+
+/* ---- gap 差距模式(参考片"效率差距 Δ"式):一快一慢,红虚线量差距 ---- */
+/* 对照线:中性灰、细、不发光——"被拉开的一方"退成背景 */
+.djv--gap .djv-line--flat {
+  stroke: rgba(255, 255, 255, 0.38);
+  stroke-width: 3.5;
+  filter: none;
+}
+/* 主线加强发光(参考片的金线质感,颜色跟 aColor) */
+.djv--gap .djv-line--glow {
+  stroke-width: 6;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--djv-a, #46d07c) 90%, transparent))
+    drop-shadow(0 0 16px color-mix(in srgb, var(--djv-a, #46d07c) 55%, transparent));
+}
+.djv-tag--flat { color: rgba(255, 255, 255, 0.55); }
+
+/* section-head 紧凑模式 (.shd--s):块级小标题,钉在证据块上方 */
+.shd--s .shd-num { font-size: 54px; }
+.shd--s .shd-bar { height: 15px; width: 4px; }
+.shd--s .shd-en { font-size: 15px; }
+.shd--s .shd-src { font-size: 12px; margin-left: 10px; padding-left: 12px; }
+.shd--s .shd-zh { margin-top: 6px; font-size: 28px; }
+.shd--s .shd-sub { margin-top: 6px; font-size: 17px; font-weight: 600; color: var(--hud-muted); }
+.hud.is-in .fpl-pill { opacity: 1; transform: none; }
+.hud.is-in .brc-cval { opacity: 1; transform: none; }
+.brc-cval.is-top { color: var(--brc-top, #46d07c); }
+.brc-cfill.is-top {
+  background: linear-gradient(180deg, var(--brc-top, #46d07c), color-mix(in srgb, var(--brc-top, #46d07c) 45%, #000));
+  box-shadow: 0 0 20px color-mix(in srgb, var(--brc-top, #46d07c) 50%, transparent);
+}
+.psh-mark--line {
+  height: 4px;
+  border-radius: 2px;
+  background: #e5484d;
+  box-shadow: 0 1px 7px rgba(229, 72, 77, 0.55);
+  transform: scaleX(0) rotate(-0.6deg);
+  transform-origin: left center;
+  transition: transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.psh-mark--line.is-on { transform: scaleX(1) rotate(-0.6deg); }
+.psh-mark--box {
+  border: 3px solid #e5484d;
+  border-radius: 9px;
+  box-shadow: 0 0 10px rgba(229, 72, 77, 0.35);
+  opacity: 0;
+  transform: scale(1.18);
+  transition: opacity 320ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.psh-mark--box.is-on { opacity: 1; transform: scale(1); }
+.hud.is-in .ivt-body { opacity: 1; transform: none; }
+/* 打叉后徽章微降调,文字保持亮(参考片:✗ 压在亮文字上) */
+.is-vetoed .ivt-badge { opacity: 0.8; }
+.is-vetoed .ivt-text { opacity: 0.92; }
+.is-vetoed .ivt-cross path { stroke-dashoffset: 0; }
+
+/* ============================================================
+   seg-stack 段落自动顺排容器:同 seg 的卡竖排在左列,
+   左边线天然共线、卡高变化自动让位——"顺着排下来"的结构解
+   容器位置 = 段头(首成员)的 offsetX/offsetY → 拖段头即拖整段
+   ============================================================ */
+.seg-stack {
+  position: absolute;
+  left: 120px;
+  top: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 28px;
+  max-height: calc(100% - 140px);
+}
+/* 组内成员回到文档流:锚点定位/垂直居中全部失效,由容器排 */
+.seg-stack .hud-anchor {
+  position: static !important;
+  left: auto;
+  top: auto;
+  right: auto;
+  /* 缩放用 zoom(参与布局,不会叠到下一张);成员自己的 offset 变成组内微调 */
+  transform: translate(var(--hud-ox, 0px), var(--hud-oy, 0px));
+  zoom: var(--hud-scale, 1);
+  transition: zoom 0.9s ease;
+}
+/* 段头(首成员)是整段拖拽把手:它的 offset 已由容器消费,不再自己位移 */
+.seg-stack > :first-child .hud-anchor { transform: none; }
+/* 讲过让位缩小:zoom 参与布局,下方内容自动上移,不再被挤出屏幕
+   dimMode 可组合:both(默认)变浅+缩小 / fade 只变浅 / shrink 只缩小 */
+.seg-stack [data-past="1"]:not([data-dim-mode="fade"]) .hud-anchor {
+  zoom: calc(var(--hud-scale, 1) * 0.6);
+}
+/* 横排图标行 (.ibd-icons):logo/图标一排("Codex + OpenAI"式) */
+.ibd-icons { display: flex; align-items: center; gap: 12px; }
+/* 带标注时每枚图标是一列(图上字下),列之间要拉开一点,不然两列的字会连成一片 */
+.ibd-icons.is-labeled { align-items: flex-start; gap: 26px; }
+.ibd-icons-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  color: var(--hud-acc);
+  overflow: hidden;
+  flex: none;
+}
+/* 矢量图标本身就是线稿,再套一个方框等于画两遍边 —— 只有真图/logo 才需要那个框裁圆角 */
+.ibd-icons-cell.is-vec { border-color: transparent; }
+.ibd-icons-img, .ibd-icons-cell img, .ibd-icons-cell video { width: 100%; height: 100%; object-fit: cover; }
+.ibd-spark-area.is-up { fill: rgba(70, 208, 124, 0.16); }
+.ibd-spark-area.is-down { fill: rgba(239, 83, 80, 0.14); }
+.ibd-spark-path.is-up { stroke: #46d07c; }
+.ibd-spark-path.is-down { stroke: #ef5350; }
+.ibd-spark-halo.is-up, .ibd-spark-dot.is-up { fill: #46d07c; }
+.ibd-spark-halo.is-down, .ibd-spark-dot.is-down { fill: #ef5350; }
+.ibd-spark-val.is-up { color: #46d07c; }
+.ibd-spark-val.is-down { color: #ef5350; }
+.ibd-checkrow-ic.is-bad { border-color: #e5484d; color: #e5484d; }
+
+/* ---- 逐卡投影 (data-shadow):把标题从画面里托出来 ----
+   用 filter: drop-shadow 而不是 text-shadow,两个原因:
+   ① 左栏「文字光晕」总开关会把所有 text-shadow 清零,filter 不受影响;
+   ② filter 跟着字形和色块的真实轮廓走 —— 色块也有影,text-shadow 只影响字。
+   hard 是参考片那种"不虚的硬影",跟柔光的发虚感完全不是一回事。 */
+/* 必须用后代选择器:外壳和卡之间还夹着 FxSpeedScope 的 display:contents 盒子
+   (极简族外面再多一层 .slot),写成直接子代 `>` 会一个都匹配不上 */
+.hud[data-shadow="soft"],
+[data-shadow="soft"] .hud { filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5)); }
+.hud[data-shadow="hard"],
+[data-shadow="hard"] .hud { filter: drop-shadow(5px 6px 0 rgba(0, 0, 0, 0.82)); }
+.hud[data-shadow="outline"],
+[data-shadow="outline"] .hud {
+  filter:
+    drop-shadow(2px 0 0 #111318) drop-shadow(-2px 0 0 #111318)
+    drop-shadow(0 2px 0 #111318) drop-shadow(0 -2px 0 #111318);
+}
+/* chip 版式:第一行黑底彩字,第二行彩底黑字(道具色,不跟主题)
+   擦除动画用 clip-path,所以圆角必须写进 inset(... round ...),
+   否则静止那一帧会把圆角直接切成方角 */
+.dtt--chip .dtt-chip {
+  padding: 8px 22px 12px;
+  border-radius: var(--dtt-r, 0px);
+  clip-path: inset(0 100% 0 0 round var(--dtt-r, 0px));
+  transition: clip-path 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.dtt--chip.is-in .dtt-chip { clip-path: inset(0 0 0 0 round var(--dtt-r, 0px)); }
+
+/* ---- 第一块的底色(第二块归 accentB / 渐变管) ---- */
+.dtt--chip .dtt-l1 .dtt-chip { background: #17181c; color: var(--dtt-a); }
+.dtt[data-chip1="paper"].dtt--chip .dtt-l1 .dtt-chip { background: #f4f2ec; color: #17181c; }
+.dtt[data-chip1="paper"].dtt--chip .dtt-l1 .dtt-kw { color: var(--dtt-a); text-shadow: none; }
+.dtt[data-chip1="accent"].dtt--chip .dtt-l1 .dtt-chip { background: var(--dtt-a); color: #121316; }
+.dtt[data-chip1="none"].dtt--chip .dtt-l1 .dtt-chip { background: none; color: var(--dtt-a); padding-left: 0; padding-right: 0; }
+.dtt--chip .dtt-l2 .dtt-chip { background: var(--dtt-b); color: #121316; }
+.dtt--chip .dtt-kw { font-style: normal; color: #fff; }
+.dtt--chip .dtt-l2 .dtt-kw { color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+/* ink 版式:无色块,*词* 上色 */
+.dtt--ink .dtt-kw { font-style: normal; }
+.dtt--ink .dtt-l1 .dtt-kw { color: var(--dtt-a); }
+.dtt--ink .dtt-l2 .dtt-kw { color: var(--dtt-b); }
+/* 渐变模式:第二行色块(或彩字)用 A→B 双色渐变,复刻参考片的渐变色块 */
+.dtt--grad.dtt--chip .dtt-l2 .dtt-chip { background: linear-gradient(100deg, var(--dtt-a), var(--dtt-b)); }
+.dtt--grad.dtt--ink .dtt-l1 .dtt-kw,
+.dtt--grad.dtt--ink .dtt-l2 .dtt-kw {
+  background: linear-gradient(100deg, var(--dtt-a), var(--dtt-b));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.dtt.is-in .dtt-arc-p { stroke-dashoffset: 0; }
+.dtt.is-in .dtt-arc-r { opacity: 0.55; }
+.dtt.is-in .dtt-arc-d { opacity: 1; }
+/* 进场:小标 → 行1 → 行2 → 短线,阶梯错峰 */
+.dtt.is-in .dtt-kick { opacity: 1; transform: none; }
+.dtt.is-in .dtt-l1 { opacity: 1; transform: none; transition-delay: 0.1s; }
+.dtt.is-in .dtt-l2 { opacity: 1; transform: none; transition-delay: 0.22s; }
+.dtt--chip.is-in .dtt-l1 .dtt-chip { transition-delay: 0.1s; }
+.dtt--chip.is-in .dtt-l2 .dtt-chip { transition-delay: 0.22s; }
+.gsv--right { right: 30px; transform-origin: right center; }
+.gsv--left { left: 30px; transform-origin: left center; }
+.gsv.is-in {
+  opacity: var(--gsv-op, 0.82);
+  transform: translate(var(--hud-ox, 0px), var(--hud-oy, 0px)) scale(var(--hud-scale, 1)) perspective(1500px)
+    rotateY(var(--gsv-rot, 0deg));
+}
+.sbd.is-in .sbd-step { opacity: 1; transform: none; }
+.sbd.is-in .sbd-step2 { opacity: 0; }
+.sbd.is-in.is-deck .sbd-step2 { opacity: 1; }
+.cfr.is-in .cfr-ring { opacity: 1; transform: none; }
+.frs.is-in { opacity: 1; }
+.frs--dark { background: rgba(9, 10, 15, var(--frs-a, 0.42)); }
+.frs--light { background: rgba(248, 247, 244, var(--frs-a, 0.42)); }
+/* 导出透明层时下面是透明的,backdrop-filter 没有东西可以虚化 ——
+   退回纯玻璃底,并把浓度加厚一档,免得那一段变成什么都没有 */
+.export-mode .frs {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.export-mode .frs--dark { background: rgba(9, 10, 15, calc(var(--frs-a, 0.42) + 0.18)); }
+.export-mode .frs--light { background: rgba(248, 247, 244, calc(var(--frs-a, 0.42) + 0.18)); }
+.gpn.is-in { opacity: 1; }
+/* 卡片层级:普通卡锚点/段容器 z2;置顶底幕 z3。
+   置底的玻璃底幕压到 z0——不少卡的根元素没挂 .hud-anchor(hand-lift / icon-swarm /
+   clip-parade 这类自锚定卡),层级是 auto,底幕只要 z1 就会反过来盖住它们。
+   z0 + 渲染时排到最前(见 Canvas / ExportView)= 真的垫在所有卡下面,仍盖住口播画面 */
+.hud-anchor, .seg-stack { z-index: 2; }
+.gpn--back { z-index: 0; }
+.gpn--front { z-index: 3; }
+.gpn--left  { left: 0;  --gpn-dir: 90deg; }
+.gpn--right { right: 0; --gpn-dir: -90deg; }
+/* 落差只由 mask 这一条曲线说了算(底色是纯色平铺),黑度和虚化因此同步淡出、
+   不会各淡各的。曲线 = 前 35% 几乎不掉的平台 + 余弦缓出,首尾斜率都是 0:
+   旧版是「平台走到 46% 再直线砸到 0」,拐点处斜率翻十倍,浓度一调高那道折就成了
+   看得见的边。现在全程没有折点,浓度拉到多深收尾都是化开的。 */
+.gpn--left,
+.gpn--right {
+  background: rgba(var(--gpn-rgb, 9, 10, 15), var(--gpn-str, 0.55));
+  -webkit-mask-image: linear-gradient(var(--gpn-dir), rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.977) 8%,
+    rgba(0, 0, 0, 0.954) 16%,
+    rgba(0, 0, 0, 0.931) 24%,
+    rgba(0, 0, 0, 0.909) 32%,
+    rgba(0, 0, 0, 0.895) 38%,
+    rgba(0, 0, 0, 0.858) 44%,
+    rgba(0, 0, 0, 0.787) 50%,
+    rgba(0, 0, 0, 0.687) 56%,
+    rgba(0, 0, 0, 0.568) 62%,
+    rgba(0, 0, 0, 0.439) 68%,
+    rgba(0, 0, 0, 0.311) 74%,
+    rgba(0, 0, 0, 0.194) 80%,
+    rgba(0, 0, 0, 0.099) 86%,
+    rgba(0, 0, 0, 0.042) 91%,
+    rgba(0, 0, 0, 0.013) 95%,
+    rgba(0, 0, 0, 0.002) 98%,
+    rgba(0, 0, 0, 0) 100%);
+  mask-image: linear-gradient(var(--gpn-dir), rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.977) 8%,
+    rgba(0, 0, 0, 0.954) 16%,
+    rgba(0, 0, 0, 0.931) 24%,
+    rgba(0, 0, 0, 0.909) 32%,
+    rgba(0, 0, 0, 0.895) 38%,
+    rgba(0, 0, 0, 0.858) 44%,
+    rgba(0, 0, 0, 0.787) 50%,
+    rgba(0, 0, 0, 0.687) 56%,
+    rgba(0, 0, 0, 0.568) 62%,
+    rgba(0, 0, 0, 0.439) 68%,
+    rgba(0, 0, 0, 0.311) 74%,
+    rgba(0, 0, 0, 0.194) 80%,
+    rgba(0, 0, 0, 0.099) 86%,
+    rgba(0, 0, 0, 0.042) 91%,
+    rgba(0, 0, 0, 0.013) 95%,
+    rgba(0, 0, 0, 0.002) 98%,
+    rgba(0, 0, 0, 0) 100%);
+}
+.dtr.is-in .dtr-cam { opacity: 1; transform: scale(1); }
+.dtr.is-in .dtr-camring { opacity: 1; transform: scale(1); }
+
+/* ============================================================
+   竖版运镜:横版一律「左右分」,竖版一律「上下分」
+   —— 人在下、内容在上。只覆盖差异,横版规则一行不动。
+   ⚠ 像素是初版提案,拿真素材看过再定。
+   ============================================================ */
+
+/* ---- focus-card:人像框从左侧方块挪到下方,要点列表从右栏挪到上半屏 ---- */
+/* --fcd-* 由组件按画幅算好写成内联变量(见 camGeom.focusCamGeom),这里不再重复。
+   竖版排版:人像在上方一块(120~840),要点列表排到它下面,两者不重叠。 */
+.stage[data-ratio="v"] .fcd-list {
+  left: 80px;
+  right: 80px;
+  top: 900px;
+  bottom: auto;
+  transform: none;
+  gap: 28px;
+}
+
+/* ---- focus-card 预览:口播落位框跟 --fcd-* 保持同一份几何 ---- */
+.stage[data-ratio="v"] .stage-video.is-pip-focus,
+.stage[data-ratio="v"] .stage-video.is-pip-focus-r {
+  left: 60px;
+  top: 1000px;
+  width: 960px;
+  height: 860px;
+  border-radius: 36px;
+}
+
+/* ---- demo-tour ----
+   横版:浮屏几乎占满,口播圆窗蹲左下角。
+   竖版:浮屏收成 16:9 挪到上半屏(原来的 top7%/bottom11% 在竖版会变成
+   886×1575 的高框,16:9 录屏塞进去被裁成一片白),圆窗挪到下半屏居中并放大
+   —— 竖版屏窄,252 的圆窗显小。
+   已有 transform: scale() 做进场,不能再用 translateX 居中,用 calc 算左缘。 */
+.stage[data-ratio="v"] .dtr-frame {
+  /* 竖版配的是手机录屏 —— 浮屏做成手机比例(626×1094 ≈ 9:16)竖着占大面积,
+     沉浸感才回得来;做成横条只会是「一条飘在上面」 */
+  left: 21%;
+  right: 21%;
+  top: 5%;
+  bottom: auto;
+  height: 57%;
+}
+/* 巡览是绕着「画布中心」推近的:横版浮屏占满画布,推近后照样铺满;
+   竖版浮屏只占上部 1/3,还绕画布中心推就会整块飞出右下。
+   把缩放/透视原点挪到浮屏自己的中心(16% + 33%/2 = 32.5%)。 */
+.stage[data-ratio="v"] .dtr-stage { perspective-origin: 50% 33.5%; }
+.stage[data-ratio="v"] .dtr-plane { transform-origin: 50% 33.5%; }
+
+.stage[data-ratio="v"] .dtr-cam,
+.stage[data-ratio="v"] .dtr-camring {
+  left: calc(50% - 160px);
+  bottom: 180px;
+  width: 320px;
+  height: 320px;
+}
+
+/* ---- cam-pan:左右漂移改成上下漂移 ----
+   推近(in)/推远(out)/倾斜(tilt)跟画幅无关,不动 */
+.stage[data-ratio="v"] .cpn.is-in[data-motion="drift-l"] .cpn-move { animation-name: cpn-drift-u; }
+.stage[data-ratio="v"] .cpn.is-in[data-motion="drift-r"] .cpn-move { animation-name: cpn-drift-d; }
+@keyframes cpn-drift-u {
+  from { transform: scale(var(--cp-z, 1.18)) translateY(3.5%); }
+  to   { transform: scale(var(--cp-z, 1.18)) translateY(-3.5%); }
+}
+@keyframes cpn-drift-d {
+  from { transform: scale(var(--cp-z, 1.18)) translateY(-3.5%); }
+  to   { transform: scale(var(--cp-z, 1.18)) translateY(3.5%); }
+}
+
+/* ---- 竖版:另外两张定宽/不换行的卡 ---- */
+/* warp-title:大标题 108px 且 nowrap,长一点就撑到 2433px(体检里超得最多的一张)。
+   竖版允许换行并缩一档字号 —— 竖屏本来就该多行大标题 */
+.stage[data-ratio="v"] .wpt-title {
+  white-space: normal;
+  max-width: calc(var(--stage-w) - 120px);
+  font-size: 84px;
+  line-height: 1.14;
+  text-align: center;
+}
+/* timeline-h:横向时间轴定宽 1500 */
+.stage[data-ratio="v"] .th {
+  width: calc(var(--stage-w) - 96px);
+}
+
+/* ---- 竖版:卡片式并排改成竖着叠 ----
+   这三张是「三张独立小卡横排」,竖版画布 1080 一分,每列只剩 300 出头,
+   说明文字被挤成三行。竖版改成一张张叠下来,每张占满板宽。
+
+   只挑这三张:column-stack(堆叠柱)/ stack-share(份额条)/ stair-bars(阶梯条)
+   的横排是图表语义本身,改竖了就不是那个图;scale-swap 本来就是上下两把尺子。 ---- */
+.stage[data-ratio="v"] :is(.acb-cards, .cpb-cards, .mpg-row) {
+  flex-direction: column;
+  gap: 18px;
+}
+/* 子项横排时是 flex:1 均分宽度,竖排会变成均分高度、把卡拉长 —— 改回按内容 */
+.stage[data-ratio="v"] :is(.acb-card, .cpb-card, .mpg-card) {
+  flex: 0 0 auto;
+}
+
+/* ---- 竖版:固定宽度的玻璃板收进画布 ----
+   这七张卡都是「一块定宽玻璃板 + 板内自己排版」,板宽 1240~1460px,
+   在 1080 的竖版画布里一律溢出(体检里超 160~380px 的就是它们)。
+   板宽改成跟着画布走,板内是 flex/grid 会自己收;左右内边距同时收窄,
+   竖版屏窄,52px 的边距太吃地方。 ---- */
+.stage[data-ratio="v"] :is(
+  .acb-board, .cst-board, .cpb-board, .mpg-board, .sst-board, .stb-board, .ssw-board
+) {
+  width: calc(var(--stage-w) - 96px);
+  max-width: calc(var(--stage-w) - 96px);
+  padding-left: 40px;
+  padding-right: 40px;
+}
+.wpt.is-in { opacity: 1; }
+.wpt-line.is-tint {
+  background: linear-gradient(90deg, transparent 0%, var(--hud-acc, var(--hud-orange)) 100%);
+}
+.wpt.is-in .wpt-line { animation-name: wpt-fly; animation-timing-function: linear; animation-iteration-count: infinite; }
+/* 星轨:从中心附近加速飞出画外,越飞越亮再熄灭(穿梭感) */
+@keyframes wpt-fly {
+  0%   { transform: translateX(70px) scaleX(0.4); opacity: 0; }
+  18%  { opacity: 0.85; }
+  100% { transform: translateX(1180px) scaleX(2.1); opacity: 0; }
+}
+.wpt.is-in .wpt-flash { animation: wpt-flash 640ms cubic-bezier(0.3, 0, 0.4, 1) forwards; }
+@keyframes wpt-flash {
+  0%   { opacity: 0; transform: scaleY(0.05); }
+  30%  { opacity: 0.95; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(0.3); }
+}
+.wpt.is-in .wpt-title {
+  animation:
+    wpt-title-in 680ms cubic-bezier(0.22, 1, 0.36, 1) 180ms forwards,
+    wpt-jitter 1.9s ease-in-out 900ms infinite;
+}
+@keyframes wpt-title-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.82); filter: blur(14px); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+}
+/* 高速穿梭下的微震:小幅平移 + 残影,别做大(大了像故障) */
+@keyframes wpt-jitter {
+  0%, 100% { text-shadow: 0 0 34px rgba(255, 255, 255, 0.35); translate: 0 0; }
+  25% { translate: 2.5px 0; text-shadow: -4px 0 10px rgba(255, 255, 255, 0.22), 0 0 34px rgba(255, 255, 255, 0.3); }
+  60% { translate: -2px 1px; text-shadow: 4px 0 10px rgba(255, 255, 255, 0.22), 0 0 34px rgba(255, 255, 255, 0.3); }
+}
+.wpt.is-in .wpt-sub { animation: wpt-sub-in 460ms cubic-bezier(0.22, 1.4, 0.36, 1) 760ms forwards; }
+@keyframes wpt-sub-in {
+  from { opacity: 0; transform: translateX(-50%) scale(1.7); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+.hud-anchor--top .stk-col,
+.hud-anchor--center .stk-col,
+.hud-anchor--bottom .stk-col { align-items: center; }
+.hud-anchor--right .stk-col { align-items: flex-end; }
+.hud.is-in .stk-tag { opacity: 1; transform: rotate(-2deg); }
+.hud.is-in .stk-line { opacity: 1; transform: none; }
+
+/* ============ PinBoard 要点钉板(角落累积) ============ */
+/* 章节标题+副题钉住,黑牌要点逐条落钉常驻:观众扫一眼就知道讲到哪 */
+.pbd-col { display: flex; flex-direction: column; align-items: flex-end; gap: 13px; }
+.hud-anchor--top-left .pbd-col { align-items: flex-start; }
+.pbd-title {
+  font-size: 36px; font-weight: 900; letter-spacing: 2px;
+  color: var(--hud-ink); text-shadow: var(--hud-sh);
+  opacity: 0; transform: translateY(-18px);
+  transition: opacity 420ms var(--ease), transform 460ms var(--ease);
+}
+.pbd-sub {
+  font-size: 28px; font-weight: 800; letter-spacing: 1px;
+  color: var(--hud-acc);
+  opacity: 0; transform: translateY(-14px);
+  transition: opacity 420ms var(--ease) 140ms, transform 460ms var(--ease) 140ms;
+}
+.hud.is-in .pbd-title, .hud.is-in .pbd-sub { opacity: 1; transform: none; }
+.pbd-chip {
+  padding: 8px 22px; border-radius: 10px;
+  background: rgba(15, 13, 21, 0.9); color: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  font-size: 26px; font-weight: 700; letter-spacing: 1px;
+  opacity: 0; transform: translateY(-16px) scale(0.68);
+  transition: opacity 340ms var(--ease), transform 430ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.hud.is-in .pbd-chip { opacity: 1; transform: none; }
+.hud.is-in .ssw-board { opacity: 1; transform: translateY(0) scale(1); }
+.export-mode .ssw-board {
+  background: rgba(255, 255, 255, calc(var(--ssw-alpha, 0.7) + 0.24));
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+/* 条A:假读数粉条(旧刻度下看起来还很空) */
+.ssw-fillA {
+  position: absolute; left: 0; top: 0; bottom: 0; border-radius: 28px;
+  background: color-mix(in srgb, var(--hud-acc) 42%, #fff);
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform 900ms var(--ease) 120ms;
+}
+.ssw-row.is-on .ssw-fillA { transform: scaleX(1); }
+.ssw-tagA {
+  position: absolute; top: 50%; transform: translateY(-50%) translateX(-10px);
+  white-space: nowrap; font-size: 25px; font-weight: 800; color: var(--hud-ink);
+  opacity: 0; transition: opacity 420ms var(--ease) 620ms, transform 480ms var(--ease) 620ms;
+}
+.ssw-row.is-on .ssw-tagA { opacity: 1; transform: translateY(-50%) translateX(0); }
+.ssw-fillB {
+  position: absolute; inset: 0; border-radius: 33px;
+  background: color-mix(in srgb, var(--hud-acc) 64%, #331109);
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform 680ms var(--ease) 80ms;
+}
+.ssw-rowB.is-on .ssw-fillB { transform: scaleX(1); }
+.hud.is-in .sst-board { opacity: 1; transform: none; }
+.hud.is-in .cst-board { opacity: 1; transform: none; }
+.hud.is-in .stb-board { opacity: 1; transform: none; }
+.hud.is-in .mpg-board { opacity: 1; transform: none; }
+.hud.is-in .acb-board { opacity: 1; transform: none; }
+.hud.is-in .cpb-board { opacity: 1; transform: none; }
+
+/* ============================================================
+   通用文字卡「玻璃底色」:黑/白/无 + 透明度(--hud-glass-alpha)
+   加在文字卡根节点上;none 时不加 class,布局与旧行为一致
+   ============================================================ */
+.hud-glass { border-radius: 18px; padding: 26px 36px; }
+.hud-glass--dark {
+  background: rgba(18, 16, 26, var(--hud-glass-alpha, 0.6));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
+.export-mode .hud-glass--dark {
+  background: rgba(14, 13, 20, var(--hud-glass-alpha, 0.82));
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.hud-glass--light {
+  background: rgba(255, 255, 255, var(--hud-glass-alpha, 0.68));
+  border: 1px solid rgba(26, 37, 64, 0.16);
+  box-shadow: 0 18px 48px rgba(16, 20, 34, 0.18);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
+.export-mode .hud-glass--light {
+  background: rgba(255, 255, 255, var(--hud-glass-alpha, 0.93));
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+
+/* ============ DropArrow 降幅大箭头(压缩实测):前值→俯冲箭头→后值+巨号降幅 ============ */
+.dpa { flex-direction: column; align-items: flex-start; opacity: 0; transition: opacity 0.45s ease; }
+.dpa.is-in { opacity: 1; }
+.dpa-val--from { left: 0; top: 0; }
+.dpa-val--to { left: 520px; top: 340px; transition-delay: 460ms; }
+.dpa-val--to .dpa-val-num { font-size: 74px; color: var(--hud-acc); }
+/* 收队后:缩略图在左、名字挪到右边一列(参考片式竖排清单) */
+.clp-tile.is-list .clp-label {
+  left: calc(100% + 18px); bottom: 50%; transform: translateY(50%);
+  font-size: 17px; letter-spacing: 0.14em; color: var(--hud-ink);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+.clp[data-side="left"] .clp-tile.is-list .clp-label { left: auto; right: calc(100% + 18px); }
+/* ---- 竖版:左右分改上下分 ----
+   横版是「录屏靠右 + 左侧步骤链」,竖版 1080 宽塞不下(默认窗宽 1180 直接溢出)。
+   改成录屏在上、步骤链在下,窗宽由组件按画布算。 */
+.stage[data-ratio="v"] .dmr-win {
+  right: auto;
+  left: 48px;
+  top: 140px;
+}
+.stage[data-ratio="v"] .dmr-left {
+  left: 60px;
+  right: 60px;
+  width: auto;
+  top: 800px;
+  bottom: calc(var(--dmr-safe, 12%) + 40px);
+  gap: 28px;
+}
+.isw-col--l { left: 92px; top: 356px; }
+.isw-col--r { right: 92px; top: 356px; align-items: flex-start; }
+.isw[data-layout="left"] .isw-col--l { top: 268px; }
+
+/* 随讲述长高:板高跟着已点亮的行走,下方不留空位(板子跟着讲述"长出来") */
+.ibd--grow .ibd-panel { transition: none; }
+.pwl.is-in { opacity: 1; }
+.pwl--left  { --pwl-dir: to right; }
+.pwl--right { --pwl-dir: to left; }
+.pwl--left  .pwl-bg { left: 0; }
+.pwl--right .pwl-bg { right: 0; }
+.pwl--right .pwl-body { transform-origin: right center; }
+.pwl--left  .pwl-grid { left: 0; }
+.pwl--right .pwl-grid { right: 0; }
+.pwl--left  .pwl-tag { left: 34px; }
+.pwl--right .pwl-tag { right: 34px; }
+.pwl--left  .pwl-count { left: calc(var(--pwl-w, 50%) - 150px); }
+.pwl--right .pwl-count { right: calc(var(--pwl-w, 50%) - 150px); }
+/* 细长截图用 contain 才看得全,底下垫张白纸像"贴上去的一张图" */
+.pwl--contain .pwl-img { object-fit: contain; }
+.pwl--contain .pwl-cell { background: rgba(240, 242, 250, 0.08); }
+.cfw.is-in { opacity: 1; }
+/* ---- conveyor ---- */
+.cfw-lane { position: relative; display: flex; align-items: flex-end; gap: 96px; height: 150px; }
+.cfw-side { display: flex; flex-direction: column; }
+.cfw-belt {
+  position: relative; height: 78px; border-radius: 14px;
+  background: var(--hud-glass); border: 1px solid var(--hud-glass-brd);
+  box-shadow: var(--hud-card-sh); overflow: hidden;
+}
+.cfw-machine {
+  position: absolute; bottom: 2px; width: 96px; height: 96px;
+}
+.cfw-ring {
+  position: absolute; inset: -7px; border-radius: 26px;
+  border: 3px solid var(--hud-acc); opacity: 0.85;
+}
+.cfw-core {
+  position: absolute; inset: 0; border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 25px; font-weight: 800; color: var(--hud-ink);
+  background: var(--hud-node); border: 1px solid var(--hud-glass-brd);
+  box-shadow: var(--hud-card-sh); text-align: center; line-height: 1.15; padding: 6px;
+}
+.cfw-chip--free { z-index: 4; flex-direction: column; width: auto; min-width: 58px; height: auto; padding: 8px 12px; gap: 2px; }
+.cfw-zone.is-hit { box-shadow: 0 0 0 5px color-mix(in srgb, var(--hud-acc) 45%, transparent), var(--hud-card-sh); }
+.stk.is-in { opacity: 1; }
+/* 赛道背景没有素材堆,标签跟在人旁边 */
+.stk-lb--free { margin-bottom: 0; align-self: flex-end; padding-bottom: 22px; }
+.cfw-gear--st {
+  position: absolute; top: -26px; left: 50%; margin-left: -10px;
+  font-size: 21px; color: var(--hud-ink); text-shadow: var(--hud-sh);
+}
+.cfw-chip.is-neat { border-color: var(--hud-acc); color: var(--hud-acc); font-weight: 800; }
+
+/* ---- ClipFlow drop:App 图标吞素材 ---- */
+.cfw-zone--app {
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding-bottom: 0; height: 148px;
+}
+.cfw-zone--app .cfw-zone-lb { font-size: 19px; }
+
+/* ---- CoverStack 竖版封面 ---- */
+.cvs--tall .cvs-item { width: 330px; }
+.cvs--tall .cvs-thumb { height: 440px; }
+.cfw-src.is-given { opacity: 0.38; }
+.cvl-chip.is-pulse {
+  border-color: var(--hud-acc);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--hud-acc) 25%, transparent), var(--hud-card-sh);
+}
+.cvl-bub.is-r { border-color: var(--hud-teal); }
+
+/* ChatVolley 两端头像 / 收尾戳图标 */
+.cvl-chip.has-img { padding: 0; overflow: hidden; background: var(--hud-node); }
+
+/* ---- 毛玻璃模糊总关 ----
+   导出是透明背景,backdrop-filter 没有画面可糊,必然丢失。
+   预览这边也一起关掉,预览看到的就等于成片(所见即所得)。
+   想恢复磨砂质感就删掉这一段(但预览会又和导出不一样)。 */
+.hud,
+.hud *,
+.stage [data-card-theme] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}

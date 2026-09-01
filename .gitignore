@@ -1,0 +1,65 @@
+# 本文件由发行仓自己维护(不随上游同步)。改动规则:只加不减,拿不准先开 issue。
+# 系统杂物
+.DS_Store
+
+# 依赖与构建产物
+node_modules/
+motion-playground/dist/
+
+# 导出产物(透明 MOV/WebM/PNG 序列,动辄数 GB)
+motion-playground/exports/
+
+# 视频素材:源片、demo 录屏都不进仓库(体积大,GitHub 单文件限 100MB)
+*.mp4
+*.mov
+*.webm
+*.m4v
+
+# 本地日志
+*.log
+
+# 每期进度状态(个人工作文件,不进仓库)
+**/STATUS.md
+
+# 个人素材与文案工作区(仓库只放应用和 skill;素材本地保留,不进 git)
+后续工作/
+
+# skill 的个人偏好规则(公共版 SKILL.md 在仓库里,个人经验不上传)
+.claude/skills/overlay-fx-generator/经验规则.md
+
+# 每期工作目录(原片、字幕、编排草稿、剪辑工程边角料)——只在本地留
+*月*日/
+视频动效编辑台/
+.demo/
+/overlay*.json
+
+# 临时截图脚本
+motion-playground/_*.mjs
+
+# 字体不随仓库分发:中文字体的授权条款各不相同,多数「免费商用」并不包含
+# 「随软件再分发」。本地丢进去照常用(Studio 下拉里还在),只是不进仓库。
+motion-playground/src/assets/fonts/*
+!motion-playground/src/assets/fonts/README.md
+
+# 演示素材:仓库只带内置示例必需的编排和字幕。
+# 历次工作留下的截图/照片(含他人肖像、群聊截图)本地保留但不进仓库、不随开源分发
+motion-playground/public/demo/*
+!motion-playground/public/demo/demo-overlay.json
+!motion-playground/public/demo/demo.srt
+!motion-playground/public/demo/README.txt
+
+# 第三方品牌 logo:本地演示照常用,不随开源分发(simple-icons 的 35 个 SVG 是 CC0,留在仓库)
+motion-playground/public/logos/*.png
+
+# 音效文件不随仓库分发(免费音效多数禁止把音频本身当素材库再发布),只留说明
+motion-playground/public/sfx/*
+!motion-playground/public/sfx/README.md
+
+# Agent Skill 的个人偏好(只留本机)
+.claude/skills/overlay-fx-generator/我的偏好.md
+.agents/skills/overlay-fx-generator/经验规则.md
+.agents/skills/overlay-fx-generator/我的偏好.md
+.codebuddy/skills/overlay-fx-generator/经验规则.md
+.codebuddy/skills/overlay-fx-generator/我的偏好.md
+.workbuddy/skills/overlay-fx-generator/经验规则.md
+.workbuddy/skills/overlay-fx-generator/我的偏好.md

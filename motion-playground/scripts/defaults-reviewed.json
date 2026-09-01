@@ -1,0 +1,82 @@
+{
+  "blur-text": {
+    "hash": "8f38a94332a3",
+    "file": "src/effects/hud/BlurText.tsx"
+  },
+  "caption-track": {
+    "hash": "3d718126ae6e",
+    "file": "src/effects/hud/CaptionTrack.tsx"
+  },
+  "chapter-bar": {
+    "hash": "45de8220b2f7",
+    "file": "src/effects/hud/ChapterBar.tsx"
+  },
+  "checklist": {
+    "hash": "6092ee834bf2",
+    "file": "src/effects/hud/Checklist.tsx"
+  },
+  "entity-chips": {
+    "hash": "0f494f28b48e",
+    "file": "src/effects/hud/EntityChips.tsx"
+  },
+  "focus-card": {
+    "hash": "16853ea6b6f1",
+    "file": "src/effects/hud/FocusCard.tsx"
+  },
+  "growth-curve": {
+    "hash": "d9750400627d",
+    "file": "src/effects/hud/GrowthCurve.tsx"
+  },
+  "odometer": {
+    "hash": "c32549c9352b",
+    "file": "src/effects/hud/Odometer.tsx"
+  },
+  "pin-board": {
+    "hash": "45d3a1cf4663",
+    "file": "src/effects/hud/PinBoard.tsx"
+  },
+  "punch-pill": {
+    "hash": "b27d1895c249",
+    "file": "src/effects/hud/PunchPill.tsx"
+  },
+  "quote-lockup": {
+    "hash": "f052c9f61b03",
+    "file": "src/effects/QuoteLockup.tsx"
+  },
+  "rank-bars": {
+    "hash": "1e986f5e195e",
+    "file": "src/effects/hud/RankBars.tsx"
+  },
+  "ring-metric": {
+    "hash": "6f3638292a4f",
+    "file": "src/effects/hud/RingMetric.tsx"
+  },
+  "stat-proof": {
+    "hash": "0578b9ebba86",
+    "file": "src/effects/hud/StatProof.tsx"
+  },
+  "step-timeline": {
+    "hash": "f5979e7ead1c",
+    "file": "src/effects/hud/StepTimeline.tsx"
+  },
+  "term-card": {
+    "hash": "a058f7ed8735",
+    "file": "src/effects/hud/TermCard.tsx"
+  },
+  "terminal-3d": {
+    "hash": "1138894a38db",
+    "file": "src/effects/hud/Terminal3D.tsx"
+  },
+  "type-shift": {
+    "hash": "156f06812ce1",
+    "file": "src/effects/hud/TypeShift.tsx"
+  },
+  "ui-callout": {
+    "hash": "2da0556855f5",
+    "file": "src/effects/hud/UICallout.tsx"
+  },
+  "versus-card": {
+    "hash": "87febfffb2b1",
+    "file": "src/effects/hud/VersusCard.tsx"
+  }
+}

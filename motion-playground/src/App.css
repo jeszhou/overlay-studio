@@ -1,0 +1,2358 @@
+/* ============ 布局:通栏仪表条 + 三栏 ============ */
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-app);
+}
+.app-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 320px 1fr 340px;
+}
+
+.panel {
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.panel-left {
+  border-right: 1px solid var(--hairline);
+  padding: 16px 16px 20px;
+}
+.panel-right {
+  border-left: 1px solid var(--hairline);
+  padding: 28px 0;
+}
+
+
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 22px;
+}
+.panel-left .panel-title {
+  padding: 0;
+}
+.panel-sub {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+/* ---- 左栏:动效列表 ---- */
+.fx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  /* 不能是 0:标签栏占掉空间后会把列表压没(实测 height 变 0,筛出来也看不见) */
+  min-height: 260px;
+  overflow-y: auto;
+}
+.fx-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 12px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  transition: background 180ms ease, box-shadow 180ms ease;
+}
+.fx-item:hover {
+  background: var(--fill-subtle);
+}
+.fx-item.is-on {
+  background: var(--fill-subtle);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+/* 编辑台卡片行:序号 | 名称+类型 | 右对齐时间码 */
+.fx-item--row {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: start;
+}
+.fx-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+.fx-time {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  padding-top: 3px;
+}
+.fx-item.is-on .fx-time {
+  color: var(--ink-muted);
+}
+.fx-idx {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-top: 3px;
+}
+.fx-item.is-on .fx-idx {
+  color: var(--ink);
+}
+.fx-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fx-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.fx-desc {
+  font-size: 12px;
+  color: var(--ink-muted);
+  line-height: 1.4;
+}
+
+/* ---- 左栏底部:重放 + 开关 ---- */
+.sidebar-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  margin-top: 10px;
+  border-top: 1px solid var(--hairline);
+  /* 全局项是配角:最多占侧栏四成,超了自己滚,不许再挤卡片列表 */
+  flex: 0 1 auto;
+  max-height: 42%;
+  overflow-y: auto;
+}
+.play-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px;
+  background: var(--ink);
+  color: var(--bg-app);
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: opacity 160ms ease;
+  margin-bottom: 8px;
+}
+.play-btn:hover {
+  opacity: 0.85;
+}
+.play-tri {
+  width: 0;
+  height: 0;
+  border-left: 9px solid var(--bg-app);
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--ink-muted);
+  padding: 6px 2px;
+}
+
+/* ---- 开关 ---- */
+.switch {
+  width: 40px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--hairline);
+  border: 1px solid var(--hairline-strong);
+  position: relative;
+  padding: 0;
+  transition: background 180ms ease;
+  flex: none;
+}
+.switch.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--ink);
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), background 180ms;
+}
+.switch.is-on .switch-knob {
+  transform: translateX(18px);
+  background: var(--on-accent);
+}
+
+/* ============ 中栏:画布 ============ */
+.stage-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+  min-height: 0;
+  min-width: 0; /* 防止工具条内容撑宽中栏挤走右栏 */
+}
+.canvas-wrap {
+  position: relative;
+  flex: 1;
+  margin: 20px 26px 14px;
+  min-height: 0;
+}
+.stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: center;
+  background: var(--bg-canvas);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+.stage-caption {
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  flex: none;
+}
+
+/* 人物安全区占位 */
+.person {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 480px;
+  height: 900px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 24px;
+  padding-bottom: 60px;
+}
+.person-body {
+  width: 360px;
+  height: 520px;
+  background: var(--fill-subtle);
+  border: 1px solid var(--hairline);
+  border-radius: 180px 180px 0 0;
+  position: relative;
+}
+.person-body::before {
+  content: "";
+  position: absolute;
+  top: -212px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  background: var(--fill-subtle);
+  border: 1px solid var(--hairline);
+}
+.person-tag {
+  position: absolute;
+  bottom: 60px;
+  font-size: 15px;
+  letter-spacing: 0.3em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+/* 参考线 */
+.guide {
+  position: absolute;
+  top: 48px;
+  bottom: 48px;
+  pointer-events: none;
+}
+.guide-safe {
+  left: 720px;
+  right: 720px;
+  border: 1px dashed rgba(245, 245, 247, 0.28);
+  border-radius: 8px;
+}
+.guide-safe::after {
+  content: "SAFE";
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  color: var(--ink-faint);
+}
+.guide-slot {
+  width: 600px;
+  border: 1px dashed rgba(245, 245, 247, 0.16);
+  border-radius: 8px;
+}
+.guide-slot-left {
+  left: 120px;
+}
+.guide-slot-right {
+  right: 120px;
+}
+
+/* 动效槽位:左右各一,内容垂直居中 */
+.slot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 600px;
+  display: flex;
+  align-items: center;
+  transform: scale(var(--hud-scale, 1));
+}
+.slot-left {
+  left: 120px;
+  justify-content: flex-start;
+  transform-origin: left center;
+}
+.slot-right {
+  right: 120px;
+  justify-content: flex-end;
+  transform-origin: right center;
+}
+
+/* ============ 右栏:参数控件 ============ */
+/* 头部:我在调哪张卡 */
+.pp-head {
+  padding: 0 22px 14px;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pp-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.pp-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.pp-name em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+/* 空状态:编辑台没选卡 */
+.pp-empty {
+  padding: 28px 22px;
+  font-size: 13px;
+  line-height: 2.1;
+  color: var(--ink-muted);
+}
+.pp-empty b {
+  color: var(--ink);
+  font-weight: 600;
+}
+/* 参数分组:内容/节奏/样式/落位 */
+.pp-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pp-sec-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.06em;
+}
+.pp-sec-head i {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--ink-faint);
+}
+/* 左栏底部:全局作用域标识 */
+.foot-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-bottom: 2px;
+}
+.ctrl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  padding: 4px 22px 22px;
+  /* 撑满剩余高度,底下那条动作栏才贴得住底(min-height:0 让它真的能滚) */
+  flex: 1;
+  min-height: 0;
+}
+
+/* 右栏底部动作条:效果库模式下常驻,不跟着参数一起滚。
+   「加入时间轴」是这条流水线的终点动作,位置固定人才不用每次找。 */
+.pp-foot {
+  flex: none;
+  padding: 12px 22px 0;
+  border-top: 1px solid var(--hairline);
+  background: var(--bg-panel);
+}
+.pp-add-btn {
+  width: 100%;
+  padding: 11px 0;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--bg-panel);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: filter 150ms ease, background 150ms ease, color 150ms ease;
+}
+.pp-add-btn:hover {
+  filter: brightness(1.12);
+}
+/* 加完的回执:不跳页,所以按钮自己变一下 */
+.pp-add-btn.is-done {
+  background: transparent;
+  color: var(--accent);
+}
+.ctrl {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ctrl-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.ctrl-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+.ctrl-input {
+  background: var(--bg-elev);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+.ctrl-input:focus {
+  border-color: var(--accent);
+}
+
+/* 全局字体下拉的空态提示 */
+.ctrl-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+
+/* 讲过让位方式三选一(变浅+缩小 / 只变浅 / 只缩小) */
+.dim-mode-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.dim-mode-btn {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+  background: var(--bg-elev);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+.dim-mode-btn.is-on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 滑块 */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: var(--hairline-strong);
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--ink);
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+input[type="range"]::-webkit-slider-thumb:active {
+  background: var(--accent); /* 拖动中 = 正在发生,点亮信号色 */
+}
+input[type="range"]::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: none;
+  border-radius: 2px;
+  background: var(--ink);
+  cursor: pointer;
+}
+
+/* 分段选择 */
+.seg {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 4px;
+}
+.seg-btn {
+  flex: 1;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  transition: background 160ms ease, color 160ms ease;
+}
+.seg-btn.is-on {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.ctrl-toggle {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+/* ---- 导入视频 ---- */
+.stage-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.video-row {
+  display: flex;
+  gap: 8px;
+}
+.video-btn {
+  flex: 1;
+  padding: 12px;
+  background: var(--fill-subtle);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--ink);
+  transition: background 160ms ease;
+}
+.video-btn:hover {
+  background: var(--fill-hover);
+}
+.video-btn--clear {
+  flex: none;
+  width: 72px;
+  color: var(--ink-muted);
+}
+
+/* 侧栏缩放滑块 */
+.scale-row {
+  padding: 6px 2px 10px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+/* ---- 导出模式:全链路透明 ---- */
+.export-mode,
+.export-mode body,
+.export-mode #root {
+  background: transparent !important;
+  overflow: hidden;
+}
+.stage.is-export {
+  background: transparent !important;
+  border: none !important;
+}
+.stage.is-export::before {
+  display: none; /* 去掉点阵网格 */
+}
+
+/* ---- 导出透明动效层 ---- */
+.export-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.export-btn {
+  padding: 12px;
+  background: var(--fill-subtle);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: background 160ms ease;
+}
+.export-btn:hover:not(:disabled) {
+  background: var(--fill-hover);
+}
+.export-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.export-sec {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  padding: 0 2px;
+}
+.export-sec input {
+  flex: 1;
+}
+
+/* ---- 底部视频时间线:贴底通栏 ---- */
+.tlb {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  flex: none;
+  /* 卡多了轨道会堆很多层,不封顶就会把上面三栏挤到只剩一行(字幕稿尤其明显)。
+     封在 42vh,超出的层在轨道内部滚动 —— 左右栏永远留得住高度 */
+  max-height: 42vh;
+  padding: 0 20px 14px;
+  background: var(--bg-panel);
+  border: none;
+  border-top: 1px solid var(--hairline-strong);
+  border-radius: 0;
+}
+/* 顶边抓手:上下拖 = 调时间轴高度(色块跟着变粗) */
+.tlb-resize {
+  height: 12px;
+  margin: 0 -20px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+.tlb-resize span {
+  width: 44px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--hairline-strong);
+  transition: background 150ms ease, width 150ms ease;
+}
+.tlb-resize:hover span,
+.tlb-resize.is-drag span {
+  background: var(--accent);
+  width: 64px;
+}
+.tlb-info {
+  display: flex;
+  gap: 18px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+/* 快捷键小抄:钉在时间线右上角 */
+.tlb-keys {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+/* 滚动视口:放大后左右滚动看局部 */
+.tlb-track {
+  flex: 1;
+  min-height: 0; /* 配合 .tlb 的 max-height:轨道能被压缩,压不下的走竖向滚动 */
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior-x: contain;
+}
+.tlb-track::-webkit-scrollbar {
+  height: 7px;
+}
+.tlb-track::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: 4px;
+}
+/* 内容层:宽 = 缩放倍数 × 视口,百分比定位都相对它 */
+.tlb-inner {
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  padding-top: 12px; /* 给播放头手柄留空间 */
+  /* 播放头手柄从 left:-6px 起、宽 12px:走到 100% 时有 6px 探出内容右缘。
+     绝对定位的右侧溢出算进滚动范围 —— .tlb-track 于是撑出 7px 高的横向滚动条,
+     轨道内容整体上跳 7px;跳完纵向溢出变 9px,竖滚动条再冒出来把内容挤窄,
+     播放头 100% 的位置左移、横向又不溢出了……来回抖两下。片尾"闪一下"就是这么来的。
+     clip 把探出部分排除在滚动范围外(元素自身宽度照常撑 .tlb-track 的横向滚动)。
+     clip-margin 必须是 0:留多少就漏多少(实测 8px→仍溢出 6px、2px→溢出 2px),
+     代价是播放头手柄在最两端会被切掉外面那一半 —— 换不抖,这个价值得。 */
+  overflow: clip;
+  overflow-clip-margin: 0;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+/* 缩放控件 */
+.tlb-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tlb-zoom-btn {
+  width: 22px;
+  height: 20px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.tlb-zoom-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.tlb-zoom-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-muted);
+  min-width: 30px;
+  text-align: center;
+}
+.tlb-lanes {
+  position: relative;
+  min-height: 14px;
+}
+.tlb-card {
+  position: absolute;
+  border-radius: 2px;
+  border: none;
+  opacity: 0.9; /* 接近实色:参考图那种发亮的色块 */
+  min-width: 4px;
+  padding: 0;
+  cursor: grab; /* 整块拖 = 平移时间 */
+  transition: opacity 150ms ease, filter 150ms ease;
+}
+.tlb-card:hover { opacity: 1; filter: brightness(1.12); }
+/* 左右边缘 = 改起止时间 */
+.tlb-card::before,
+.tlb-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+.tlb-card::before { left: 0; }
+.tlb-card::after { right: 0; }
+.tlb-card.is-live { opacity: 1; filter: brightness(1.18) saturate(1.1); }
+.tlb-card.is-sel { opacity: 1; outline: 2px solid var(--accent); outline-offset: 1px; }
+/* 刻度条:细进度槽,已播部分点亮 */
+.tlb-ruler {
+  height: 5px;
+  border-radius: 2px;
+  background: var(--fill-subtle, rgba(255, 255, 255, 0.08));
+  overflow: hidden;
+}
+.tlb-ruler-fill {
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.7;
+  border-radius: 2px;
+}
+/* 播放头:剪映式白色竖线,贯穿轨道;拖动由 .tlb-track 的擦洗接管 */
+.tlb-playhead {
+  position: absolute;
+  top: 0;
+  bottom: -2px;
+  width: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.tlb-playhead::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  bottom: 0;
+  left: -1px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.tlb-ph-head {
+  position: absolute;
+  top: 0;
+  left: -6px;
+  width: 12px;
+  height: 13px;
+  background: var(--accent);
+  border-radius: 2px 2px 1px 1px;
+  clip-path: polygon(0 0, 100% 0, 100% 58%, 50% 100%, 0 58%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.tl-clear {
+  background: transparent;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 3px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  padding: 3px 10px;
+  letter-spacing: 0.08em;
+}
+
+/* ---- 左栏:编辑台 卡片/字幕稿 双视图 ---- */
+.side-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.side-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 7px 12px;
+  letter-spacing: 0.04em;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+.side-tab.is-on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.side-tabs .tl-clear {
+  margin-left: auto;
+}
+.srt-line {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: background 150ms ease;
+}
+.srt-line:hover {
+  background: var(--fill-subtle);
+}
+.srt-line.is-now {
+  background: var(--fill-subtle);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.srt-time {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+.srt-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hairline-strong);
+}
+.srt-dot.is-covered {
+  background: var(--accent); /* 这句已有卡覆盖 */
+}
+.srt-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+.srt-line.is-now .srt-text {
+  color: var(--ink);
+}
+
+/* ---- 左栏:动效分组 ---- */
+.fx-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fx-group + .fx-group {
+  margin-top: 14px;
+}
+.fx-group-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--ink-faint);
+  padding: 0 4px 2px;
+  border-bottom: 1px solid var(--hairline);
+}
+.fx-group-count {
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
+/* ---- 录屏 Demo 运镜:口播画面缩到角落(3:4,cover 裁剪不拉伸) ---- */
+.stage-video {
+  inset: auto;
+  left: 0;
+  top: 0;
+  width: var(--stage-w);
+  height: var(--stage-h);
+  transition:
+    left 1050ms cubic-bezier(0.22, 1, 0.36, 1),
+    top 1050ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 1050ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 1050ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 1050ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.stage-video.is-pip {
+  border-radius: 30px;
+  z-index: 5; /* 模拟成片:口播小窗在特效层之上 */
+}
+/* screen-demo:角落 3:4 小窗 */
+.stage-video.is-pip-br { left: 1424px; top: 482px; width: 400px; height: 534px; }
+.stage-video.is-pip-bl { left: 96px; top: 482px; width: 400px; height: 534px; }
+/* focus-card:左侧圆角方框(和 .fc-ring 严格同几何) */
+.stage-video.is-pip-focus { left: 110px; top: 190px; width: 700px; height: 700px; border-radius: 36px; }
+/* cam-frame:几何由卡片参数算,这里只负责"别被 is-pip 的圆角覆盖"
+   (left/top/width/height/border-radius 全部走内联样式) */
+.stage-video.is-pip-frame { border-radius: 0; }
+/* demo-tour:口播缩成左下圆窗(几何走内联样式,描边由卡里的 .dtr-camring 画) */
+.stage-video.is-pip-dtr { border-radius: 50%; }
+
+/* 右栏:删除选中卡 */
+.del-card-btn {
+  margin: 6px 0 0;
+  padding: 9px 0;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: 4px;
+  color: var(--danger);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.del-card-btn:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+/* ---- 右栏:卡片时间编辑 ---- */
+.time-fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.time-fields .ctrl-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+}
+.time-sep {
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+
+/* ---- 通栏仪表条(A1 瑞士编辑部) ---- */
+.topbar {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  height: 52px;
+  padding: 0 0 0 18px;
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--hairline-strong);
+  overflow: hidden;
+}
+.tb-brand {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  margin-right: 20px;
+  white-space: nowrap;
+}
+.tb-brand em {
+  font-style: normal;
+  color: var(--accent);
+}
+.tb-ver {
+  margin-left: 10px;
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--ink-faint);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+.tb-tab {
+  padding: 0 18px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--hairline);
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  transition: color 160ms ease, box-shadow 160ms ease;
+}
+.tb-tab.is-on {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.tb-tab:last-of-type {
+  border-right: 1px solid var(--hairline);
+}
+/* 读数模块:等宽小字标签 + 数值 */
+.tb-meter {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  margin-left: 24px;
+  min-width: 0;
+  overflow: hidden;
+}
+.tb-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+.tb-k {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.tb-v {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.tb-v i {
+  font-style: normal;
+  color: var(--ink-faint);
+}
+.tb-v b {
+  color: var(--accent);
+  font-weight: 600;
+}
+.tb-v--acc {
+  color: var(--accent);
+}
+.tb-flex {
+  flex: 1;
+}
+/* 熔接按钮组:共享 hairline,负边距去重 */
+.tb-group {
+  display: flex;
+  align-items: center;
+  padding-right: 14px;
+  gap: 0;
+}
+.tb-btn,
+.tb-gear {
+  height: 32px;
+  padding: 0 15px;
+  background: transparent;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 0;
+  margin-left: -1px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  transition: background 160ms ease, color 160ms ease;
+}
+.tb-btn:hover:not(:disabled),
+.tb-gear:hover,
+.tb-gear.is-on {
+  background: var(--fill-subtle);
+  color: var(--ink);
+}
+.tb-btn--primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+  font-weight: 600;
+  z-index: 1;
+}
+.tb-btn--primary:hover:not(:disabled) {
+  opacity: 0.9;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.tb-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+/* 更换特效下拉 */
+.kind-select {
+  width: 100%;
+  appearance: auto;
+  background: var(--bg-elev);
+  color: var(--ink);
+}
+
+
+/* 编辑台空状态提示 */
+.fx-empty {
+  padding: 24px 10px;
+  font-size: 13px;
+  line-height: 2;
+  color: var(--ink-faint);
+}
+
+
+/* 录屏路径回显 */
+.demo-src {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  word-break: break-all;
+}
+
+/* 多行文本参数(字幕表等):等宽小字,方便逐行核对时间 */
+.ctrl-textarea {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.7;
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* punch-zoom 预览:底层视频原位推近(覆盖 is-pip 的缩角几何)。
+   注意 z 回到底层:推近的是背景画面,不能像小窗那样盖住同窗的特效卡 */
+.stage-video.is-pip.is-punch-zoom {
+  left: 0;
+  top: 0;
+  width: var(--stage-w);
+  height: var(--stage-h);
+  border-radius: 0;
+  z-index: 0;
+  animation: pz-push var(--pz-ms, 1400ms) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* focus-card 口播缩右侧的预览落位(镜像) */
+.stage-video.is-pip-focus-r { left: 1110px; }
+
+/* 效果库搜索框(卡片多了先搜再挑) */
+.fx-search { padding: 0 12px 10px; }
+.fx-search .ctrl-input { width: 100%; }
+
+/* ---- 导出进度浮窗(右下角) ---- */
+.export-prog {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 200;
+  width: 300px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(18, 16, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #f2f0ea;
+}
+.export-prog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  font-weight: 700;
+}
+.export-prog-head b {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.export-prog-bar {
+  margin: 10px 0 8px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.export-prog-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #5fa0fa, #45c6cf);
+  transition: width 0.6s ease;
+}
+.export-prog-sub {
+  font-size: 12px;
+  color: rgba(242, 240, 234, 0.72);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 参数预设行 ---- */
+.preset-line {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.preset-line select {
+  flex: 1;
+  min-width: 0;
+}
+.preset-btn {
+  flex: 0 0 auto;
+  padding: 0 10px;
+}
+
+/* ---- 拖拽对齐辅助线:吸附命中时的青色虚线(Figma 式) ---- */
+.align-guide {
+  position: absolute;
+  z-index: 60;
+  pointer-events: none;
+}
+.align-guide-v {
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px dashed #22d3ee;
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.55);
+}
+.align-guide-h {
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px dashed #22d3ee;
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.55);
+}
+
+/* ---- 检查器浮窗(左下角) ---- */
+.lint-panel {
+  position: fixed;
+  left: 22px;
+  bottom: 22px;
+  z-index: 200;
+  width: 380px;
+  max-height: 46vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: rgba(18, 16, 26, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #f2f0ea;
+  overflow: hidden;
+}
+.lint-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+.lint-err-count {
+  color: #ff7a6e;
+}
+.lint-head-btns {
+  display: flex;
+  gap: 6px;
+}
+.lint-head-btns button,
+.lint-btns button {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f2f0ea;
+  cursor: pointer;
+}
+.lint-head-btns button:hover,
+.lint-btns button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.lint-list {
+  overflow-y: auto;
+  padding: 0 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lint-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.lint-item.lint-error {
+  background: rgba(255, 96, 80, 0.12);
+}
+.lint-msg {
+  flex: 1;
+}
+.lint-btns {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+/* ---- 参数面板:语法速查折叠面板 ---- */
+.ctrl-help {
+  margin: 4px 0 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--fill-subtle);
+  font-size: 11px;
+}
+.ctrl-help summary {
+  padding: 5px 9px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+.ctrl-help summary:hover {
+  color: var(--ink);
+}
+.ctrl-help pre {
+  margin: 0;
+  padding: 6px 10px 10px;
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: "SF Mono", "JetBrains Mono", Menlo, monospace;
+  font-size: 10.5px;
+  line-height: 1.75;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--hairline);
+}
+
+/* ── 授权协议门(仅发行版,dev 无 /LICENSE.txt 不出现)── */
+.eula {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-app);
+}
+.eula-box {
+  width: min(720px, 92vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.eula-head {
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+.eula-head b {
+  display: block;
+  font-size: 17px;
+  color: var(--ink);
+}
+.eula-head span {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+.eula-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 24px;
+}
+.eula-body pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+.eula-foot {
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--hairline);
+}
+.eula-btn {
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: 9px;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.eula-btn:disabled {
+  background: var(--fill-subtle);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+/* ============ 风格骨架(form) ============
+   这一节只管**形状**:圆角、边框、控件长相。颜色一律走令牌(index.css 的
+   data-palette),所以任何风格 × 任何配色都能组合。
+   data-form 缺省 = 「编辑部」:直角、hairline 分区、按钮组共享细线熔接,
+   也就是文件上半部分的基础样式本身,不需要额外覆盖。 */
+
+/* ---- iOS 家族共享的控件语言(iOS / iOS·玻璃 / 浮岛) ----
+   iOS 的控件语言和编辑部正好相反:那边靠 hairline 和熔接分区,iOS 靠圆角
+   色块自己成形 —— 所以下面主要在拆边框、加圆角、改填充。
+   玻璃和浮岛都建在这套语言上,各自再叠自己的那层:玻璃叠药丸圆角+毛玻璃,
+   浮岛叠大圆角+面板间隙。加新成员只要往下面的 :is() 家族里加一个 id。 */
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) {
+  /* 三个 iOS 专属量全部从配色令牌派生,这样换任何配色都成立 */
+  --ios-field: var(--fill-subtle);
+  --ios-seg-on: var(--bg-elev);
+  --ios-switch-off: color-mix(in srgb, var(--ink) 20%, transparent);
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .topbar {
+  padding-left: 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-brand {
+  letter-spacing: -0.01em;
+}
+
+/* 编辑台/效果库 → 分段控件(灰槽 + 选中片浮起) */
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-tab {
+  margin: 11px 0;
+  padding: 0 16px;
+  border: none;
+  background: var(--fill-subtle);
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 590;
+  box-shadow: none;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-tab:first-of-type {
+  margin-left: 10px;
+  border-radius: 9px 0 0 9px;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-tab:last-of-type {
+  margin-right: 10px;
+  border-radius: 0 9px 9px 0;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-tab.is-on {
+  border-radius: 9px;
+  background: var(--ios-seg-on);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+/* 顶栏按钮组:拆掉熔接,各自成一枚填充圆角块 */
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-group {
+  gap: 6px;
+  padding-right: 12px;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-btn,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-gear {
+  height: 30px;
+  margin-left: 0;
+  padding: 0 12px;
+  border: none;
+  border-radius: 9px;
+  background: var(--fill-subtle);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-btn:hover:not(:disabled),
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-gear:hover,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-gear.is-on {
+  background: var(--fill-hover);
+  color: var(--ink);
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-btn--primary,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-btn--primary:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 590;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-prefs-pop {
+  border-radius: 14px;
+}
+/* 弹出面板内的小控件只跟圆角,不碰配色:面板底色目前锁死深色
+   (.tb-prefs-pop 用的 --panel/--fg/--muted 这几个令牌全项目都没定义,
+   一路走硬编码回退值),这里改配色会变成同色不可读。 */
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-mini,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tb-sw {
+  border-radius: 8px;
+}
+
+/* 输入 / 下拉:填充式,无描边,聚焦给一圈强调色晕 */
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .ctrl-input,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .kind-select {
+  border: none;
+  border-radius: 10px;
+  background: var(--ios-field);
+  font-size: 13px;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .ctrl-input:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* 分段控件 */
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .seg {
+  gap: 2px;
+  padding: 2px;
+  border: none;
+  border-radius: 9px;
+  background: var(--fill-subtle);
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .seg-btn {
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .seg-btn.is-on {
+  background: var(--ios-seg-on);
+  color: var(--ink);
+  font-weight: 590;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
+}
+
+/* 开关 → iOS 胶囊。开启态是 iOS 绿,不跟强调色走:绿开关是 iOS 的签名。 */
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .switch {
+  width: 51px;
+  height: 31px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ios-switch-off);
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .switch.is-on {
+  background: #34c759;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .switch-knob {
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.16);
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .switch.is-on .switch-knob {
+  /* 槽 51 - 钮 27 - 两边各 2 = 20 */
+  transform: translateX(20px);
+  background: #ffffff;
+}
+
+/* 大按钮 / 时间轴控件 */
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .video-btn,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .export-btn,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .play-btn,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .dim-mode-btn,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .del-card-btn,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tl-clear,
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tlb-zoom-btn {
+  border: none;
+  border-radius: 10px;
+  background: var(--fill-subtle);
+  color: var(--ink);
+  font-weight: 500;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tlb-card {
+  border-radius: 6px;
+}
+:root:is([data-form="ios"],[data-form="glass"],[data-form="float"]) .tlb-ruler {
+  border-radius: 999px;
+}
+
+/* ---- 玻璃:在上面那套控件语言之上,叠药丸圆角 + 毛玻璃 + 墙纸 ----
+   墙纸和面板透明度都从当前配色派生,所以换配色时玻璃跟着走,
+   不再是写死的一张彩图。面板不透明度调高会直接变「洗白」,别随手加。 */
+:root[data-form="glass"] #root {
+  background: var(--wallpaper);
+}
+:root[data-form="glass"] .topbar,
+:root[data-form="glass"] .panel {
+  background: color-mix(in srgb, var(--bg-panel) 52%, transparent);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}
+:root[data-form="glass"] .topbar {
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bg-elev) 70%, transparent);
+}
+:root[data-form="glass"] .panel-left {
+  border-right: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+:root[data-form="glass"] .panel-right {
+  border-left: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+/* 玻璃版控件走全药丸 + 顶部高光,和 iOS 版的 9px 圆角区分开 */
+:root[data-form="glass"] .tb-btn,
+:root[data-form="glass"] .tb-gear,
+:root[data-form="glass"] .seg,
+:root[data-form="glass"] .video-btn,
+:root[data-form="glass"] .export-btn,
+:root[data-form="glass"] .play-btn,
+:root[data-form="glass"] .tl-clear {
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bg-elev) 80%, transparent),
+    0 2px 8px rgba(20, 25, 40, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+:root[data-form="glass"] .tb-tab:first-of-type {
+  border-radius: 999px 0 0 999px;
+}
+:root[data-form="glass"] .tb-tab:last-of-type {
+  border-radius: 0 999px 999px 0;
+}
+:root[data-form="glass"] .tb-tab.is-on {
+  border-radius: 999px;
+}
+:root[data-form="glass"] .ctrl-input,
+:root[data-form="glass"] .kind-select {
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bg-elev) 80%, transparent);
+}
+:root[data-form="glass"] .tb-prefs-pop {
+  border-radius: 22px;
+}
+
+/* ---- 浮岛:面板不再彼此贴合,而是被间隙隔开,像一堆卡片飘在底色上 ----
+   它和 iOS 共用控件语言(见上面的家族),自己只负责一件事:改外壳布局。
+   这也是这套风格真正的差别所在 —— 面板之间从「一条线」变成「一段空隙」,
+   比任何圆角改动都显眼。 */
+:root[data-form="float"] .app {
+  padding: 12px;
+  gap: 12px;
+}
+:root[data-form="float"] .app-body {
+  gap: 12px;
+}
+:root[data-form="float"] .topbar,
+:root[data-form="float"] .panel-left,
+:root[data-form="float"] .panel-right,
+:root[data-form="float"] .tlb {
+  border: none;
+  border-radius: 18px;
+  background: var(--bg-panel);
+}
+:root[data-form="float"] .topbar {
+  height: 56px;
+  padding-left: 18px;
+}
+:root[data-form="float"] .canvas-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+}
+/* 控件比 iOS 再圆一档,和 18px 的面板圆角呼应 */
+:root[data-form="float"] .tb-btn,
+:root[data-form="float"] .tb-gear,
+:root[data-form="float"] .ctrl-input,
+:root[data-form="float"] .kind-select,
+:root[data-form="float"] .seg,
+:root[data-form="float"] .video-btn,
+:root[data-form="float"] .export-btn,
+:root[data-form="float"] .play-btn,
+:root[data-form="float"] .tl-clear {
+  border-radius: 12px;
+}
+:root[data-form="float"] .tlb-card {
+  border-radius: 10px;
+}
+:root[data-form="float"] .tb-prefs-pop {
+  border-radius: 18px;
+}
+
+/* ---- 粗野主义:3px 粗边 + 硬投影,按下时控件真的位移 ----
+   和编辑部是同一个方向的两个极端:那边 1px 细线的克制,这边把线加粗到
+   变成主角。边和投影都用 --ink,所以换任何配色都成立(不是写死的黑)。 */
+:root[data-form="brutal"] .topbar {
+  border-bottom: 3px solid var(--ink);
+}
+:root[data-form="brutal"] .tb-group {
+  gap: 8px;
+  padding-right: 14px;
+}
+:root[data-form="brutal"] .tb-btn,
+:root[data-form="brutal"] .tb-gear,
+:root[data-form="brutal"] .video-btn,
+:root[data-form="brutal"] .export-btn,
+:root[data-form="brutal"] .play-btn,
+:root[data-form="brutal"] .dim-mode-btn,
+:root[data-form="brutal"] .del-card-btn,
+:root[data-form="brutal"] .tl-clear,
+:root[data-form="brutal"] .tlb-zoom-btn {
+  margin-left: 0;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--bg-elev);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 60ms ease, box-shadow 60ms ease;
+}
+/* 按下 = 控件真的往右下沉,投影同时收掉。这套风格的手感全在这一条上 */
+:root[data-form="brutal"] .tb-btn:active,
+:root[data-form="brutal"] .tb-gear:active,
+:root[data-form="brutal"] .video-btn:active,
+:root[data-form="brutal"] .export-btn:active,
+:root[data-form="brutal"] .play-btn:active,
+:root[data-form="brutal"] .del-card-btn:active,
+:root[data-form="brutal"] .tl-clear:active {
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}
+:root[data-form="brutal"] .tb-btn--primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--ink);
+}
+:root[data-form="brutal"] .tb-tab {
+  margin: 10px 0 10px 8px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--bg-elev);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+:root[data-form="brutal"] .tb-tab.is-on {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+:root[data-form="brutal"] .ctrl-input,
+:root[data-form="brutal"] .kind-select {
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--bg-elev);
+}
+:root[data-form="brutal"] .ctrl-input:focus {
+  box-shadow: 3px 3px 0 var(--accent);
+}
+:root[data-form="brutal"] .seg {
+  gap: 0;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--bg-elev);
+}
+:root[data-form="brutal"] .seg-btn {
+  border-radius: 0;
+  font-weight: 700;
+}
+:root[data-form="brutal"] .seg-btn.is-on {
+  background: var(--ink);
+  color: var(--bg-app);
+}
+:root[data-form="brutal"] .switch {
+  width: 44px;
+  height: 24px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--bg-elev);
+}
+:root[data-form="brutal"] .switch.is-on {
+  background: var(--accent);
+}
+:root[data-form="brutal"] .switch-knob {
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: var(--ink);
+}
+:root[data-form="brutal"] .switch.is-on .switch-knob {
+  transform: translateX(20px);
+  background: var(--ink);
+}
+:root[data-form="brutal"] .tlb-card {
+  border-radius: 0;
+}
+:root[data-form="brutal"] .tb-prefs-pop {
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+/* ---- 终端 TUI:整个外壳换等宽字,按钮包进方括号 ----
+   和编辑部虽然都是直角,但控件语言是另一套:那边靠 hairline 画格子,
+   这边靠字符本身构成控件(方括号即按钮边界)。 */
+:root[data-form="tui"] {
+  /* 外壳全字换等宽 —— 这一条就定了大半个气质 */
+  --font-sans: var(--font-mono);
+}
+:root[data-form="tui"] .tb-group {
+  gap: 4px;
+  padding-right: 12px;
+}
+:root[data-form="tui"] .tb-btn,
+:root[data-form="tui"] .tb-gear {
+  margin-left: 0;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+/* 按钮的「边框」是打出来的方括号,不是画出来的线 */
+:root[data-form="tui"] .tb-btn::before,
+:root[data-form="tui"] .tb-gear::before {
+  content: "[ ";
+  opacity: 0.5;
+}
+:root[data-form="tui"] .tb-btn::after,
+:root[data-form="tui"] .tb-gear::after {
+  content: " ]";
+  opacity: 0.5;
+}
+:root[data-form="tui"] .tb-btn:hover:not(:disabled),
+:root[data-form="tui"] .tb-gear:hover,
+:root[data-form="tui"] .tb-gear.is-on {
+  background: var(--fill-subtle);
+  color: var(--ink);
+}
+:root[data-form="tui"] .tb-btn--primary {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+:root[data-form="tui"] .tb-tab {
+  border: none;
+  border-radius: 0;
+  padding: 0 10px;
+  color: var(--ink-faint);
+  font-weight: 400;
+  box-shadow: none;
+}
+:root[data-form="tui"] .tb-tab.is-on {
+  color: var(--accent);
+  box-shadow: none;
+}
+:root[data-form="tui"] .tb-tab.is-on::before {
+  content: "▸";
+  margin-right: 4px;
+}
+:root[data-form="tui"] .ctrl-input,
+:root[data-form="tui"] .kind-select {
+  border-radius: 0;
+  border: 1px solid var(--hairline-strong);
+  background: transparent;
+  font-family: var(--font-mono);
+}
+:root[data-form="tui"] .ctrl-input:focus {
+  border-color: var(--accent);
+}
+:root[data-form="tui"] .seg {
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 0;
+  background: transparent;
+}
+:root[data-form="tui"] .seg-btn {
+  border-radius: 0;
+}
+:root[data-form="tui"] .seg-btn.is-on {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+/* 开关 = 一个方块槽 + 一个实心方块,像终端里的复选框 */
+:root[data-form="tui"] .switch {
+  width: 38px;
+  height: 18px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 0;
+  background: transparent;
+}
+:root[data-form="tui"] .switch.is-on {
+  border-color: var(--accent);
+  background: transparent;
+}
+:root[data-form="tui"] .switch-knob {
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--ink-faint);
+}
+:root[data-form="tui"] .switch.is-on .switch-knob {
+  transform: translateX(20px);
+  background: var(--accent);
+}
+:root[data-form="tui"] .video-btn,
+:root[data-form="tui"] .export-btn,
+:root[data-form="tui"] .play-btn,
+:root[data-form="tui"] .dim-mode-btn,
+:root[data-form="tui"] .del-card-btn,
+:root[data-form="tui"] .tl-clear,
+:root[data-form="tui"] .tlb-zoom-btn {
+  border-radius: 0;
+  border: 1px solid var(--hairline-strong);
+  background: transparent;
+}
+:root[data-form="tui"] .tlb-card {
+  border-radius: 0;
+}
+:root[data-form="tui"] .tb-prefs-pop {
+  border-radius: 0;
+  border: 1px solid var(--ink-muted);
+}
+
+/* ---- Material(谷歌 M3) ----
+   分区逻辑和 iOS 不同:iOS 用填充色块圈出控件,这里靠「色调容器 + 高度」
+   分层。M3 相对上一代的关键变化:按钮改全圆角、标签不再全大写、控件整体
+   放大一档 —— 所以这套是八种里密度最低的。 */
+:root[data-form="material"] .tb-group {
+  gap: 8px;
+  padding-right: 14px;
+}
+:root[data-form="material"] .tb-btn,
+:root[data-form="material"] .tb-gear {
+  height: 40px;
+  margin-left: 0;
+  padding: 0 20px;
+  border: none;
+  border-radius: 999px;
+  background: var(--fill-subtle);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  box-shadow: none;
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+:root[data-form="material"] .tb-btn:hover:not(:disabled),
+:root[data-form="material"] .tb-gear:hover,
+:root[data-form="material"] .tb-gear.is-on {
+  background: var(--fill-hover);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+:root[data-form="material"] .tb-btn--primary,
+:root[data-form="material"] .tb-btn--primary:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+/* Tab 用底部指示条,不用填充块 */
+:root[data-form="material"] .tb-tab {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  box-shadow: none;
+}
+:root[data-form="material"] .tb-tab.is-on {
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+/* 输入框 = 下划线式(Material 的填充输入框) */
+:root[data-form="material"] .ctrl-input,
+:root[data-form="material"] .kind-select {
+  border: none;
+  border-bottom: 2px solid var(--hairline-strong);
+  border-radius: 4px 4px 0 0;
+  background: var(--fill-subtle);
+}
+:root[data-form="material"] .ctrl-input:focus {
+  border-bottom-color: var(--accent);
+}
+:root[data-form="material"] .seg {
+  gap: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+:root[data-form="material"] .seg-btn {
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  background: transparent;
+  border: 1px solid var(--hairline);
+  box-shadow: none;
+}
+:root[data-form="material"] .seg-btn.is-on {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+/* Material 开关:细槽 + 大圆钮,钮比槽高,悬在上面 */
+:root[data-form="material"] .switch {
+  width: 36px;
+  height: 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--hairline-strong);
+  overflow: visible;
+}
+:root[data-form="material"] .switch.is-on {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+:root[data-form="material"] .switch-knob {
+  top: -3px;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--bg-elev);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+:root[data-form="material"] .switch.is-on .switch-knob {
+  transform: translateX(16px);
+  background: var(--accent);
+}
+:root[data-form="material"] .video-btn,
+:root[data-form="material"] .export-btn,
+:root[data-form="material"] .play-btn,
+:root[data-form="material"] .dim-mode-btn,
+:root[data-form="material"] .del-card-btn,
+:root[data-form="material"] .tl-clear,
+:root[data-form="material"] .tlb-zoom-btn {
+  border: none;
+  border-radius: 999px;
+  background: var(--fill-subtle);
+  color: var(--ink);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  box-shadow: none;
+}
+:root[data-form="material"] .tlb-card {
+  border-radius: 3px;
+}
+:root[data-form="material"] .tb-prefs-pop {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 3px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ---- 无界极简:零边框零填充,只靠间距和字重分区 ----
+   比编辑部再退一步 —— 那边至少还有 hairline 画格子,这边连线都收掉,
+   控件平时是隐形的,hover 才浮现底色。 */
+:root[data-form="quiet"] .topbar {
+  border-bottom: 1px solid var(--hairline);
+  padding-left: 20px;
+}
+:root[data-form="quiet"] .tb-group {
+  gap: 2px;
+  padding-right: 16px;
+}
+:root[data-form="quiet"] .tb-btn,
+:root[data-form="quiet"] .tb-gear,
+:root[data-form="quiet"] .video-btn,
+:root[data-form="quiet"] .export-btn,
+:root[data-form="quiet"] .play-btn,
+:root[data-form="quiet"] .dim-mode-btn,
+:root[data-form="quiet"] .del-card-btn,
+:root[data-form="quiet"] .tl-clear,
+:root[data-form="quiet"] .tlb-zoom-btn {
+  margin-left: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-weight: 450;
+}
+:root[data-form="quiet"] .tb-btn:hover:not(:disabled),
+:root[data-form="quiet"] .tb-gear:hover,
+:root[data-form="quiet"] .tb-gear.is-on,
+:root[data-form="quiet"] .video-btn:hover,
+:root[data-form="quiet"] .export-btn:hover:not(:disabled) {
+  background: var(--fill-subtle);
+  color: var(--ink);
+}
+/* 主按钮也不填充,只把字染成强调色 —— 整条顶栏没有一块实色 */
+:root[data-form="quiet"] .tb-btn--primary {
+  background: transparent;
+  color: var(--accent);
+  border: none;
+  font-weight: 600;
+}
+:root[data-form="quiet"] .tb-btn--primary:hover:not(:disabled) {
+  background: var(--fill-subtle);
+  color: var(--accent);
+}
+/* 选中的 Tab 靠字重和明度胜出,不画线不填色 */
+:root[data-form="quiet"] .tb-tab {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  font-weight: 450;
+  box-shadow: none;
+}
+:root[data-form="quiet"] .tb-tab.is-on {
+  color: var(--ink);
+  font-weight: 650;
+  box-shadow: none;
+}
+:root[data-form="quiet"] .ctrl-input,
+:root[data-form="quiet"] .kind-select {
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  transition: background 160ms ease;
+}
+:root[data-form="quiet"] .ctrl-input:hover,
+:root[data-form="quiet"] .kind-select:hover {
+  background: var(--fill-subtle);
+}
+:root[data-form="quiet"] .ctrl-input:focus {
+  background: var(--fill-subtle);
+}
+:root[data-form="quiet"] .seg {
+  gap: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+:root[data-form="quiet"] .seg-btn {
+  border-radius: 7px;
+  color: var(--ink-faint);
+}
+:root[data-form="quiet"] .seg-btn.is-on {
+  background: transparent;
+  color: var(--ink);
+  font-weight: 650;
+}
+:root[data-form="quiet"] .switch {
+  width: 34px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--fill-hover);
+}
+:root[data-form="quiet"] .switch.is-on {
+  background: var(--accent);
+}
+:root[data-form="quiet"] .switch-knob {
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--ink);
+}
+:root[data-form="quiet"] .switch.is-on .switch-knob {
+  transform: translateX(16px);
+  background: var(--on-accent);
+}
+:root[data-form="quiet"] .tlb-card {
+  border-radius: 4px;
+}
+:root[data-form="quiet"] .tb-prefs-pop {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+}
+
+/* 颜色控件(原生取色器,自带吸管) */
+.ctrl-color {
+  width: 100%; height: 36px; padding: 2px; border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16); background: transparent; cursor: pointer;
+}
+
+/* ---- 视觉标签:让「手感」可见可点,不用背词 ---- */
+.fx-tagbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 2px 8px;
+  /* 单行横滚:多一行标签就少一张卡,列表才是主角 */
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.fx-tag {
+  font-size: 10px;
+  line-height: 1.5;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.12s, border-color 0.12s;
+}
+.fx-tag:hover {
+  color: var(--ink);
+  border-color: var(--hairline-strong);
+}
+.fx-tag.is-on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.fx-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+
+/* ---- 顶栏偏好设置(齿轮弹出面板) ---- */
+.tb-prefs { position: relative; display: inline-flex; }
+/* 齿轮 = 熔接按钮组里的一枚 .tb-btn(几何/配色都在上面那条规则里),
+   这里只补它自己多出来的东西:图标和文字的排版。 */
+.tb-gear {
+  display: inline-flex; align-items: center; gap: 5px;
+  cursor: pointer;
+}
+/* fixed,但一定要 portal 到 body 上再用(见 TopBar.tsx):
+   祖先只要带 filter/backdrop-filter/transform,fixed 就改成相对那个祖先定位,
+   「玻璃」的 .topbar 正好带 backdrop-filter —— 面板会被顶栏 overflow:hidden 裁没。 */
+.tb-prefs-pop {
+  position: fixed; z-index: 200;
+  width: 292px; padding: 12px 14px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--hairline); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  display: flex; flex-direction: column; gap: 10px;
+  text-align: left;
+}
+.tb-prefs-kicker {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-muted); opacity: 0.75;
+  padding-bottom: 2px; border-bottom: 1px solid var(--hairline);
+}
+/* 分组小标题(「影响成片」/「仅编辑时可见」)统领的是它**下面**那几行。
+   4px 时它离上一行只有 4px、离下一行 10px(容器 gap),读起来像在给上一行
+   加注解 —— 2026-08-30 实测被误读成「文字光晕不影响导出」。拉开上边距,
+   让它明确贴住下面的组。 */
+.tb-prefs-kicker:not(:first-child) { margin-top: 14px; }
+.tb-prefs-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: 12px; color: var(--ink);
+}
+.tb-prefs-row--col { flex-direction: column; align-items: stretch; gap: 6px; }
+.tb-prefs-ctl { display: inline-flex; align-items: center; gap: 6px; max-width: 60%; }
+.tb-prefs-ctl input[type="color"] {
+  width: 34px; height: 22px; padding: 0; border: none; background: none; cursor: pointer;
+}
+.tb-prefs-hint { font-size: 10px; color: var(--ink-muted); opacity: 0.7; }
+.tb-mini, .tb-prefs-pop select {
+  font-size: 11px; padding: 3px 7px; border-radius: 5px;
+  border: 1px solid var(--hairline); background: none; color: var(--ink-muted); cursor: pointer;
+}
+.tb-mini:hover:not(:disabled) { color: var(--ink); }
+.tb-mini:disabled, .tb-prefs-pop button:disabled { opacity: 0.4; cursor: not-allowed; }
+.tb-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.tb-sw {
+  font-size: 10px; line-height: 1.4; padding: 4px 2px;
+  border-radius: 5px; border: 1px solid var(--hairline);
+  background: none; color: var(--ink-muted); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tb-sw:hover:not(:disabled) { color: var(--ink); border-color: currentColor; }
