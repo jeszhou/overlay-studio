@@ -1,4 +1,5 @@
 import { TIER } from "../tierFlags";
+import { VERSION_LABEL, VERSION_TITLE } from "../version";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ACCENT_OPTIONS } from "../effects/hud/accent";
@@ -233,7 +234,7 @@ export function TopBar({
   return (
     <div className="topbar">
       <div className="tb-brand">
-        OVERLAY<em>/</em>STUDIO<span className="tb-ver">v7.15</span>
+        OVERLAY<em>/</em>STUDIO<span className="tb-ver" title={VERSION_TITLE}>{VERSION_LABEL}</span>
       </div>
 
       {/* 模式切换:一眼看清自己在哪 */}

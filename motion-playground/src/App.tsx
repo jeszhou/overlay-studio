@@ -513,7 +513,7 @@ export default function App() {
   const handleImportJson = async (file: File | null) => {
     if (!file) return;
     const text = await file.text();
-    const { doc, error } = parseOverlay(text);
+    const { doc, error, dropped } = parseOverlay(text);
     if (error || !doc) {
       alert(`❌ JSON 导入失败:${error}`);
       return;
@@ -526,8 +526,17 @@ export default function App() {
     setTab("edit");
     seek(0);
     setPlaying(false);
-    // 自动体检:只提醒不阻断导入
-    setLintIssues(lintOverlay(doc, LINT_CFG, { duration: durRef.current || undefined }));
+    // 自动体检:只提醒不阻断导入。
+    // 认不出的卡已经被跳过了,在这儿补一条 error —— 跳过必须看得见,
+    // 否则用户只会觉得「导进来好像少了点东西」却说不上少了什么。
+    setLintIssues([
+      ...(dropped ?? []).map((d) => ({
+        level: "error" as const,
+        rule: "unknown-kind",
+        message: `跳过了 ${d.n} 张「${d.kind}」——  这一版没有这种卡,其余卡已正常导入`,
+      })),
+      ...lintOverlay(doc, LINT_CFG, { duration: durRef.current || undefined }),
+    ]);
     setLintCollapsed(false);
   };
 
@@ -574,11 +583,15 @@ export default function App() {
         fetch("/demo/demo-overlay.json").then((r) => r.text()),
         fetch("/demo/demo.srt").then((r) => r.text()),
       ]);
-      const { doc, error } = parseOverlay(jsonText);
+      const { doc, error, dropped } = parseOverlay(jsonText);
       if (error || !doc) {
         alert(`❌ 示例载入失败:${error}`);
         return;
       }
+      // 内置示例是按本档生成的,理论上不该有认不出的卡。真出现了就是发行版做漏了 ——
+      // 留这行 warn 当信号,别让示例悄悄少几张卡还没人发现。
+      if (dropped?.length)
+        console.warn("[示例] 跳过了这一版没有的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
       const lines = parseSrt(srtText);
       pushHistory(true);
       camClearedRef.current = false;

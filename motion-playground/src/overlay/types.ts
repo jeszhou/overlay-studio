@@ -74,17 +74,36 @@ export interface OverlayDoc {
   cards: OverlayCard[];
 }
 
-/** 校验 + 规范化:补默认参数、按 start 排序 */
-export function parseOverlay(raw: unknown): { doc?: OverlayDoc; error?: string } {
+/**
+ * 校验 + 规范化:补默认参数、按 start 排序。
+ *
+ * 认不出的卡**跳过,不作废整份编排**(2026-09-02 改)。以前一见 unknown kind 就整份
+ * 返回错误 —— 公开版只有 20 张卡,拿到一份含付费卡的编排,用户看到的是「导入失败」
+ * 四个字,像是软件坏了,而其余十几张明明都放得出来。跳过的卡放进 dropped 带出去,
+ * 由调用方明说少了哪几张,别让它无声消失。
+ *
+ * 只有「连 cards 数组都没有」这类根本不是编排的输入才整份拒绝。
+ */
+export function parseOverlay(raw: unknown): {
+  doc?: OverlayDoc;
+  error?: string;
+  /** 被跳过的卡:kind = 认不出的类型,n = 这份编排里有几张 */
+  dropped?: { kind: string; n: number }[];
+} {
   try {
     const o = typeof raw === "string" ? JSON.parse(raw) : raw;
     if (!o || !Array.isArray(o.cards)) return { error: "缺少 cards 数组" };
     const ids = new Set<string>();
     const cards: OverlayCard[] = [];
+    const dropCount = new Map<string, number>();
     for (let i = 0; i < o.cards.length; i++) {
       const c = o.cards[i];
       const def = EFFECTS.find((e) => e.id === c.kind);
-      if (!def) return { error: `第 ${i + 1} 张卡片 kind 未知: "${c.kind}"` };
+      if (!def) {
+        const k = String(c?.kind ?? "(没写 kind)");
+        dropCount.set(k, (dropCount.get(k) ?? 0) + 1);
+        continue;
+      }
       if (typeof c.start !== "number" || typeof c.end !== "number" || c.end <= c.start)
         return { error: `第 ${i + 1} 张卡片时间非法: start=${c.start} end=${c.end}` };
       const id = String(c.id ?? `card-${i + 1}`);
@@ -107,8 +126,18 @@ export function parseOverlay(raw: unknown): { doc?: OverlayDoc; error?: string }
       cards.push({ id, kind: c.kind, start: c.start, end: c.end, seg, lintOff, params });
     }
     cards.sort((a, b) => a.start - b.start);
+    // 一张都不认识:多半不是「少几张卡」,而是拿错了文件或者版本对不上。
+    // 这种情况给整份错误比给一份空编排有用 —— 空编排会让人以为文件是空的。
+    if (!cards.length && dropCount.size)
+      return {
+        error: `这份编排里的 ${o.cards.length} 张卡这一版都不支持(${[...dropCount.keys()]
+          .slice(0, 3)
+          .join("、")}${dropCount.size > 3 ? " 等" : ""})`,
+      };
+    const dropped = [...dropCount].map(([kind, n]) => ({ kind, n }));
     const theme = o.theme === "light" ? "light" : o.theme === "dark" ? "dark" : undefined;
     return {
+      dropped: dropped.length ? dropped : undefined,
       doc: {
         version: 1,
         theme,

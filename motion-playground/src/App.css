@@ -1065,6 +1065,8 @@ input[type="range"]::-moz-range-thumb {
   border: 1px solid var(--hairline);
   border-radius: 3px;
   padding: 1px 6px;
+  /* 徽章带悬停详情(档位+发布日期),给个手型光标让人知道可以停一下 */
+  cursor: help;
 }
 .tb-tab {
   padding: 0 18px;

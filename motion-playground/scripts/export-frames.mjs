@@ -128,9 +128,24 @@ function extractVideoFrames() {
   const need = collectVideoUses();
   const manifest = {};
   if (!need.size) return manifest;
-  if (spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status !== 0) {
-    console.log("ffmpeg not found — 卡内视频无法抽帧,视频窗将为空");
-    return manifest;
+  // 抽帧要 ffmpeg 和 ffprobe 两个命令,**分别探**。
+  // 以前只探 ffmpeg:装法不同的机器(Windows 上分开装、或只装了其中一个)ffprobe 会缺,
+  // 于是每张卡都走到下面「读不到时长」那条 continue,导出照跑,成片里视频窗全是空的
+  // —— 而且没有任何一句是红色的,客户拿到坏成片多半不会来问,只会觉得这软件不行。
+  //
+  // 编排里根本没有视频卡时这段不会执行(上面 need.size 为 0 就返回了),
+  // 所以纯图文的片子不装 ffmpeg 照样导得出来,这里不会误伤。
+  for (const [bin, what] of [["ffmpeg", "抽帧"], ["ffprobe", "读视频时长"]]) {
+    if (spawnSync(bin, ["-version"], { stdio: "ignore" }).status !== 0) {
+      console.error(
+        `\n【导出失败原因】这条编排里有卡要放视频,需要 ${bin}(用来${what}),但本机没装或不在 PATH 里。\n` +
+          `装好之后重新导出即可:\n` +
+          `  macOS:   brew install ffmpeg\n` +
+          `  Windows: winget install --id Gyan.FFmpeg -e\n` +
+          `(ffmpeg 和 ffprobe 通常一起装上;只装了一个的话把另一个补齐。装完要重开终端。)`,
+      );
+      process.exit(1);
+    }
   }
   const cacheRoot = path.join(ROOT, "public", "_fxframes");
   // 清理 7 天前的旧缓存
@@ -219,22 +234,28 @@ const LAUNCH_OPTS = {
 };
 
 // puppeteer 捆绑的 Chromium 没下载时(~/.cache/puppeteer 为空,npm 安装时跳过了
-// 下载步骤),launch 会报「must specify executablePath」——退回用本机装的
-// Google Chrome,导出照常跑,不必为此下 150MB。
+// 下载步骤),launch 会报「must specify executablePath」。
+//
+// 以前这里退回本机 Google Chrome 继续跑。**2026-09-02 改成直接停下**,因为那条退路
+// 产出的是坏成片:实测 Chrome 151 在无头+虚拟时间下不推进 CSS 动画时间线,靠
+// transition/animation 淡入的卡会整张停在 opacity:0(2026-08-27 踩过,字幕和大半动效
+// 全不见)。原来只 console.warn 一句 —— 它混在几百行导出日志里,界面上是绿色的
+// 「导出完成」,用户拿到一条缺了一半动效的片子,还以为是自己编排没做好。
+//
+// 一条命令就能装好,报错停下比默默交坏片强得多。
 let browser;
 try {
   browser = await puppeteer.launch(LAUNCH_OPTS);
 } catch (err) {
   if (!/executablePath|Could not find/i.test(String(err?.message))) throw err;
-  // ⚠️ 本机 Chrome 只是最后的救命稻草:实测 Chrome 151 在无头+虚拟时间下
-  // 不推进 CSS 动画时间线,靠 transition/animation 淡入的卡会整张停在
-  // opacity:0(2026-08-27 踩过:导出成片里字幕和大半动效全不见)。
-  // 正解是装匹配版:npx puppeteer browsers install chrome
-  console.warn(
-    "[export] ⚠️ 捆绑 Chromium 缺失,退回本机 Chrome —— 动效可能丢失!\n" +
-      "         请执行:npx puppeteer browsers install chrome  然后重新导出",
+  console.error(
+    "\n【导出失败原因】渲染器(Chromium)没装好,导不了。\n" +
+      "在项目文件夹里运行这一条,然后重新导出:\n" +
+      "  npx puppeteer browsers install chrome\n" +
+      "(以前这里会退回用你电脑上的 Chrome 硬跑,但那样导出的片子会缺掉大半动效,\n" +
+      " 所以现在宁可停下来告诉你,也不给你一条坏片。)",
   );
-  browser = await puppeteer.launch({ ...LAUNCH_OPTS, channel: "chrome" });
+  process.exit(1);
 }
 
 try {
