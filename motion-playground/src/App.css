@@ -2356,3 +2356,22 @@ input[type="range"]::-moz-range-thumb {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tb-sw:hover:not(:disabled) { color: var(--ink); border-color: currentColor; }
+
+/* ---- 后台掉线横幅 ----
+   页面是加载进内存的,服务停了它照样显示、按钮照样能点,用户自己看不出来。
+   这条横幅是唯一的告知渠道,所以放在最顶上、占满一行,不做成角落里的小圆点。 */
+.offline-bar {
+  flex: none;
+  padding: 8px 16px;
+  background: var(--danger);
+  color: #17110f;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+.offline-bar code {
+  font-family: var(--font-mono);
+  background: rgba(0, 0, 0, 0.14);
+  border-radius: 3px;
+  padding: 1px 5px;
+}

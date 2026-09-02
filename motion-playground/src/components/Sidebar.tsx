@@ -1,5 +1,6 @@
 import { TIER } from "../tierFlags";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { uploadErrText } from "../uploadErr";
 import type { EffectDef, VisualTag } from "../effects/types";
 import { VISUAL_TAGS } from "../effects/types";
 import { EFFECT_GROUPS } from "../effects/registry";
@@ -16,6 +17,8 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   onReplay: () => void;
   hasVideo: boolean;
+  /** 视频正在落盘:和顶栏那个按钮同一把锁 */
+  videoBusy: boolean;
   fxScale: number;
   videoScale: number;
   onVideoScale: (v: number) => void;
@@ -70,6 +73,7 @@ export function Sidebar({
   onSelect,
   onReplay,
   hasVideo,
+  videoBusy,
   fxScale,
   videoScale,
   onVideoScale,
@@ -121,7 +125,7 @@ export function Sidebar({
       if (data.ok) onSetCam(data.src);
       else alert(`❌ 上传失败:${data.error}`);
     } catch (e) {
-      alert(`❌ 上传失败:${e}`);
+      alert(`❌ 上传失败:${uploadErrText(e)}`);
     } finally {
       setCamUploading(false);
     }
@@ -500,8 +504,12 @@ export function Sidebar({
           onChange={(e) => onVideo(e.target.files?.[0] ?? null)}
         />
         <div className="video-row">
-          <button className="video-btn" onClick={() => fileRef.current?.click()}>
-            {hasVideo ? "🎬 换视频" : "🎬 导入视频"}
+          <button
+            className="video-btn"
+            disabled={videoBusy}
+            onClick={() => fileRef.current?.click()}
+          >
+            {videoBusy ? "⏳ 上传中…" : hasVideo ? "🎬 换视频" : "🎬 导入视频"}
           </button>
           {hasVideo && (
             <button

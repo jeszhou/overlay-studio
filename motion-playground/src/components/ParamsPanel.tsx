@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { uploadErrText } from "../uploadErr";
 import { TIER } from "../tierFlags";
 import type { Control, EffectDef } from "../effects/types";
 import { EFFECT_GROUPS } from "../effects/registry";
@@ -284,7 +285,7 @@ function MediaRow({
       if (data.ok) onChange(data.src);
       else alert(`❌ 上传失败:${data.error}`);
     } catch (e) {
-      alert(`❌ 上传失败:${e}`);
+      alert(`❌ 上传失败:${uploadErrText(e)}`);
     } finally {
       setUploading(false);
     }
@@ -362,7 +363,7 @@ function MediaBulkRow({
         if (data.ok) patch[keys[i]] = data.src;
         else alert(`❌ ${use[i].name} 上传失败:${data.error}`);
       } catch (e) {
-        alert(`❌ ${use[i].name} 上传失败:${e}`);
+        alert(`❌ ${use[i].name} 上传失败:${uploadErrText(e)}`);
       }
     }
     setBusy("");
@@ -736,7 +737,14 @@ export function ParamsPanel({
         {card && onKindChange && (
           <div className="ctrl">
             <div className="ctrl-head">
-              <span>更换特效(内容/时间/位置保留)</span>
+              {/* 标签跟着分档走:公开版关掉了内容搬家(kindSwapCarry),换卡给的是新卡默认值。
+                  写死「内容保留」的话,免费版用户换完发现文案没了,而时间和落位又确实还在,
+                  只会以为是自己手滑 —— 失败是静默的,不会有人来问。 */}
+              <span>
+                {TIER.kindSwapCarry
+                  ? "更换特效(内容/时间/位置保留)"
+                  : "更换特效(时间/位置保留,文案重置)"}
+              </span>
             </div>
             <input
               className="ctrl-input"

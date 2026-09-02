@@ -80,6 +80,9 @@ interface TopBarProps {
   /* 通用 */
   exporting: boolean;
   hasVideo: boolean;
+  /** 视频正在落盘:按钮要变灰。传一条几百 MB 的口播要几十秒,
+      不变灰的话界面像是没反应,人会再点一次 —— 那一次点击正是后台崩溃的触发点 */
+  videoBusy: boolean;
   onVideo: (file: File | null) => void;
   onExport: () => void;
   /* 外壳外观:风格(形状) × 配色(颜色),两根轴各自独立 */
@@ -201,6 +204,7 @@ export function TopBar({
   onReplay,
   exporting,
   hasVideo,
+  videoBusy,
   onVideo,
   onExport,
   form,
@@ -469,8 +473,12 @@ export function TopBar({
         <button className="tb-btn" onClick={onLoadDemo} title="载入内置演示编排,不需要自己的视频">
           🎬 示例
         </button>
-        <button className="tb-btn" onClick={() => videoRef.current?.click()}>
-          {hasVideo ? "换视频" : "导入视频"}
+        <button
+          className="tb-btn"
+          disabled={videoBusy}
+          onClick={() => videoRef.current?.click()}
+        >
+          {videoBusy ? "⏳ 上传中…" : hasVideo ? "换视频" : "导入视频"}
         </button>
         {(tab === "edit" || TIER.singleCardExport) && (
           <button className="tb-btn tb-btn--primary" onClick={onExport} disabled={exporting}>
@@ -498,7 +506,12 @@ export function TopBar({
         type="file"
         accept="video/*"
         style={{ display: "none" }}
-        onChange={(e) => onVideo(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          onVideo(e.target.files?.[0] ?? null);
+          // 清掉选中值:不清的话重选同一个文件不会触发 change(上传失败后重试就是这一幕),
+          // 侧栏那个入口和上面的 JSON 入口都清了,只有这里漏了
+          if (videoRef.current) videoRef.current.value = "";
+        }}
       />
     </div>
   );

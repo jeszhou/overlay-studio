@@ -16,6 +16,7 @@ import { parseOverlay, type OverlayCard, type OverlayDoc } from "./overlay/types
 import { parseSrt, type SrtLine } from "./overlay/srt";
 import { canCarryContent, swapCardParams } from "./overlay/kindSwap";
 import { lintOverlay, mergeLintConfig, type LintConfig, type LintIssue } from "./overlay/lint";
+import { uploadErrText } from "./uploadErr";
 import lintDefaults from "../lint-rules.default.json";
 
 // 个人阈值(lint-rules.local.json,gitignore):存在就叠加覆盖公共默认
@@ -50,6 +51,13 @@ export default function App() {
   const [showPerson, setShowPerson] = useState(true);
   // 导入的本地视频(object URL):编辑台=停在首帧等播放;效果库=静音循环当背景
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  // 视频落盘期间锁住导入按钮。以前这里没有任何状态:传一条几百 MB 的口播要几十秒,
+  // 界面全程毫无反应(画面里的视频还先被清掉了),换谁都会再点一次 —— 而同一个素材
+  // 传第二遍正好是把后台搞死的那个操作。别的三个上传入口早就有这个锁,只有它漏了。
+  const [videoBusy, setVideoBusy] = useState(false);
+  // 本地服务在不在。页面是加载进浏览器内存的,服务停了它照样显示、按钮照样能点,
+  // 只有真去请求后台才露馅 —— 用户完全没办法自己看出来。所以定时探一下,明着说。
+  const [online, setOnline] = useState(true);
   const [videoDur, setVideoDur] = useState(0);
   // 编辑台的视频声音(效果库永远静音)
   const [muted, setMuted] = useState(false);
@@ -199,6 +207,34 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 心跳:每 10 秒探一次后台(切到别的标签页时不探,省得白费请求)。
+  // 回到这个标签页立刻补探一次 —— 「昨天的页面被浏览器恢复了、服务其实没起」
+  // 正是最常见的那一幕,这时候第一时间告诉他,别等他点了导入才失败。
+  useEffect(() => {
+    // 连着两次探不到才算掉线。一次就报会误伤:改 vite.config.ts 会让服务自己重启一下,
+    // 导出跑满 CPU 时也可能慢一拍 —— 那几秒里弹一条「服务已停止」比不弹更让人慌。
+    let miss = 0;
+    const ping = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const r = await fetch("/api/export-status", { cache: "no-store" });
+        if (!r.ok) throw new Error(String(r.status));
+        miss = 0;
+        setOnline(true);
+      } catch {
+        miss += 1;
+        if (miss >= 2) setOnline(false);
+      }
+    };
+    ping();
+    const id = window.setInterval(ping, 10000);
+    document.addEventListener("visibilitychange", ping);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", ping);
+    };
+  }, []);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(AUTOSAVE_KEY);
@@ -226,8 +262,15 @@ export default function App() {
   // 落盘过的预览视频自动当全局「口播视频」:运镜卡导出时要烤的,和预览里那条
   // 本来就是同一条。放在 effect 里而不是导入回调里,是因为「先导视频后导编排」
   // 和「先导编排后导视频」两种顺序都要覆盖到。已经手填过的不动。
+  // 用户点过「清除」就不再往回填。以前的判断只看 `!overlay.cam`,清除把 cam 置空 →
+  // 条件重新成立 → 立刻又填回去,那个「清除」按钮等于一个摆设。
+  // 记的是「用户主动清过」这件事本身,不是「哪条视频挂过」:后者在刷新(存档里 cam 已带值,
+  // 记号没机会写)和换编排(视频没变、记号还在,新编排永远挂不上)两种情况下都会失效。
+  // 换视频 / 导入新编排 / 载入示例时把记号清掉:那是一次新的开始,该挂还得挂。
+  const camClearedRef = useRef(false);
   useEffect(() => {
     if (!overlay || overlay.cam || !videoUrl?.startsWith("/_media/")) return;
+    if (camClearedRef.current) return;
     setOverlay((o) => (o && !o.cam ? { ...o, cam: videoUrl } : o));
   }, [overlay, videoUrl]);
 
@@ -256,14 +299,19 @@ export default function App() {
       }
     }, 800);
     return () => clearTimeout(id);
+    // videoUrl 也要在依赖里:少了它,「清除视频」之后不会重新落盘,存档里留着旧地址,
+    // 刷新一次视频又回来了 —— 用户看到的就是「清了个寂寞」。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overlay, srt]);
+  }, [overlay, srt, videoUrl]);
 
-  // ---- 撤销/重做(⌘Z / ⇧⌘Z):存 overlay 快照 ----
-  const overlaySnapRef = useRef<OverlayDoc | null>(null);
-  overlaySnapRef.current = overlay;
-  const undoRef = useRef<(OverlayDoc | null)[]>([]);
-  const redoRef = useRef<(OverlayDoc | null)[]>([]);
+  // ---- 撤销/重做(⌘Z / ⇧⌘Z):存 overlay + 字幕稿 快照 ----
+  // 字幕稿也要进快照:「清空」会把它一起清掉,而弹窗承诺了能 ⌘Z 撤销 ——
+  // 只记 overlay 的话,撤销回来卡片在、字幕稿没了,自动存档还会顺手把最后一份也覆盖掉。
+  type Snap = { overlay: OverlayDoc | null; srt: SrtLine[] | null };
+  const snapRef = useRef<Snap>({ overlay: null, srt: null });
+  snapRef.current = { overlay, srt };
+  const undoRef = useRef<Snap[]>([]);
+  const redoRef = useRef<Snap[]>([]);
   const lastEditRef = useRef(0);
 
   /**
@@ -275,20 +323,24 @@ export default function App() {
     const coalesce = !force && now - lastEditRef.current < 400;
     lastEditRef.current = now;
     if (coalesce) return;
-    undoRef.current.push(structuredClone(overlaySnapRef.current));
+    undoRef.current.push(structuredClone(snapRef.current));
     if (undoRef.current.length > 50) undoRef.current.shift();
     redoRef.current = [];
   };
 
+  const applySnap = (s: Snap) => {
+    setOverlay(s.overlay);
+    setSrt(s.srt);
+  };
   const undo = () => {
     if (!undoRef.current.length) return;
-    redoRef.current.push(structuredClone(overlaySnapRef.current));
-    setOverlay(undoRef.current.pop()!);
+    redoRef.current.push(structuredClone(snapRef.current));
+    applySnap(undoRef.current.pop()!);
   };
   const redo = () => {
     if (!redoRef.current.length) return;
-    undoRef.current.push(structuredClone(overlaySnapRef.current));
-    setOverlay(redoRef.current.pop()!);
+    undoRef.current.push(structuredClone(snapRef.current));
+    applySnap(redoRef.current.pop()!);
   };
 
   // 编辑台总时长 = max(视频时长, 最后一张卡结束)
@@ -467,6 +519,7 @@ export default function App() {
       return;
     }
     pushHistory(true);
+    camClearedRef.current = false; // 新编排:口播视频该挂还得挂
     setOverlay(doc);
     originRef.current = structuredClone(doc); // AI 初选快照,学习闭环用
     setSelCardId(doc.cards[0]?.id ?? null);
@@ -528,6 +581,7 @@ export default function App() {
       }
       const lines = parseSrt(srtText);
       pushHistory(true);
+      camClearedRef.current = false;
       setSrt(lines.length ? lines : null);
       setOverlay(doc);
       originRef.current = structuredClone(doc);
@@ -606,9 +660,15 @@ export default function App() {
   };
 
   const handleClearOverlay = () => {
+    // 「清空」清的是这一条编排:卡片 + 字幕稿 + 自动存档。以前只清卡片,字幕稿原样留着,
+    // 下一条片子的卡就长在上一条的字幕上 —— 这也是「清除不干净」的一份。
+    // 导入的视频不在此列,它有自己的「清除」按钮,不该被这里顺手带走。
+    if (!confirm("清空这条编排?\n\n卡片和字幕稿都会清掉(导入的视频不受影响)。\n可以用 ⌘Z 撤销。"))
+      return;
     pushHistory(true);
     localStorage.removeItem(AUTOSAVE_KEY);
     setOverlay(null);
+    setSrt(null);
     setPlaying(false);
     setSelCardId(null);
     seek(0);
@@ -923,6 +983,8 @@ export default function App() {
   };
 
   const handleVideo = async (file: File | null) => {
+    if (videoBusy) return;
+    camClearedRef.current = false; // 换了视频,之前那次「清除」不作数
     setVideoUrl((prev) => {
       if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
       return null;
@@ -933,6 +995,7 @@ export default function App() {
       return;
     }
     setPlaying(false);
+    setVideoBusy(true);
     // 先落盘换一个真实路径:刷新后能自动恢复,无头 Chrome 导出时也读得到。
     // 线上试玩版没有这个后端,退回 blob 地址 —— 那种情况下刷新仍需重新导入。
     try {
@@ -941,13 +1004,24 @@ export default function App() {
         headers: { "x-filename": encodeURIComponent(file.name) },
         body: file,
       });
-      const d = r.ok ? await r.json() : null;
+      // 非 2xx 也要把响应体读出来:后台写盘失败时会认真回一句原因(500 + JSON),
+      // 以前 `r.ok ? … : null` 直接把它扔了,页面一声不吭退回 blob,用户以为导入成功了
+      const d = await r.json().catch(() => null);
       if (d?.ok && d.url) {
         setVideoUrl(d.url);
         return;
       }
-    } catch {
-      /* 落盘失败就退回 blob,不挡住编辑 */
+      alert(
+        `❌ 视频落盘失败:${d?.error ?? `HTTP ${r.status}`}\n\n` +
+          "先用临时地址预览;这种情况下刷新要重新导入,导出时也带不上口播。",
+      );
+    } catch (e) {
+      // 本地服务没在跑的时候会走到这儿。以前这里一声不吭地退回 blob,用户不知道后台已经
+      // 掉线,只会觉得「刷新一次素材就没了」。和其他三个上传入口一样弹一句人话;
+      // 顶部横幅交给心跳去判(它要连续两次探不到才报,这里一次失败就翻旗会闪一下又消失)。
+      alert(`❌ 视频落盘失败:${uploadErrText(e)}`);
+    } finally {
+      setVideoBusy(false);
     }
     setVideoUrl(URL.createObjectURL(file));
   };
@@ -1011,6 +1085,12 @@ export default function App() {
         }
       }}
     >
+      {!online && (
+        <div className="offline-bar">
+          ⚠️ 本地服务已停止 —— 这个页面还开着,但导入、上传、导出都不会成功。
+          回到启动时那个终端窗口,重新运行 <code>npm run dev</code>(或再双击一次启动器),然后刷新本页。
+        </div>
+      )}
       <TopBar
         tab={tab}
         onTab={setTab}
@@ -1034,6 +1114,7 @@ export default function App() {
         onReplay={() => setPlayToken((t) => t + 1)}
         exporting={exporting}
         hasVideo={videoUrl !== null}
+        videoBusy={videoBusy}
         onVideo={handleVideo}
         onExport={handleExport}
         form={form}
@@ -1105,7 +1186,10 @@ export default function App() {
         sideColor={overlay?.sideColor ?? ""}
         onSideColor={(c) => setOverlay((o) => (o ? { ...o, sideColor: c || undefined } : o))}
         cam={overlay?.cam ?? ""}
-        onSetCam={(src) => setOverlay((o) => (o ? { ...o, cam: src || undefined } : o))}
+        onSetCam={(src) => {
+          camClearedRef.current = !src; // 清空 = 用户主动清过,自动挂载别再填回来
+          setOverlay((o) => (o ? { ...o, cam: src || undefined } : o));
+        }}
         srt={srt}
         curT={curT}
         onSeek={seek}
@@ -1118,6 +1202,7 @@ export default function App() {
         onImportJson={handleImportJson}
         onExportJson={handleExportJson}
         onClearOverlay={handleClearOverlay}
+        videoBusy={videoBusy}
         onVideo={handleVideo}
         onFxScale={setFxScale}
         onExportSec={setExportSec}

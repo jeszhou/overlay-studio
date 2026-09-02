@@ -421,11 +421,21 @@ export function Canvas({
               onVideoMeta?.((e.target as HTMLVideoElement).duration || 0)
             }
             onError={(e) => {
-              const err = (e.target as HTMLVideoElement).error;
+              const el = e.target as HTMLVideoElement;
+              const err = el.error;
+              // 错误码 4 有两种截然不同的原因,却长得一模一样:一是编码真的放不了,
+              // 二是文件根本没读全 —— 大视频写盘要时间,上传还没落完就点播放就会撞上。
+              // 以前一律赖 H.265,客户就跑去重导一遍格式,白折腾。
+              // 拿浏览器自己的解码能力来分辨:它连 H.265 都放得了,那锅就不在编码上。
+              const hevcOk =
+                el.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"') !== "" &&
+                el.canPlayType('video/mp4; codecs="hvc1.2.4.L120.B0"') !== "";
               const msg =
-                err?.code === 4
-                  ? "浏览器不支持这个视频的编码(常见于 H.265/HEVC)。用剪映导出时选 H.264,或换 Chrome 试试。"
-                  : `视频加载失败(错误码 ${err?.code ?? "?"})`;
+                err?.code !== 4
+                  ? `视频加载失败(错误码 ${err?.code ?? "?"})`
+                  : hevcOk
+                    ? "这个视频读不出来。多半是还没传完就点了播放 —— 大文件写盘要几十秒。等一会儿刷新页面重新选一次;要是刷新后还这样,换个视频试试。"
+                    : "浏览器不支持这个视频的编码(常见于 H.265/HEVC)。用剪映导出时选 H.264,或换 Chrome 试试。";
               alert(`❌ ${msg}`);
             }}
           />

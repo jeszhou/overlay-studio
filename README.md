@@ -31,7 +31,7 @@ Overlay Studio 的解法:动效**提前**做好——20 张卡,每张都调好�
 
 ## 快速开始(3 分钟)
 
-需要两样:[Node.js](https://nodejs.org/) ≥ 20,和 **ffmpeg**(导出时用;不装也能预览,但导不出成片)。
+需要两样:[Node.js](https://nodejs.org/) ≥ 22.12(导出用的组件要求),和 **ffmpeg**(导出时用;不装也能预览,但导不出成片)。
 
 ```bash
 brew install ffmpeg                      # macOS
