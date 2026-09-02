@@ -18,8 +18,6 @@
 ## 本期决定
 
 - 主点缀色:<当期穿着/画面定的色,如 orange>
-- 皮肤 skin:<rose/iris/dawn/默认>
-- 风格骨架 style:<默认 HUD / sketch 漫画白卡>
 - 其他:<如"原片有烧录字幕,不配 caption-track">
 
 ## 已完成

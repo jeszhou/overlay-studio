@@ -6,7 +6,7 @@
  */
 
 /** 徽章正文 */
-export const VERSION_LABEL = "v1.0.0";
+export const VERSION_LABEL = "v1.0.1";
 
 /** 鼠标悬停时的一行详情 */
 export const VERSION_TITLE = "公开版 · 2026-09-02 发布";

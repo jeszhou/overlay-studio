@@ -241,7 +241,12 @@ export default function App() {
       if (!raw) return;
       const saved = JSON.parse(raw);
       if (saved.overlay?.cards?.length) {
-        setOverlay(saved.overlay);
+        // 也走一遍 parseOverlay:导入 JSON 会做的字段迁移(letter-glitch 的 speed→flipMs 之类)
+        // 和「认不出的卡跳过」,刷新恢复以前全跳过了 —— 升级后旧草稿翻动快 N 倍,就是这个原因。
+        const { doc: migrated, dropped } = parseOverlay(saved.overlay);
+        if (dropped?.length)
+          console.warn("恢复上次编排时跳过了这一版没有的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
+        setOverlay(migrated ?? saved.overlay);
         originRef.current = saved.origin ?? null;
         if (Array.isArray(saved.srt) && saved.srt.length) setSrt(saved.srt);
         setSelCardId(saved.overlay.cards[0]?.id ?? null);
@@ -518,6 +523,9 @@ export default function App() {
       alert(`❌ JSON 导入失败:${error}`);
       return;
     }
+    // 和「载入示例」一样先问一句。这个入口以前不问:拖错一个 JSON 进窗口,当前编排立刻被换掉,
+    // 800ms 后自动存档也跟着被盖 —— ⌘Z 能救,刷新一次就救不回了。
+    if (overlay?.cards.length && !confirm("导入这份编排会替换当前编排(可撤销),继续吗?")) return;
     pushHistory(true);
     camClearedRef.current = false; // 新编排:口播视频该挂还得挂
     setOverlay(doc);
@@ -533,7 +541,7 @@ export default function App() {
       ...(dropped ?? []).map((d) => ({
         level: "error" as const,
         rule: "unknown-kind",
-        message: `跳过了 ${d.n} 张「${d.kind}」——  这一版没有这种卡,其余卡已正常导入`,
+        message: `跳过了 ${d.n} 张「${d.kind}」——  这一版没有这种卡,其余卡已正常导入。注意:再导出 JSON 时这几张不会带回去,原文件留好`,
       })),
       ...lintOverlay(doc, LINT_CFG, { duration: durRef.current || undefined }),
     ]);
@@ -998,6 +1006,11 @@ export default function App() {
   const handleVideo = async (file: File | null) => {
     if (videoBusy) return;
     camClearedRef.current = false; // 换了视频,之前那次「清除」不作数
+    // 记住换之前的主视频:下面落盘成功后,如果全局「口播视频」(overlay.cam)就是它,要跟着换。
+    // 以前不换 —— 自动挂载只在 cam 为空时生效,换视频后 cam 还指着上一条:预览里运镜卡
+    // 圆窗放的是新视频(预览用 videoUrl),导出烤进去的却是旧的(导出用 doc.cam),而且没有任何提示。
+    // 只在「cam 等于旧主视频」时换:用户在侧栏手动选过别的口播视频,那是他的选择,不动。
+    const prevUrl = videoUrl;
     setVideoUrl((prev) => {
       if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
       return null;
@@ -1022,6 +1035,7 @@ export default function App() {
       const d = await r.json().catch(() => null);
       if (d?.ok && d.url) {
         setVideoUrl(d.url);
+        setOverlay((o) => (o && o.cam && o.cam === prevUrl ? { ...o, cam: d.url } : o));
         return;
       }
       alert(

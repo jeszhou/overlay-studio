@@ -163,7 +163,23 @@ function overlayExport(): Plugin {
             prog = { running: true, stage: 'prep', frame: 0, total: 0, startedAt: Date.now(), framesAt: 0 }
             let out = ''
             let err = ''
+            // 看门狗:子进程 15 分钟没有任何输出就当它假死,强制停掉。不设的话 busy 永远是 true,
+            // 之后每次点导出都是「已有导出任务在进行中」,只能重启服务。15 分钟留给最慢的静默
+            // 阶段(长视频抽帧、ProRes 合成都不打进度);脚本内部另有 30 秒的单帧超时兜常见情况。
+            const IDLE_MS = 15 * 60_000
+            const giveUp = () => {
+              err +=
+                '\n【导出失败原因】导出 15 分钟没有任何进展,已强制停止。多半是渲染器假死了:' +
+                '重新导出一次;还不行就重启 npm run dev。'
+              child.kill('SIGKILL')
+            }
+            let idle = setTimeout(giveUp, IDLE_MS)
+            const kick = () => {
+              clearTimeout(idle)
+              idle = setTimeout(giveUp, IDLE_MS)
+            }
             child.stdout.on('data', (d) => {
+              kick()
               out += d
               process.stdout.write(`[export] ${d}`)
               // 从累计输出的尾部解析进度(行可能被分块截断,所以每次都从全文找最后一条)
@@ -185,8 +201,12 @@ function overlayExport(): Plugin {
               if (out.includes('composing WebM')) prog.stage = 'webm'
               if (out.includes('baking')) prog.stage = 'sfx'
             })
-            child.stderr.on('data', (d) => (err += d))
+            child.stderr.on('data', (d) => {
+              kick()
+              err += d
+            })
             child.on('close', (code) => {
+              clearTimeout(idle)
               busy = false
               prog = { ...prog, running: false, stage: 'done', ok: code === 0 }
               fs.rmSync(jobFile, { force: true })

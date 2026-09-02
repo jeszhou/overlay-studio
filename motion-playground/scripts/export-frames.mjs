@@ -69,18 +69,6 @@ const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
 const name = mode === "timeline" ? "timeline" : effectId;
 const outDir = path.join(ROOT, "exports", `${name}-${stamp}`);
 const finalDir = path.join(ROOT, "exports", "output");
-const freeNow = freeBytes(ROOT);
-if (freeNow < needBytes) {
-  console.error(
-    `\n【导出失败原因】磁盘空间不够:还剩 ${gb(freeNow)}GB,这条 ${Math.round(duration)}s 的片子` +
-      `大约需要 ${gb(needBytes)}GB(PNG 序列 + ProRes 成片 + 余量)。\n` +
-      `先腾地方再导 —— exports/ 里除 output 外的目录都是 PNG 中间产物,成片出来后可以整个删。`,
-  );
-  process.exit(1);
-}
-
-fs.mkdirSync(outDir, { recursive: true });
-fs.mkdirSync(finalDir, { recursive: true });
 
 
 // ---- 卡内视频预抽帧 ----
@@ -124,8 +112,9 @@ function collectVideoUses() {
   return need;
 }
 
-function extractVideoFrames() {
-  const need = collectVideoUses();
+const cacheRoot = path.join(ROOT, "public", "_fxframes");
+
+function extractVideoFrames(need = collectVideoUses()) {
   const manifest = {};
   if (!need.size) return manifest;
   // 抽帧要 ffmpeg 和 ffprobe 两个命令,**分别探**。
@@ -147,7 +136,6 @@ function extractVideoFrames() {
       process.exit(1);
     }
   }
-  const cacheRoot = path.join(ROOT, "public", "_fxframes");
   // 清理 7 天前的旧缓存
   if (fs.existsSync(cacheRoot)) {
     for (const d of fs.readdirSync(cacheRoot)) {
@@ -206,7 +194,30 @@ function extractVideoFrames() {
   return manifest;
 }
 
-const vidFrames = extractVideoFrames();
+// ---- 磁盘预检:放在抽帧清单算出来之后 ----
+// 以前只算 PNG 序列 + ProRes 成片,**卡内视频抽的 JPEG 不在账里** —— 全局口播是按整条时长抽的,
+// 20 分钟的口播在 30fps 下就是三万多张 JPEG(几个 GB),预检说「够」,抽到一半盘满了。
+// 按每帧 200KB 估(1080p、-q:v 4 的实测量级),宁可高估。
+const videoUses = collectVideoUses();
+const frameBytes = [...videoUses.values()].reduce((a, sec) => a + sec * FPS * 200 * 1024, 0);
+const needTotal = needBytes + frameBytes;
+const freeNow = freeBytes(ROOT);
+if (freeNow < needTotal) {
+  console.error(
+    `\n【导出失败原因】磁盘空间不够:还剩 ${gb(freeNow)}GB,这条 ${Math.round(duration)}s 的片子` +
+      `大约需要 ${gb(needTotal)}GB(PNG 序列 + ProRes 成片` +
+      (frameBytes ? ` + 卡内视频抽帧 ${gb(frameBytes)}GB` : "") +
+      ` + 余量)。\n` +
+      `先腾地方再导 —— exports/ 里除 output 外的目录都是 PNG 中间产物,成片出来后可以整个删;` +
+      `public/_fxframes/ 是视频抽帧缓存,也可以整个删。`,
+  );
+  process.exit(1);
+}
+
+fs.mkdirSync(outDir, { recursive: true });
+fs.mkdirSync(finalDir, { recursive: true });
+
+const vidFrames = extractVideoFrames(videoUses);
 
 // timeline 的整份编排不放 URL:中文转码后网址会超过服务器 16KB 上限(HTTP 431),
 // 改在 page.goto 前用 evaluateOnNewDocument 注入 window.__EXPORT_DOC
@@ -217,10 +228,26 @@ const url =
         JSON.stringify(params),
       )}`;
 
-function waitBudgetExpired(client) {
-  return new Promise((resolve) =>
-    client.once("Emulation.virtualTimeBudgetExpired", resolve),
-  );
+// 等「虚拟时钟推进完毕」这个事件,**带超时**。以前是裸等:渲染器假死(没崩、只是不再响应)
+// 事件永远不来,这个进程就永远挂着 —— 服务端的导出锁也就永远解不开,用户之后每次点导出
+// 都是「已有导出任务在进行中」,只能重启 npm run dev。一帧的虚拟时间几十毫秒就该推完,
+// 30 秒没动静一定是出事了,与其干等不如报错退出,让人重来。
+function waitBudgetExpired(client, ms = 30_000) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `渲染器 ${ms / 1000} 秒没有推进(多半是假死了)。重新导出一次;还不行就重启 npm run dev`,
+          ),
+        ),
+      ms,
+    );
+    client.once("Emulation.virtualTimeBudgetExpired", () => {
+      clearTimeout(t);
+      resolve();
+    });
+  });
 }
 
 const LAUNCH_OPTS = {
@@ -244,6 +271,9 @@ const LAUNCH_OPTS = {
 //
 // 一条命令就能装好,报错停下比默默交坏片强得多。
 let browser;
+// 渲染循环跑完才置 true:catch 里靠它区分「渲染到一半崩了」(PNG 是半成品,删)
+// 和「渲染完了、合成失败」(PNG 是几分钟的成果,留着可手动重合成)。
+let framesDone = false;
 try {
   browser = await puppeteer.launch(LAUNCH_OPTS);
 } catch (err) {
@@ -379,6 +409,8 @@ try {
       console.log(`progress ${i}/${totalFrames}`);
     }
   }
+
+  framesDone = true;
 
   // 烤入人物的时间段(导出页按「卡有没有 camSrc 控件」算好挂在 window 上)。
   // 趁浏览器还开着取出来,后面写进「合成说明」。
@@ -566,12 +598,39 @@ try {
     console.log("cleaned PNG frames dir");
   }
 
+  // ---- 抽帧缓存:只留这次用到的 ----
+  // 缓存键带着视频的 mtime,同一段口播换一版原片就再抽一份,旧的没人清(7 天那条只在
+  // 下次导出时才跑)。用户盘满时翻不到这个目录 —— 它在 public/ 下面,名字还带下划线。
+  // 换视频重导要多等一次抽帧(几分钟),换来的是磁盘不会悄悄长几个 G;对客户,盘更稀缺。
+  {
+    const used = new Set(Object.values(vidFrames).map((m) => path.basename(m.dir)));
+    let n = 0;
+    if (fs.existsSync(cacheRoot))
+      for (const d of fs.readdirSync(cacheRoot))
+        if (!used.has(d)) {
+          fs.rmSync(path.join(cacheRoot, d), { recursive: true, force: true });
+          n++;
+        }
+    if (n) console.log(`cleaned ${n} unused video-frame cache dir(s)`);
+  }
+
   console.log(JSON.stringify(result));
 } catch (e) {
+  // 渲染到一半崩了:半成品 PNG 没用,别留几个 G 在 exports/ 里(界面上只会说「导出失败」,
+  // 用户不知道还有这么一堆)。渲染完了才崩(合成阶段)的 PNG 是完整的,照旧保留。
+  if (!framesDone && !keepFrames && fs.existsSync(outDir)) {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    console.error("渲染没做完,已清掉半成品 PNG 目录");
+  }
   // 人话原因放在 stderr 结尾(接口取尾部展示给用户)
   console.error(String(e?.stack ?? e));
   console.error(`\n【导出失败原因】${String(e?.message ?? e).split("\n")[0]}`);
   process.exitCode = 1;
 } finally {
-  await browser.close();
+  // 假死的渲染器连 close 都可能不回:给 10 秒,不回就直接杀进程,别让「收尾」再挂一次。
+  await Promise.race([
+    browser.close().catch(() => {}),
+    new Promise((r) => setTimeout(r, 10_000)),
+  ]);
+  try { browser.process()?.kill("SIGKILL"); } catch { /* 已经退出了 */ }
 }
