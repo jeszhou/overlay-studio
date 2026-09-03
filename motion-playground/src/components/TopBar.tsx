@@ -141,7 +141,7 @@ function usePrefsPopover() {
 }
 
 /* 顶栏放不下时,读数按「整格」藏,不能切半个字。
-   ——切一半会正好切在按钮组左边缘,看起来像按钮压住了数字(2026-09-01 实测反馈)。
+   ——切一半会正好切在按钮组左边缘,看起来像按钮压住了数字(实测反馈)。
    格子自己不参与压缩(nowrap + 自然宽度),所以量到的位置和裁没裁无关,
    直接比右边缘就知道谁露在外面;用 visibility 藏是为了留住布局,
    下次量还是同一份坐标,不会藏一格→变宽→又该显示→抖起来。
@@ -313,7 +313,7 @@ export function TopBar({
           {/* 挂到 body 上,不能留在顶栏里:「玻璃」风格给 .topbar 加了 backdrop-filter,
               带 filter 的元素会变成后代 fixed 的包含块 —— 面板于是相对顶栏定位、
               又被顶栏的 overflow:hidden 裁成一道白边,看起来就是「设置拉不下来」
-              (2026-09-01 实测反馈)。 */}
+              (实测反馈)。 */}
           {prefsOpen &&
             createPortal(
               <div className="tb-prefs-pop" ref={popRef} style={{ top: pos.top, left: pos.left }}>
@@ -386,7 +386,7 @@ export function TopBar({
 
               {/* 风格/配色本来摆在顶栏里,两个下拉占掉近 300px —— 控件大一档的
                   Material/终端/粗野一上身,读数区就被挤没了。外观是设一次就不动的
-                  东西,收进这里最合适(2026-09-01)。 */}
+                  东西,收进这里最合适。 */}
               <div className="tb-prefs-row">
                 <span>编辑台风格</span>
                 <select

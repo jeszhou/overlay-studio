@@ -382,7 +382,7 @@ export function Canvas({
                缩到某个框,那本身就是一种让位,档位得让路;punch-zoom 只是原位推近,
                不改人像该在哪 —— 让位照常生效,推近叠在让位后的位置上。
                (以前二者是二选一,时间轴上只要有一张 punch-zoom 在场,
-                让位就永远不生效 —— 2026-09-01 踩的坑) */
+                让位就永远不生效 —— 踩过的坑) */
             className={`stage-video${pip ? ` is-pip ${pipClass}` : ""}${
               !framingPip && vTierCls ? ` ${vTierCls}` : ""
             }`}

@@ -1,4 +1,4 @@
-/* 【此文件由构建自动生成】改这里没用 —— 下次发布会被整个覆盖。
+/* 【这个文件由软件自动生成】改这里没用 —— 每次更新都会被整个替换。
    想调整动效卡,请改卡片组件本身,不要改这里。 */
 import type { EffectDef } from "./types";
 import { quoteLockupDef } from "./QuoteLockup";

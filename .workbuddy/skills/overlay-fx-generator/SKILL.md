@@ -4,7 +4,7 @@ description: 特效生成——当用户提供 SRT 字幕文件(或带时间戳�
 ---
 
 <!--
-【此文件由构建自动生成】改这里没用 —— 下次发布会被整个覆盖。
+【这个文件由软件自动生成】改这里没用 —— 每次更新都会被整个替换。
 想调整动效卡,请改卡片组件本身,不要改这里。
 -->
 
@@ -132,68 +132,68 @@ description: 特效生成——当用户提供 SRT 字幕文件(或带时间戳�
      已有行的文案会原样保留,放心精修。 -->
 
 ### 常驻层(每期必配,画面没有一帧「没人管」)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `chapter-bar` | still 不让 | 章节导航条,贴顶全宽全程在场 | 每期一张,start=0 到视频结尾 | `chapters`(「章名 起始秒」`\|`分隔)、`accent`、`showProgress` |
-| `pin-board` | half 人下沉 | 要点钉板 · 讲过的要点逐条钉在角落,全程不消失 | 一段里有 2-4 条短要点要「讲过也不撤」,钉在角落陪跑整段;比信息板轻,只放短句不放数据行 | `theme`(底色(此卡独立生效))、`position`(落位)、`title`(章节标题(可空))、`subtitle`(强调副题(可空))、`items`(要点(/ 分隔,逐条落钉))、`stepMs`(每条落钉间隔(卡点用))、`accent`(强调色(副题)) |
-| `caption-track` | still 不让 | 双语字幕层,底部居中全程在场 | 每期一张,start=0 到视频结尾 | `lines`(一行一条`起始\|结束\|中文\|英文`,中文夹`*关键词*`)、`accent`、`showEn` |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `chapter-bar` | 章节导航条,贴顶全宽全程在场 | 每期一张,start=0 到视频结尾 | `chapters`(「章名 起始秒」`\|`分隔)、`accent`、`showProgress` |
+| `pin-board` | 要点钉板 · 讲过的要点逐条钉在角落,全程不消失 | 一段里有 2-4 条短要点要「讲过也不撤」,钉在角落陪跑整段;比信息板轻,只放短句不放数据行 | `theme`(底色(此卡独立生效))、`position`(落位)、`title`(章节标题(可空))、`subtitle`(强调副题(可空))、`items`(要点(/ 分隔,逐条落钉))、`stepMs`(每条落钉间隔(卡点用))、`accent`(强调色(副题)) |
+| `caption-track` | 双语字幕层,底部居中全程在场 | 每期一张,start=0 到视频结尾 | `lines`(一行一条`起始\|结束\|中文\|英文`,中文夹`*关键词*`)、`accent`、`showEn` |
 
 ### 证据实证(语义可视化核心,优先选用)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `stat-proof` | half 人下沉 | 数字实证,巨号滚动计数 | 里程碑/成绩/金额:"三万粉达成" | `kicker`(EN等宽)、`kickerZh`、`value`、`prefix`/`suffix`、`footEn`/`footZh`、`countMs`(卡点)、`position` |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `stat-proof` | 数字实证,巨号滚动计数 | 里程碑/成绩/金额:"三万粉达成" | `kicker`(EN等宽)、`kickerZh`、`value`、`prefix`/`suffix`、`footEn`/`footZh`、`countMs`(卡点)、`position` |
 
 ### 数据指标(有具体数字时用,别拿它讲概念)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `ring-metric` | half 人下沉 | 指标环 | 单个比例指标(圆环更醒目) | `kicker`、`value`、`max`、`unit`、`label`、`position`(left/right/center) |
-| `odometer` | still 不让 | 翻牌计数器 | 单个整数的里程表滚轮 | `kicker`、`value`(整数)、`unit`、`label`、`position` |
-| `rank-bars` | half 人下沉 | 数据排名条 | 多项数据对比排名:"A 42%、B 21%" | `title`、`rows`(`名称,数值`用`\|`分隔)、`suffix`、`position`(left/right) |
-| `growth-curve` | half 人下沉 | 增长曲线:平滑曲线动画画出+渐变面积,峰值滚动计数 | "越攒越多/一路上涨"的复利叙事(粉丝数、资产库存、收入) | `kicker`/`kickerZh`、`points`(「标签 数值」`\|`分隔)、`unit`、`drawMs`(画完时长,卡点)、`caption`(数据口径)、`position` |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `ring-metric` | 指标环 | 单个比例指标(圆环更醒目) | `kicker`、`value`、`max`、`unit`、`label`、`position`(left/right/center) |
+| `odometer` | 翻牌计数器 | 单个整数的里程表滚轮 | `kicker`、`value`(整数)、`unit`、`label`、`position` |
+| `rank-bars` | 数据排名条 | 多项数据对比排名:"A 42%、B 21%" | `title`、`rows`(`名称,数值`用`\|`分隔)、`suffix`、`position`(left/right) |
+| `growth-curve` | 增长曲线:平滑曲线动画画出+渐变面积,峰值滚动计数 | "越攒越多/一路上涨"的复利叙事(粉丝数、资产库存、收入) | `kicker`/`kickerZh`、`points`(「标签 数值」`\|`分隔)、`unit`、`drawMs`(画完时长,卡点)、`caption`(数据口径)、`position` |
 
 ### 对比取舍(两个东西对撞/否定一个立一个)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `versus-card` | still 不让 | VS 对比卡 | 二选一对撞:"主动 vs 被动" | `aKicker`/`aTitle`/`aSub`、`bKicker`/`bTitle`/`bSub`、`winner`(a/b/none) |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `versus-card` | VS 对比卡 | 二选一对撞:"主动 vs 被动" | `aKicker`/`aTitle`/`aSub`、`bKicker`/`bTitle`/`bSub`、`winner`(a/b/none) |
 
 ### 金句观点(口播最常用,一句话一张)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `quote-lockup` | half 人下沉 | 金句定格卡 | 多行金句逐行揭示(毛玻璃卡) | `quote`(`\|`分行)、`author`、`accent`(默认pink)、`side`(left/right) |
-| `punch-pill` | still 不让 | 金句药丸 | 短金句/设问定格:"你怎么选?" | `text`、`position`(bottom/top-left/top-right) |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `quote-lockup` | 金句定格卡 | 多行金句逐行揭示(毛玻璃卡) | `quote`(`\|`分行)、`author`、`accent`(默认pink)、`side`(left/right) |
+| `punch-pill` | 金句药丸 | 短金句/设问定格:"你怎么选?" | `text`、`position`(bottom/top-left/top-right) |
 
 ### 步骤流程(有先后顺序的过程)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `step-timeline` | half 人下沉 | 竖版章节卡 | 本期章节/教程大纲 | `title`(`*关键词*`)、`steps`(`\|`分隔)、`revealed`(讲到第几章)、`position`(left/right) |
-| `checklist` | half 人下沉 | 步骤打勾 | 流程逐项完成 | `title`、`items`(`\|`分隔)、`checked`(已完成数)、`stepMs`(每项间隔,按SRT算)、`position`(left/right) |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `step-timeline` | 竖版章节卡 | 本期章节/教程大纲 | `title`(`*关键词*`)、`steps`(`\|`分隔)、`revealed`(讲到第几章)、`position`(left/right) |
+| `checklist` | 步骤打勾 | 流程逐项完成 | `title`、`items`(`\|`分隔)、`checked`(已完成数)、`stepMs`(每项间隔,按SRT算)、`position`(left/right) |
 
 ### 教程标注(讲界面、解释术语、给提示)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `term-card` | half 人下沉 | 术语解释卡 | 出现术语要解释:Plan模式、MVP… | `en`(英文)、`term`、`def`(一句话定义)、`position`(left/right) |
-| `ui-callout` | still 不让 | 界面标注 | 讲解界面某区域:"项目入口在这里" | `label`、`ringW`/`ringH`(圈大小)、`side`、`offsetX`/`offsetY`(挪到目标位置) |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `term-card` | 术语解释卡 | 出现术语要解释:Plan模式、MVP… | `en`(英文)、`term`、`def`(一句话定义)、`position`(left/right) |
+| `ui-callout` | 界面标注 | 讲解界面某区域:"项目入口在这里" | `label`、`ringW`/`ringH`(圈大小)、`side`、`offsetX`/`offsetY`(挪到目标位置) |
 
 ### 文字进场(纯文字的进场方式,内容轻时用)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `blur-text` | still 不让 | 模糊浮现 | 情绪/走心句,词块从虚焦中浮现 | `text`(`\|`分隔,`*关键词*`可夹在句中)、`staggerMs`、`position`(center/top/bottom) |
-| `type-shift` | still 不让 | 排版流 | 结尾升华/多行金句 | `lines`(`\|`分隔;`*`开头=大标,`—`开头=小字)、`shiftAtMs`、`position` |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `blur-text` | 模糊浮现 | 情绪/走心句,词块从虚焦中浮现 | `text`(`\|`分隔,`*关键词*`可夹在句中)、`staggerMs`、`position`(center/top/bottom) |
+| `type-shift` | 排版流 | 结尾升华/多行金句 | `lines`(`\|`分隔;`*`开头=大标,`—`开头=小字)、`shiftAtMs`、`position` |
 
 ### 人物锚定(效果直接「碰」人物,会盖住脸,交付时提醒抠像)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `entity-chips` | still 不让 | 实体名牌:白牌(机构)+黑牌(人物·头衔)依次滑入后常驻,可带侧注(股票代码/身份) | 讲到具体的人/公司/产品时钉一排名牌锚定,整段讨论期间不撤,观众随时知道"在说谁" | `chips`(一行一块:`light/dark\|名称\|身份或EN`,最多3块)、`note`(侧注 上行`\|`下行)、`stepMs`、`accent`(黑牌身份行颜色)、`position` |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `entity-chips` | 实体名牌:白牌(机构)+黑牌(人物·头衔)依次滑入后常驻,可带侧注(股票代码/身份) | 讲到具体的人/公司/产品时钉一排名牌锚定,整段讨论期间不撤,观众随时知道"在说谁" | `chips`(一行一块:`light/dark\|名称\|身份或EN`,最多3块)、`note`(侧注 上行`\|`下行)、`stepMs`、`accent`(黑牌身份行颜色)、`position` |
 
 ### 场景 · 运镜(独占全屏,勿与其他卡同屏,时长跟整段走)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `focus-card` | still 不让 | 人物聚焦运镜 | 抛出本段 2-3 个要点/议题的时刻:口播缩进一侧圆角框,另一侧要点逐条弹入(或留白叠其他卡) | `bg`(cream米色/mist雾白/dark暗色)、`side`(left/right;right=口播缩右、左侧留白可叠动效卡)、`items`(`\|`分隔,每条≤8字;空=留白)、`stepMs`(每条间隔,按SRT算)、`showRing`(默认true)、`camSrc`(留空;传口播后运镜烤进导出)。**独占全屏(留白侧可叠内容卡),常 8-15s** |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `focus-card` | 人物聚焦运镜 | 抛出本段 2-3 个要点/议题的时刻:口播缩进一侧圆角框,另一侧要点逐条弹入(或留白叠其他卡) | `bg`(cream米色/mist雾白/dark暗色)、`side`(left/right;right=口播缩右、左侧留白可叠动效卡)、`items`(`\|`分隔,每条≤8字;空=留白)、`stepMs`(每条间隔,按SRT算)、`showRing`(默认true)、`camSrc`(留空;传口播后运镜烤进导出)。**独占全屏(留白侧可叠内容卡),常 8-15s** |
 
 ### 场景 · B-roll(全屏背景板,只配 B-roll 段落)
-| kind | 竖版 | 用途 | 触发条件 | 关键 params |
-|---|---|---|---|---|
-| `terminal-3d` | full 人缩小窗 | 3D 终端打字机 | 讲命令行/代码执行过程;**模拟和 AI 的拉扯对话**("改→不对→再改→✗还是不对"逐字打出,痛点共鸣神器,可当人物背景板:剪映智能抠像把人叠回终端上层) | `file`(标题栏)、`lines`(`\|`分隔;`$`提示符/用户`-`参数 `"字符串"` `#`注释 `❯`执行 `✓`成功 `✗`失败红)、`cps`(按卡片时长算:总字数÷时长)、`position` |
+| kind | 用途 | 触发条件 | 关键 params |
+|---|---|---|---|
+| `terminal-3d` | 3D 终端打字机 | 讲命令行/代码执行过程;**模拟和 AI 的拉扯对话**("改→不对→再改→✗还是不对"逐字打出,痛点共鸣神器,可当人物背景板:剪映智能抠像把人叠回终端上层) | `file`(标题栏)、`lines`(`\|`分隔;`$`提示符/用户`-`参数 `"字符串"` `#`注释 `❯`执行 `✓`成功 `✗`失败红)、`cps`(按卡片时长算:总字数÷时长)、`position` |
 <!-- CARDS:AUTO-END -->
 
 ## 示例(输入 → 输出)

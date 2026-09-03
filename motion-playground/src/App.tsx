@@ -417,7 +417,7 @@ export default function App() {
    * 卡内 <video> 是 autoPlay 自己走的,只在挂载时起播 —— 顺着播不会错,
    * 但一旦拖动播放头(卡片重新挂载 / 或本来就在播),它还停在"从挂载算起"的位置,
    * 时间轴显示 45s、画面其实是录屏的头几秒。导出端是按时间轴逐帧对位的,
-   * 于是**编辑台里看到的和导出的对不上**(2026-08-21 实测碰到的就是这个)。
+   * 于是**编辑台里看到的和导出的对不上**(实际碰到过)。
    * 拖完拉一把,两边就一致了。
    */
   const alignCardVideos = (t: number) => {
@@ -759,7 +759,7 @@ export default function App() {
           ? {
               ...c,
               kind,
-              // 公开版关掉内容搬家:换卡给空模板,文案/节奏要重填
+              // 免费版关掉内容搬家:换卡给空模板,文案/节奏要重填
               params: TIER.kindSwapCarry
                 ? swapCardParams(c.kind, c.params, kind)
                 : { ...(EFFECTS.find((e) => e.id === kind)?.defaults ?? {}) },
@@ -1077,7 +1077,7 @@ export default function App() {
   // 参数面板:编辑台改选中的卡,效果库改当前效果
   const inEdit = tab === "edit";
   const panelEffect =
-    // 这里的 ! 是 2026-08-31 公开版白屏的根因:编排里只要有一张本档没有的卡,
+    // 这里以前的 ! 是「整页白屏」的根因:编排里只要有一张本档没有的卡,
     // 查出来就是 undefined。现在照实传下去,由 ParamsPanel 说清楚是哪张。
     inEdit && selCard ? EFFECTS.find((e) => e.id === selCard.kind) : effect;
   const panelParams = inEdit && selCard ? selCard.params : params;

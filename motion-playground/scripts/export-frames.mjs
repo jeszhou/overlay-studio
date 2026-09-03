@@ -263,9 +263,9 @@ const LAUNCH_OPTS = {
 // puppeteer 捆绑的 Chromium 没下载时(~/.cache/puppeteer 为空,npm 安装时跳过了
 // 下载步骤),launch 会报「must specify executablePath」。
 //
-// 以前这里退回本机 Google Chrome 继续跑。**2026-09-02 改成直接停下**,因为那条退路
+// 以前这里退回本机 Google Chrome 继续跑。**改成直接停下**,因为那条退路
 // 产出的是坏成片:实测 Chrome 151 在无头+虚拟时间下不推进 CSS 动画时间线,靠
-// transition/animation 淡入的卡会整张停在 opacity:0(2026-08-27 踩过,字幕和大半动效
+// transition/animation 淡入的卡会整张停在 opacity:0(踩过,字幕和大半动效
 // 全不见)。原来只 console.warn 一句 —— 它混在几百行导出日志里,界面上是绿色的
 // 「导出完成」,用户拿到一条缺了一半动效的片子,还以为是自己编排没做好。
 //
@@ -291,7 +291,7 @@ try {
 try {
   const page = await browser.newPage();
 
-  // ⚠️ 钉死 CSS 动画钟校正系数(2026-08-28,勿删)。
+  // ⚠️ 钉死 CSS 动画钟校正系数(勿删)。
   // ExportView 会在开跑瞬间实测一个 __fxClockRate,再每帧把所有动画的 playbackRate
   // 乘上它。实测这个值在不同运行里会落在 1~5.5 之间;一旦落到 5 附近,
   // 进场过渡就整个卡死在第一帧 —— 卡片挂上了、is-in 也加了,但内层 opacity 恒为 0,
@@ -388,7 +388,7 @@ try {
       budget: intervalMs,
     });
     await p;
-    // ⚠️ 确定性动画步进(2026-08-28,勿删)。CSS 过渡/动画的钟在无头虚拟时间下
+    // ⚠️ 确定性动画步进(勿删)。CSS 过渡/动画的钟在无头虚拟时间下
     // 快慢不定(实测同一台机器不同一次运行,偏差 1x~5.4x;偏差大时进场过渡
     // 整个卡死在第一帧,短卡全程隐形 —— 就是"同一编排有的导出好有的丢卡"的根源)。
     // 从本版起不再信任任何钟:每推进一帧虚拟时间,就把页面里所有动画显式
@@ -427,7 +427,7 @@ try {
     const r1 = spawnSync(
       "ffmpeg",
       ["-y", "-framerate", FPS_ARG, "-i", seq,
-        // 预乘 alpha(2026-08-28 定案,勿再删)。剪映按**预乘**合成 ProRes 4444:
+        // 预乘 alpha(定案,勿再删)。剪映按**预乘**合成 ProRes 4444:
         // 它算的是 dst*(1-a) + c,而不是 dst*(1-a) + c*a。所以必须先把 RGB 乘上 alpha。
         //
         // 8/27 曾以"预乘会把半透明压暗一倍"为由删掉这行 —— 那次测法是错的:
@@ -445,7 +445,7 @@ try {
         "-vf", "premultiply=inplace=1",
         "-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le", "-vendor", "apl0",
         // 色彩空间标记:不写的话 ffprobe 三项都是 unknown,剪映只能猜,
-        // 猜错就整条偏色(2026-08-27 实测:导进剪映后整条颜色不对)。原片是 bt709,对齐它。
+        // 猜错就整条偏色(实测:导进剪映后整条颜色不对)。原片是 bt709,对齐它。
         "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", mov],
       { stdio: "ignore" },
     );
@@ -540,7 +540,7 @@ try {
         const rMux = spawnSync(
           "ffmpeg",
           ["-y", "-i", result.mov, "-i", mixFile,
-            // 音轨转 PCM 再封进 MOV。剪映读 .mov 里的 AAC 不稳:2026-08-28 这次导出
+            // 音轨转 PCM 再封进 MOV。剪映读 .mov 里的 AAC 不稳:有一次导出
             // 音轨齐全(40 个点、max 0dB)但剪映里就是没声音,转成 pcm_s16le 后立刻正常。
             // 以前的导出同样是 AAC 且能出声(上一版成片 18.55/19.75/21.35s 都能测到音效),
             // 所以这不是必现问题 —— 但 PCM 是 MOV 的通用选择,只多约 30MB,直接默认给它。

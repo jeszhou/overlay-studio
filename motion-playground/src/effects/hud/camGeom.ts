@@ -4,7 +4,7 @@ import { stageSize, type StageRatio } from "../../stage";
  * 运镜几何 —— 画布(预览)和卡片(导出)共用,两边必须算出同一个结果。
  *
  * 这些工具原先住在 PunchZoom / CamFrame 两张卡的文件里,但画布始终需要它们,
- * 而卡片可能不在某个发行版中(公开版只带一部分卡)。所以放进共享模块:
+ * 而卡片可能不在某个发行版中(免费版只带一部分卡)。所以放进共享模块:
  * 卡片来去自如,画布不受影响。
  */
 
@@ -25,7 +25,7 @@ export interface CamFrameGeomInput {
 }
 
 /** 人物取景框的落位与尺寸。竖版没有左右可分,一律水平居中、垂直偏上 */
-// ratio 必填,不给默认值:漏传就静默按横版算,预览和卡各画各的(2026-08-31 踩过)
+// ratio 必填,不给默认值:漏传就静默按横版算,预览和卡各画各的(踩过)
 export function camFrameGeom(p: CamFrameGeomInput, ratio: StageRatio) {
   const { w: SW, h: SH } = stageSize(ratio);
   const shape = p.shape ?? "circle";
