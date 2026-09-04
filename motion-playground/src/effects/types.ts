@@ -86,11 +86,6 @@ export interface EffectDef<P = Record<string, unknown>> {
    *   half  半让 = 中型卡,人下沉到下方,上半屏让给特效
    *   full  全让 = 大卡,人缩成角落小窗,特效近乎占满
    * 同屏多张卡时取最重的一档(full > half > still)。
-   *
-   * **新卡必须显式写**,哪怕写的就是 "still" —— 类型上留成可选只为兼容豁免的老卡,
-   * 实际由 `npm run check:vtier` 强制(名单 scripts/vtier-grandfathered.json)。
-   * 不知道该写哪档就量一下(先 npm run dev):
-   *     node scripts/measure-stage.mjs <effectId> --ratio v
    */
   vTier?: "still" | "half" | "full";
 }

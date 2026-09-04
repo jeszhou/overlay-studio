@@ -432,8 +432,13 @@ export function Sidebar({
             </div>
             <select className="ctrl-input" value={ratio} onChange={(e) => onRatio(e.target.value)}>
               <option value="h">▭ 横版 16:9(1920×1080)</option>
-              <option value="v">▯ 竖版 9:16(1080×1920)</option>
+              <option value="v">▯ 竖版 9:16(1080×1920)· 试验中</option>
             </select>
+            {ratio === "v" && (
+              <div className="ctrl-hint">
+                竖版刚上线,还没经过完整成片检验,效果可能不稳。导出前整条预览一遍;遇到问题欢迎反馈。
+              </div>
+            )}
           </label>
         )}
 

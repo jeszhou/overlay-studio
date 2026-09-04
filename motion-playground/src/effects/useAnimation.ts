@@ -65,7 +65,7 @@ export function useFxSpeed(getEl: () => HTMLElement | null, speed: number) {
  * 关键:这个值在**渲染期**直接从时钟算出,不经过 rAF 回调 + setState。
  * 只换时间源是不够的 —— 导出每帧的顺序是「下发时间 → 推进虚拟时钟 → 截图」,
  * 而 rAF→setState→React 重渲染这条链在那一小段里有时跑得完、有时跑不完,
- * 跑不完就截到上一帧的画面。实测只换时间源后仍有 10/22 张卡两次导出不一致,
+ * 跑不完就截到上一帧的画面。实测只换时间源后仍有近半数卡两次导出不一致,
  * 且不同的帧散乱分布 —— 正是竞态的特征。渲染期直接读就没有这个窗口。
  *
  * 起点在 playToken 变化时重置(渲染期比对,不用 effect —— effect 跑在首次渲染之后,
@@ -190,7 +190,7 @@ export function useEnter(playToken: number): boolean {
     // 两层 rAF 都要记下来取消。以前只取消外层:连着重放时(playToken 快速连变)
     // 上一轮的内层回调已经排上了队,cleanup 拦不住它,于是它在新一轮刚 setEntered(false)
     // 之后立刻又置回 true —— 那张卡的进场动画整个被吃掉,直接显示成已进场的样子。
-    // 76 张卡走这个钩子,连按空格重放最容易撞上。
+    // 绝大多数卡走这个钩子,连按空格重放最容易撞上。
     let inner = 0;
     const outer = requestAnimationFrame(() => {
       inner = requestAnimationFrame(() => setEntered(true));

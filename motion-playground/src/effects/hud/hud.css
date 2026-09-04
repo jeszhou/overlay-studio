@@ -32,7 +32,7 @@
 }
 /* ---- 竖版锚点:half 档的卡从顶部挂,不居中 ----
    共享锚点 .hud-anchor--center/left/right 写的是 top: 50%。横版下 50% = y540,安全;
-   竖版下 50% = y960,**正好是人脸**。实测 40 张声明 half 的卡里有 35 张卡在这个位置上。
+   竖版下 50% = y960,**正好是人脸**。实测声明 half 的卡里,绝大多数都落在这个位置上。
 
    为什么从顶部挂而不是在特效区(0~--vhalf-top)里居中:居中要靠 translateY(-50%),
    比特效区还高的卡就会往上顶出屏幕 —— 实测 8 张(action-band 高 1214px、
@@ -968,7 +968,9 @@
      成片里就是"底部闪一下"(实测反馈)。字幕直接切换才干脆。 */
 }
 .ctrack-zh {
-  font-size: 44px;
+  /* 「卡片大小」滑杆(和画布滚轮)吃在字号上,不吃 transform ——
+     字幕要在 .ctrack-cue 的 max-width 里正常换行,整块缩放会把长句顶出画面 */
+  font-size: calc(44px * var(--hud-scale, 1));
   font-weight: 800;
   line-height: 1.35;
   /* 字幕永远压在画面上:固定白字 + 三层柔和黑晕,黑底白底都清楚 */
@@ -991,8 +993,8 @@
    在成片里就是"画面底部闪一下"(实测 24-25s 闪光)。
    字幕本身有描边+黑晕,不需要暗纱兜底。 */
 .ctrack-en {
-  margin-top: 8px;
-  font-size: 17px;
+  margin-top: calc(8px * var(--hud-scale, 1));
+  font-size: calc(17px * var(--hud-scale, 1));
   font-weight: 500;
   letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.82);

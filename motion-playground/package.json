@@ -12,10 +12,9 @@
     "lint": "oxlint",
     "lint:overlay": "tsx --tsconfig tsconfig.app.json scripts/lint-overlay.ts",
     "sync:cards": "node scripts/sync-skill-cards.mjs && node scripts/sync-agent-skills.mjs",
-    "check:cards": "node scripts/check-card-defaults.mjs && node scripts/check-motion.mjs && node scripts/check-vtier.mjs && node scripts/sync-skill-cards.mjs --check && node scripts/sync-agent-skills.mjs --check",
+    "check:cards": "node scripts/check-card-defaults.mjs && node scripts/check-motion.mjs && node scripts/sync-skill-cards.mjs --check && node scripts/sync-agent-skills.mjs --check",
     "check:defaults": "node scripts/check-card-defaults.mjs",
     "check:motion": "node scripts/check-motion.mjs",
-    "check:vtier": "node scripts/check-vtier.mjs",
     "sync:agent-skills": "node scripts/sync-agent-skills.mjs",
     "check:agent-skills": "node scripts/sync-agent-skills.mjs --check",
     "preview": "vite preview"
