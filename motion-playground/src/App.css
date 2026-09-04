@@ -1121,6 +1121,24 @@ input[type="range"]::-moz-range-thumb {
   color: var(--ink);
   box-shadow: inset 0 -2px 0 var(--accent);
 }
+/* 版本指南入口(只有基础版渲染)。和两个模式切换同高同边框,所以读起来是顶栏的一部分;
+   靠强调色和淡底把它和"当前在哪个模式"区分开 —— 它不是第三个模式。 */
+.tb-pro {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border-left: 1px solid var(--hairline);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  transition: background 160ms ease;
+}
+.tb-pro:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
 .tb-tab:last-of-type {
   border-right: 1px solid var(--hairline);
 }

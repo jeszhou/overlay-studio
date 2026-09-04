@@ -236,22 +236,7 @@ export function TopBar({
     <div className="topbar">
       <div className="tb-brand">
         OVERLAY<em>/</em>STUDIO
-        {PROMO_URL ? (
-          /* 有地址(基础版)时徽章是入口:点开版本指南,看两版差在哪、怎么联系作者 */
-          <a
-            className="tb-ver tb-ver--link"
-            href={PROMO_URL}
-            target="_blank"
-            rel="noreferrer"
-            title={`${VERSION_TITLE} · 点开看两版对比`}
-          >
-            {VERSION_LABEL} 基础版 ↗
-          </a>
-        ) : (
-          <span className="tb-ver" title={VERSION_TITLE}>
-            {VERSION_LABEL}
-          </span>
-        )}
+        <span className="tb-ver" title={VERSION_TITLE}>{VERSION_LABEL}</span>
       </div>
 
       {/* 模式切换:一眼看清自己在哪 */}
@@ -264,6 +249,20 @@ export function TopBar({
       >
         效果库
       </button>
+      {/* 版本指南入口。放在两个模式切换的紧右边 —— 眼睛本来就扫这一片,
+          又不混进右边那排干活的按钮(那儿每次导出都会看到,容易烦)。
+          地址为空(专业版 / dev)时整个不渲染。 */}
+      {PROMO_URL ? (
+        <a
+          className="tb-pro"
+          href={PROMO_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="看基础版和专业版差在哪,以及怎么联系作者"
+        >
+          看专业版 ↗
+        </a>
+      ) : null}
 
       {/* 读数模块 */}
       <div className="tb-meter" ref={meterRef}>
