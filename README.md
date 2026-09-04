@@ -167,6 +167,20 @@ motion-playground/
 需要完整版直接上手,或想直接用现成模板的,联系作者:
 全网同名「**一页枝鸥**」 —— 抖音号 `67790100407` · 小红书号 `27401290504`
 
+## 关于作者
+
+我是**一页枝鸥**。平时分享 AI 工具、学习思考、新手教程和工作流 ——
+Overlay Studio 就是这么一路做出来的。
+
+想看更多,欢迎关注我。一起变成 AI native 吧。
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/qr-douyin.png" width="180"><br><sub>抖音 · 一页枝鸥</sub></td>
+    <td align="center"><img src="docs/qr-xiaohongshu.png" width="180"><br><sub>小红书 · 一页枝鸥</sub></td>
+  </tr>
+</table>
+
 ## 致谢
 
 本项目最初的思路受 AI 博主 **茂茂AI** 的公开分享启发,在此致谢。

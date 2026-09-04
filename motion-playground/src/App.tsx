@@ -245,7 +245,7 @@ export default function App() {
         // 和「认不出的卡跳过」,刷新恢复以前全跳过了 —— 升级后旧草稿翻动快 N 倍,就是这个原因。
         const { doc: migrated, dropped } = parseOverlay(saved.overlay);
         if (dropped?.length)
-          console.warn("恢复上次编排时跳过了这一版没有的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
+          console.warn("恢复上次编排时跳过了认不出的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
         setOverlay(migrated ?? saved.overlay);
         originRef.current = saved.origin ?? null;
         if (Array.isArray(saved.srt) && saved.srt.length) setSrt(saved.srt);
@@ -541,7 +541,7 @@ export default function App() {
       ...(dropped ?? []).map((d) => ({
         level: "error" as const,
         rule: "unknown-kind",
-        message: `跳过了 ${d.n} 张「${d.kind}」——  这一版没有这种卡,其余卡已正常导入。注意:再导出 JSON 时这几张不会带回去,原文件留好`,
+        message: `跳过了 ${d.n} 张「${d.kind}」——  认不出这种卡,其余卡已正常导入。注意:再导出 JSON 时这几张不会带回去,原文件留好`,
       })),
       ...lintOverlay(doc, LINT_CFG, { duration: durRef.current || undefined }),
     ]);
@@ -599,7 +599,7 @@ export default function App() {
       // 内置示例是按本档生成的,理论上不该有认不出的卡。真出现了就是发行版做漏了 ——
       // 留这行 warn 当信号,别让示例悄悄少几张卡还没人发现。
       if (dropped?.length)
-        console.warn("[示例] 跳过了这一版没有的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
+        console.warn("[示例] 跳过了认不出的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
       const lines = parseSrt(srtText);
       pushHistory(true);
       camClearedRef.current = false;

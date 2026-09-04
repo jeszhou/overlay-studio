@@ -3,13 +3,13 @@ import type { CSSProperties } from "react";
 
 /** HUD 族共用的强调色映射(对应 hud.css 里的主题令牌) */
 export const ACCENT_VAR: Record<string, string> = {
-  pink: "var(--hud-blue)" /* 这一版没有这个色,统一走蓝 */,
+  pink: "var(--hud-blue)" /* 未启用的色,统一走蓝 */,
   blue: "var(--hud-blue)",
-  teal: "var(--hud-blue)" /* 这一版没有这个色,统一走蓝 */,
-  violet: "var(--hud-blue)" /* 这一版没有这个色,统一走蓝 */,
-  lav: "var(--hud-blue)" /* 这一版没有这个色,统一走蓝 */,
+  teal: "var(--hud-blue)" /* 未启用的色,统一走蓝 */,
+  violet: "var(--hud-blue)" /* 未启用的色,统一走蓝 */,
+  lav: "var(--hud-blue)" /* 未启用的色,统一走蓝 */,
   alert: "var(--hud-alert)",
-  green: "var(--hud-blue)" /* 这一版没有这个色,统一走蓝 */,
+  green: "var(--hud-blue)" /* 未启用的色,统一走蓝 */,
   orange: "var(--hud-orange)",
 };
 
