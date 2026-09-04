@@ -52,7 +52,6 @@ function QuoteLockup({ params, playToken }: EffectProps<QuoteLockupParams>) {
 
 export const quoteLockupDef: EffectDef<QuoteLockupParams> = {
   id: "quote-lockup",
-  vTier: "half",
   name: "QuoteLockup",
   description: "金句定格卡 · 逐行揭示后定格",
   tags: ["逐条落位"],

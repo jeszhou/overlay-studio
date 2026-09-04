@@ -5,7 +5,7 @@
  *   npm run sync:cards          写入 SKILL.md
  *   npm run sync:cards -- --check   只检查,有差异就非 0 退出(收工自检用)
  *
- * 自动来自源码:分组、kind、竖版让位档(vTier)、用途(description)、关键 params(controls)
+  * 自动来自源码:分组、kind、用途(description)、关键 params(controls)
  * 人工维护并原样保留:每张卡的「触发条件」,以及被人精修过的「用途/params」文案
  */
 import fs from "node:fs";
@@ -24,24 +24,6 @@ const STK_END = "<!-- STICK:AUTO-END -->";
 const STICK_POSES = path.join(FX_DIR, "hud/stickPoses.ts");
 const STICK_PROPS = path.join(FX_DIR, "hud/stickProps.tsx");
 
-/** 竖版让位档 → 表里怎么写。前缀保留英文档名,parseExisting 靠它认列 */
-const VTIER_ZH = {
-  still: "still 不让",
-  half: "half 人下沉",
-  full: "full 人缩小窗",
-};
-
-/** 这一份有没有竖版画幅。没有的(基础版)卡表就不出「竖版」列 ——
- *  否则等于告诉读它的 AI「有竖版、每张卡怎么让位」,而这一份根本切不到竖版。
- *  直接读本目录的 tierFlags.ts,读到的就是这一份自己的开关;专业版是 true,表不变。 */
-const HAS_VERTICAL = (() => {
-  try {
-    const t = fs.readFileSync(path.join(ROOT, "src/tierFlags.ts"), "utf8");
-    return !/^\s+verticalRatio:\s*false,/m.test(t);
-  } catch {
-    return true;
-  }
-})();
 
 /** 每组的编排提示:影响 AI 选卡优先级,人工维护 */
 const GROUP_NOTES = {
@@ -80,13 +62,11 @@ function scanEffects() {
       const id = (body.match(/\bid:\s*"([a-z0-9-]+)"/) || [])[1];
       if (!id) continue;
       const desc = (body.match(/\bdescription:\s*"([^"]*)"/) || [])[1] || "";
-      // 竖版让位档:没写 = 缺省 still(类型上可选,新卡由 check:vtier 强制)
-      const vTier = (body.match(/\bvTier:\s*"(still|half|full)"/) || [])[1] || "still";
       const ci = body.indexOf("controls:");
       const seg = ci < 0 ? "" : body.slice(ci);
       const params = [...seg.matchAll(/key:\s*"(\w+)"[^}]*?label:\s*"([^"]*)"/g)]
         .map((x) => `\`${x[1]}\`(${x[2].replace(/\|/g, "/")})`);
-      byVar.set(m[1], { id, desc, params, vTier, file: path.basename(f) });
+      byVar.set(m[1], { id, desc, params, file: path.basename(f) });
     }
   }
   return byVar;
@@ -139,9 +119,6 @@ function parseExisting(md) {
     if (!kind) continue;
     if (bars.length === 3) { ghosts.add(kind); continue; } // 禁用区那张 2 列表
     const last = bars[bars.length - 1];
-    // 2026-09-01 加了「竖版」列(在 kind 之后)。旧表没有这一列,靠内容认:
-    // 第二格是 still/half/full 就是新表,否则按旧表的列序读。
-    // 竖版列是从源码生成的,不需要保留人工值 —— 这里只为把后面几列对上。
     const shift = /^(still|half|full)\b/.test(cut(bars[1], bars[2])) ? 1 : 0;
     rows.set(kind, {
       use: cut(bars[1 + shift], bars[2 + shift]),
@@ -161,8 +138,8 @@ function buildSection(groups, old, knownGhosts) {
     if (!g.cards.length) continue;
     const note = GROUP_NOTES[g.title];
     out.push(`### ${g.title}${note ? `(${note})` : ""}`);
-    out.push(HAS_VERTICAL ? "| kind | 竖版 | 用途 | 触发条件 | 关键 params |" : "| kind | 用途 | 触发条件 | 关键 params |");
-    out.push(HAS_VERTICAL ? "|---|---|---|---|---|" : "|---|---|---|---|");
+    out.push("| kind | 用途 | 触发条件 | 关键 params |");
+    out.push("|---|---|---|---|");
     for (const c of g.cards) {
       seen.add(c.id);
       n++;
@@ -172,8 +149,7 @@ function buildSection(groups, old, knownGhosts) {
       const use = prev?.use || c.desc.replace(/\|/g, "/");
       const when = prev?.when || TODO;
       const params = prev?.params || (c.params.length ? c.params.join("、") : "—");
-      const vt = HAS_VERTICAL ? `${VTIER_ZH[c.vTier]} | ` : "";
-      out.push(`| \`${c.id}\` | ${vt}${use} | ${when} | ${params} |`);
+      out.push(`| \`${c.id}\` | ${use} | ${when} | ${params} |`);
     }
     out.push("");
   }

@@ -83,7 +83,6 @@ function StepTimeline({ params, playToken }: EffectProps<StepTimelineParams>) {
 
 export const stepTimelineDef: EffectDef<StepTimelineParams> = {
   id: "step-timeline",
-  vTier: "half",
   name: "StepTimeline",
   description: "步骤时间线卡 · 章节逐句冒出",
   tags: ["逐条落位"],

@@ -165,7 +165,6 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
 
 export const growthCurveDef: EffectDef<GrowthCurveParams> = {
   id: "growth-curve",
-  vTier: "half",
   name: "GrowthCurve",
   description: "增长曲线 · 平滑曲线动画画出+渐变面积,峰值滚动计数",
   tags: ["生长描画", "滚动计数"],

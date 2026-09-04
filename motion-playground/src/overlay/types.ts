@@ -1,5 +1,4 @@
 import { EFFECTS } from "../effects/registry";
-import type { StageRatio } from "../stage";
 
 /** 时间轴上的一张动效卡 */
 export interface OverlayCard {
@@ -64,8 +63,6 @@ export interface OverlayDoc {
   skin?: string;
   /** 风格骨架(hud.css 的 data-style 令牌组):skin 换配色,style 换材质骨架;sketch = 手绘白卡 */
   style?: string;
-  /** 画幅:h = 16:9 横版(默认),v = 9:16 竖版。缺省 = 横版,老工程文件行为不变 */
-  ratio?: StageRatio;
   /** 侧边色块(仅 sketch 风格):卡片左缘一道漫画感色带,hex 颜色,空 = 不要色块 */
   sideColor?: string;
   /** 全局文字色:盖住皮肤自带的 --hud-ink(主文字),次要文字自动按同色降透明度。
@@ -146,7 +143,6 @@ export function parseOverlay(raw: unknown): {
         font: typeof o.font === "string" && o.font ? o.font : undefined,
         skin: ["rose", "iris", "dawn"].includes(o.skin) ? o.skin : undefined,
         style: ["sketch"].includes(o.style) ? o.style : undefined,
-        ratio: o.ratio === "v" ? "v" : undefined,
         sideColor: typeof o.sideColor === "string" && /^#[0-9a-fA-F]{3,8}$/.test(o.sideColor) ? o.sideColor : undefined,
         inkColor: typeof o.inkColor === "string" && /^#[0-9a-fA-F]{3,8}$/.test(o.inkColor) ? o.inkColor : undefined,
         cards,

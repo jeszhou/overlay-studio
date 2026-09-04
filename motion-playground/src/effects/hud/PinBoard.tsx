@@ -63,7 +63,6 @@ function PinBoard({ params, playToken }: EffectProps<PinBoardParams>) {
 
 export const pinBoardDef: EffectDef<PinBoardParams> = {
   id: "pin-board",
-  vTier: "half",
   name: "PinBoard",
   description: "要点钉板 · 讲过的要点逐条钉在角落,全程不消失",
   tags: ["逐条落位", "堆叠累积"],

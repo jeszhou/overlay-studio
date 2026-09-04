@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { EffectDef } from "../effects/types";
 import { EFFECTS } from "../effects/registry";
-import { StageRatioContext, heaviestTier, stageSize, tierClass, useStageSize, type StageRatio } from "../stage";
+import { STAGE } from "../stage";
 import { PZ_ORIGIN, camFrameGeom, focusCamGeom } from "../effects/hud/camGeom";
 import { backdropFirst, outroFade, type OverlayCard } from "../overlay/types";
 import { useEnter } from "../effects/useAnimation";
@@ -39,8 +39,6 @@ interface CanvasProps {
   skin?: string;
   /** 风格骨架(doc.style):hud.css 的 data-style 令牌组,空 = HUD 现状 */
   docStyle?: string;
-  /** 画幅(doc.ratio):h = 16:9 横版(默认),v = 9:16 竖版 */
-  ratio?: StageRatio;
   /** 侧边色块(doc.sideColor,仅 sketch):写进 --hud-side */
   sideColor?: string;
   /** 全局文字色(doc.inkColor):盖住皮肤的 --hud-ink,次要文字同色降透明度 */
@@ -58,7 +56,7 @@ interface CanvasProps {
   onPickCard?: (id: string) => void;
 }
 
-/* 画布尺寸不再写死:由 doc.ratio 决定,见 src/stage.ts */
+/* 画布尺寸见 src/stage.ts */
 
 /**
  * 卡片交互壳:display:contents 不产生盒子,不影响卡片自身定位;
@@ -84,7 +82,6 @@ function CardShell({
   onNudge,
   onPick,
   snapCtx,
-  vTier,
   children,
 }: {
   cardId: string | null;
@@ -99,11 +96,9 @@ function CardShell({
   onNudge?: NudgeFn;
   onPick?: (id: string) => void;
   snapCtx?: SnapCtx;
-  /** 竖版让位档:落到 data-card-vtier,hud.css 按它给 half 档的卡改锚点 */
-  vTier?: "still" | "half" | "full";
   children: ReactNode;
 }) {
-  const { w: STAGE_W, h: STAGE_H } = useStageSize();
+  const { w: STAGE_W, h: STAGE_H } = STAGE;
   const scale = fxScale * (Number(params.scale) || 1);
   // 有效倍速 = 全局「动画速度」×该卡自己的「动画速度(此卡)」
   const speed = animSpeed * (Number(params.speed) || 1);
@@ -119,16 +114,11 @@ function CardShell({
       data-card-theme={(params.theme as string) || undefined}
       /* 逐卡投影:挂在这个 display:contents 的壳上,靠后代选择器落到卡根元素,
          所以每一张卡都能用,不必逐卡加参数 */
-      data-shadow={(params.shadow as string) || undefined}
       data-past={past ? "1" : undefined}
       /* 退场淡出:同样靠后代选择器落到卡根元素,不必逐卡加参数 */
       data-outro={outro === undefined ? undefined : "1"}
       /* 讲过之后的让位方式:both 变浅+缩小(默认)/ fade 只变浅 / shrink 只缩小 */
       data-dim-mode={(params.dimMode as string) || undefined}
-      /* 竖版让位档:这一张卡自己的档,横版忽略。
-         注意跟 .stage 上的 data-vtier 不是一回事——那个是同屏所有卡取的最重档。
-         竖版下 hud.css 靠它把 half 档的卡从画面正中抬到上半屏 */
-      data-card-vtier={vTier || undefined}
       onPointerDown={(e) => {
         if (!onNudge || e.button !== 0) return;
         if (cardId && onPick) onPick(cardId);
@@ -250,10 +240,9 @@ export function Canvas({
   onVideoMeta,
   onNudge,
   onPickCard,
-  ratio = "h",
 }: CanvasProps) {
-  // 画布逻辑尺寸:横版 1920×1080 / 竖版 1080×1920
-  const { w: STAGE_W, h: STAGE_H } = stageSize(ratio);
+  // 画布逻辑尺寸:1920×1080
+  const { w: STAGE_W, h: STAGE_H } = STAGE;
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const videoNodeRef = useRef<HTMLVideoElement | null>(null);
@@ -305,16 +294,13 @@ export function Canvas({
     }),
     "punch-zoom": () => ({ cls: "is-punch-zoom" }),
     // demo-tour 的口播圆窗:和 .dtr-cam / .dtr-camring 同一份几何
-    // 横版蹲左下角,竖版挪到底部居中(跟 hud.css 里的竖版覆盖对齐)
+    // 蹲左下角
     "demo-tour": () => ({
       cls: "is-pip-dtr",
-      style:
-        ratio === "v"
-          ? { left: (STAGE_W - 320) / 2, top: STAGE_H - 180 - 320, width: 320, height: 320, borderRadius: "50%" }
-          : { left: 56, top: STAGE_H - 48 - 252, width: 252, height: 252, borderRadius: "50%" },
+      style: { left: 56, top: STAGE_H - 48 - 252, width: 252, height: 252, borderRadius: "50%" },
     }),
     "cam-frame": (p) => {
-      const g = camFrameGeom(p ?? {}, ratio);
+      const g = camFrameGeom(p ?? {});
       return {
         cls: "is-pip-frame",
         style: { left: g.x, top: g.y, width: g.w, height: g.h, borderRadius: g.r },
@@ -331,26 +317,11 @@ export function Canvas({
   const pipClass = pipRes?.cls ?? "";
   const pipStyle = pipRes?.style;
 
-  // 会改人像落位的运镜(推近不算):这类在场时,人像听运镜的,让位档让路
+  // 会改人像落位的运镜(推近不算)
   const framingPip = pip && pipCard != null && pipCard.kind !== "punch-zoom";
 
-  // 竖版让位:按在场卡的最重一档把口播画面推开
-  const vTierCls =
-    ratio === "v" && overlayMode
-      ? tierClass(
-          heaviestTier(
-            overlayCards.map((c) => {
-              // 卡上自己设的档说了算,没设才用卡片出厂默认
-              const own = (c.params as Record<string, unknown> | undefined)?.vTier;
-              if (own === "still" || own === "half" || own === "full") return own;
-              return EFFECTS.find((e) => e.id === c.kind)?.vTier;
-            }),
-          ),
-        )
-      : "";
 
   return (
-    <StageRatioContext.Provider value={ratio}>
     <div className="canvas-wrap" ref={wrapRef}>
       <div
         ref={stageRef}
@@ -358,8 +329,6 @@ export function Canvas({
         data-theme={theme}
         data-skin={skin || undefined}
         data-style={docStyle || undefined}
-        data-ratio={ratio === "v" ? "v" : undefined}
-        data-vtier={vTierCls || undefined}
         data-pip={framingPip ? (pipCard?.kind ?? "1") : undefined}
         style={{
           width: STAGE_W,
@@ -378,14 +347,7 @@ export function Canvas({
               videoNodeRef.current = el;
               videoElRef?.(el);
             }}
-            /* 运镜分两类:screen-demo / focus-card / demo-tour / cam-frame 会把人
-               缩到某个框,那本身就是一种让位,档位得让路;punch-zoom 只是原位推近,
-               不改人像该在哪 —— 让位照常生效,推近叠在让位后的位置上。
-               (以前二者是二选一,时间轴上只要有一张 punch-zoom 在场,
-                让位就永远不生效 —— 踩过的坑) */
-            className={`stage-video${pip ? ` is-pip ${pipClass}` : ""}${
-              !framingPip && vTierCls ? ` ${vTierCls}` : ""
-            }`}
+            className={`stage-video${pip ? ` is-pip ${pipClass}` : ""}`}
             src={videoUrl}
             /* 缩角小窗时不叠加缩放,保证和落位框对齐;
                punch-zoom 把推近参数交给 CSS 变量 */
@@ -401,7 +363,7 @@ export function Canvas({
                   : pipCard?.kind === "focus-card"
                     ? (() => {
                         // 口播框几何走 camGeom 里那一份,和卡自己用的是同一个函数
-                        const g = focusCamGeom(pipCard.params as any, ratio);
+                        const g = focusCamGeom(pipCard.params as any);
                         return {
                           left: g.x,
                           top: g.y,
@@ -499,7 +461,6 @@ export function Canvas({
                     onNudge={onNudge}
                     onPick={onPickCard}
                     snapCtx={snapCtx}
-                    vTier={def.vTier}
                   >
                     {def.selfPosition ? (
                       <C params={cardParams} playToken={1} />
@@ -554,7 +515,6 @@ export function Canvas({
                   animSpeed={animSpeed ?? 1}
                   onNudge={onNudge}
                   snapCtx={snapCtx}
-                  vTier={effect.vTier}
                 >
                   {effect.selfPosition ? (
                     <Effect params={previewParams} playToken={playToken} />
@@ -568,6 +528,5 @@ export function Canvas({
             })()}
       </div>
     </div>
-    </StageRatioContext.Provider>
   );
 }

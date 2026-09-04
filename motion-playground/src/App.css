@@ -659,18 +659,6 @@ input[type="range"]::-moz-range-thumb {
   opacity: 0.55;
   cursor: wait;
 }
-.export-sec {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  padding: 0 2px;
-}
-.export-sec input {
-  flex: 1;
-}
 
 /* ---- 底部视频时间线:贴底通栏 ---- */
 .tlb {
@@ -1328,21 +1316,6 @@ input[type="range"]::-moz-range-thumb {
   font-size: 12px;
   color: rgba(242, 240, 234, 0.72);
   font-variant-numeric: tabular-nums;
-}
-
-/* ---- 参数预设行 ---- */
-.preset-line {
-  display: flex;
-  gap: 6px;
-  align-items: stretch;
-}
-.preset-line select {
-  flex: 1;
-  min-width: 0;
-}
-.preset-btn {
-  flex: 0 0 auto;
-  padding: 0 10px;
 }
 
 /* ---- 拖拽对齐辅助线:吸附命中时的青色虚线(Figma 式) ---- */

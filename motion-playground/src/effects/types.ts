@@ -80,12 +80,4 @@ export interface EffectDef<P = Record<string, unknown>> {
   selfPosition?: boolean;
   /** 视觉标签:这张卡「看起来怎么动」,可多个,用于跨组检索 */
   tags?: VisualTag[];
-  /**
-   * 竖版让位档:这张卡在场时,口播人像该退到哪(只在 9:16 竖版生效,横版忽略)。
-   *   still 不让 = 小卡,整个待在上下安全带里,人不动(缺省值)
-   *   half  半让 = 中型卡,人下沉到下方,上半屏让给特效
-   *   full  全让 = 大卡,人缩成角落小窗,特效近乎占满
-   * 同屏多张卡时取最重的一档(full > half > still)。
-   */
-  vTier?: "still" | "half" | "full";
 }

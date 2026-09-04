@@ -7,7 +7,6 @@ import {
   OFFSET_DEFAULTS,
   offsetVars,
   THEME_OPTIONS,
-  GLASS_CONTROLS,
   GLASS_DEFAULTS,
   glassClass,
   glassVars,
@@ -75,7 +74,6 @@ function RingMetric({ params, playToken }: EffectProps<RingMetricParams>) {
 
 export const ringMetricDef: EffectDef<RingMetricParams> = {
   id: "ring-metric",
-  vTier: "half",
   name: "RingMetric",
   description: "指标环 · 圆环进度 + 数字滚动",
   tags: ["滚动计数", "生长描画"],
@@ -112,7 +110,6 @@ export const ringMetricDef: EffectDef<RingMetricParams> = {
     { key: "unit", label: "单位", type: "text" },
     { key: "label", label: "说明文字", type: "text" },
     { key: "accent", label: "环色", type: "select", options: ACCENT_OPTIONS },
-    ...GLASS_CONTROLS,
     ...OFFSET_CONTROLS,
   ],
   Component: RingMetric,

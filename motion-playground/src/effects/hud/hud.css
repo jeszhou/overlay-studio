@@ -5,74 +5,9 @@
    两套主题:dark 暗底 / light 亮底  ·  通透玻璃 · 无渐变无光晕
    ============================================================ */
 
-/* ---- 画幅令牌:画布逻辑尺寸。Canvas / ExportView 按 doc.ratio 写内联值,
-        这里的兜底供效果库单卡预览等没写变量的场合(横版) ---- */
 .stage {
   --stage-w: 1920px;
   --stage-h: 1080px;
-}
-.stage[data-ratio="v"] {
-  --stage-w: 1080px;
-  --stage-h: 1920px;
-}
-
-/* ---- 竖版人像让位:特效卡在场时把口播画面推开 ----
-   默认满屏(不加 class);半让 = 人下沉到下方,上半屏给特效;
-   全让 = 人缩成右下小窗,特效近乎占满。
-   过渡靠 .stage-video 自带的 1050ms 缓动,和运镜卡是同一条曲线。
-   ⚠ 这几个数是初版提案,拿真素材看过再定。 ---- */
-.stage[data-ratio="v"] {
-  /* 半让:人像占下方这一块(上边缘 = 特效区下界) */
-  --vhalf-top: 700px;
-  /* 全让:右下小窗 3:4 */
-  --vfull-w: 360px;
-  --vfull-h: 480px;
-  --vfull-right: 48px;
-  --vfull-bottom: 80px;
-}
-/* ---- 竖版锚点:half 档的卡从顶部挂,不居中 ----
-   共享锚点 .hud-anchor--center/left/right 写的是 top: 50%。横版下 50% = y540,安全;
-   竖版下 50% = y960,**正好是人脸**。实测声明 half 的卡里,绝大多数都落在这个位置上。
-
-   为什么从顶部挂而不是在特效区(0~--vhalf-top)里居中:居中要靠 translateY(-50%),
-   比特效区还高的卡就会往上顶出屏幕 —— 实测 8 张(action-band 高 1214px、
-   compare-bars 1028px 等)会跑到 y 负数去。它们声明 half 本来就不对(塞不进半让区),
-   但布局规则不该因为一张卡填错档就把画面顶穿。从顶部挂则任何高度都不会越上界,
-   填错档的卡会被量尺照常报成「该改 full」。
-
-   96px 用的是库里 .hud-anchor--top-left 的既有顶锚点值,不是新拍的数。
-
-   只管声明 half 的卡:full 档人已缩成小窗、整屏可用,居中是对的;
-   still 档的卡本该待在上下安全带里,位置不对是那张卡自己的事,不在这里替它决定。 */
-.stage[data-ratio="v"] [data-card-vtier="half"] :is(
-  .hud-anchor--center,
-  .hud-anchor--left,
-  .hud-anchor--right
-) {
-  top: 96px;
-  --anchor-tf: translate(0, 0);
-}
-/* center 还要保留水平居中,只去掉纵向那一半 */
-.stage[data-ratio="v"] [data-card-vtier="half"] .hud-anchor--center {
-  --anchor-tf: translateX(-50%);
-}
-
-.stage[data-ratio="v"] .stage-video.is-vhalf {
-  left: 0;
-  top: var(--vhalf-top);
-  width: var(--stage-w);
-  height: calc(var(--stage-h) - var(--vhalf-top));
-  border-radius: 0;
-}
-.stage[data-ratio="v"] .stage-video.is-vfull {
-  left: auto;
-  right: var(--vfull-right);
-  top: auto;
-  bottom: var(--vfull-bottom);
-  width: var(--vfull-w);
-  height: var(--vfull-h);
-  border-radius: 24px;
-  z-index: 5; /* 缩成小窗后压在特效之上,和运镜卡的小窗一致 */
 }
 
 /* ---- 主题令牌(挂在 .stage 上,由 Canvas 写 data-theme;
@@ -720,51 +655,6 @@
 }
 .sd-dot.r { background: #d98b8b; } .sd-dot.y { background: #d9c07f; } .sd-dot.g { background: #8fc79f; }
 .hud.is-in .sd-ring { opacity: 1; }
-/* ---- 竖版:横版的「左右分」改成「上下分」 ----
-   录屏窗占上半屏(16:9 录屏满宽最舒服),人降到下半屏。
-   横版那套 left/right/bottom 全部让位,只覆盖差异。 ---- */
-.stage[data-ratio="v"] {
-  /* 演示窗:上边距 / 高度;人像上边缘 = 窗底 + 间隙 */
-  --sdv-top: 168px;
-  --sdv-h: 632px;
-  --sdv-camtop: 840px;
-}
-.stage[data-ratio="v"] .sd-win {
-  left: 48px;
-  right: 48px;
-  top: var(--sdv-top);
-  bottom: auto;
-  height: var(--sdv-h);
-  /* 竖版画面窄,3D 侧倾会让窗看着歪;收成正面,只留一点点 */
-  --sd-ry: -2deg;
-}
-/* 角落提示环:横版用来标「人会缩到这个角」,竖版人像满宽落在下半屏,
-   框它等于框半个屏幕,没有指示意义 —— 直接不画 */
-.stage[data-ratio="v"] .sd-ring { display: none; }
-/* 预览里的口播落位:不再缩右下角,改成占下半屏满宽 */
-.stage[data-ratio="v"] .stage-video.is-pip-br,
-.stage[data-ratio="v"] .stage-video.is-pip-bl {
-  left: 0;
-  top: var(--sdv-camtop);
-  width: var(--stage-w);
-  height: calc(var(--stage-h) - var(--sdv-camtop));
-  border-radius: 0;
-}
-/* 竖版烤入:同样是「满屏起步 → 落位」,只是落到下半屏而不是右下角。
-   两个 corner 共用一条 —— 竖版满宽落位,左右角没有区别了。 */
-.stage[data-ratio="v"] .sd[data-corner="br"] .sd-cam,
-.stage[data-ratio="v"] .sd[data-corner="bl"] .sd-cam {
-  animation-name: sd-cam-v;
-}
-@keyframes sd-cam-v {
-  to {
-    left: 0;
-    top: var(--sdv-camtop);
-    width: var(--stage-w);
-    height: calc(var(--stage-h) - var(--sdv-camtop));
-    border-radius: 0;
-  }
-}
 .cpn.is-in[data-motion="in"]      .cpn-move { animation: cpn-in      var(--cp-sec) cubic-bezier(0.32, 0, 0.3, 1) forwards; }
 .cpn.is-in[data-motion="out"]     .cpn-move { animation: cpn-out     var(--cp-sec) cubic-bezier(0.32, 0, 0.3, 1) forwards; }
 .cpn.is-in[data-motion="drift-l"] .cpn-move { animation: cpn-drift-l var(--cp-sec) cubic-bezier(0.36, 0, 0.36, 1) forwards; }
@@ -1510,24 +1400,6 @@
 .ibd-spark-val.is-up { color: #46d07c; }
 .ibd-spark-val.is-down { color: #ef5350; }
 .ibd-checkrow-ic.is-bad { border-color: #e5484d; color: #e5484d; }
-
-/* ---- 逐卡投影 (data-shadow):把标题从画面里托出来 ----
-   用 filter: drop-shadow 而不是 text-shadow,两个原因:
-   ① 左栏「文字光晕」总开关会把所有 text-shadow 清零,filter 不受影响;
-   ② filter 跟着字形和色块的真实轮廓走 —— 色块也有影,text-shadow 只影响字。
-   hard 是参考片那种"不虚的硬影",跟柔光的发虚感完全不是一回事。 */
-/* 必须用后代选择器:外壳和卡之间还夹着 FxSpeedScope 的 display:contents 盒子
-   (极简族外面再多一层 .slot),写成直接子代 `>` 会一个都匹配不上 */
-.hud[data-shadow="soft"],
-[data-shadow="soft"] .hud { filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5)); }
-.hud[data-shadow="hard"],
-[data-shadow="hard"] .hud { filter: drop-shadow(5px 6px 0 rgba(0, 0, 0, 0.82)); }
-.hud[data-shadow="outline"],
-[data-shadow="outline"] .hud {
-  filter:
-    drop-shadow(2px 0 0 #111318) drop-shadow(-2px 0 0 #111318)
-    drop-shadow(0 2px 0 #111318) drop-shadow(0 -2px 0 #111318);
-}
 /* chip 版式:第一行黑底彩字,第二行彩底黑字(道具色,不跟主题)
    擦除动画用 clip-path,所以圆角必须写进 inset(... round ...),
    否则静止那一帧会把圆角直接切成方角 */
@@ -1646,120 +1518,6 @@
 }
 .dtr.is-in .dtr-cam { opacity: 1; transform: scale(1); }
 .dtr.is-in .dtr-camring { opacity: 1; transform: scale(1); }
-
-/* ============================================================
-   竖版运镜:横版一律「左右分」,竖版一律「上下分」
-   —— 人在下、内容在上。只覆盖差异,横版规则一行不动。
-   ⚠ 像素是初版提案,拿真素材看过再定。
-   ============================================================ */
-
-/* ---- focus-card:人像框从左侧方块挪到下方,要点列表从右栏挪到上半屏 ---- */
-/* --fcd-* 由组件按画幅算好写成内联变量(见 camGeom.focusCamGeom),这里不再重复。
-   竖版排版:人像在上方一块(120~840),要点列表排到它下面,两者不重叠。 */
-.stage[data-ratio="v"] .fcd-list {
-  left: 80px;
-  right: 80px;
-  top: 900px;
-  bottom: auto;
-  transform: none;
-  gap: 28px;
-}
-
-/* ---- focus-card 预览:口播落位框跟 --fcd-* 保持同一份几何 ---- */
-.stage[data-ratio="v"] .stage-video.is-pip-focus,
-.stage[data-ratio="v"] .stage-video.is-pip-focus-r {
-  left: 60px;
-  top: 1000px;
-  width: 960px;
-  height: 860px;
-  border-radius: 36px;
-}
-
-/* ---- demo-tour ----
-   横版:浮屏几乎占满,口播圆窗蹲左下角。
-   竖版:浮屏收成 16:9 挪到上半屏(原来的 top7%/bottom11% 在竖版会变成
-   886×1575 的高框,16:9 录屏塞进去被裁成一片白),圆窗挪到下半屏居中并放大
-   —— 竖版屏窄,252 的圆窗显小。
-   已有 transform: scale() 做进场,不能再用 translateX 居中,用 calc 算左缘。 */
-.stage[data-ratio="v"] .dtr-frame {
-  /* 竖版配的是手机录屏 —— 浮屏做成手机比例(626×1094 ≈ 9:16)竖着占大面积,
-     沉浸感才回得来;做成横条只会是「一条飘在上面」 */
-  left: 21%;
-  right: 21%;
-  top: 5%;
-  bottom: auto;
-  height: 57%;
-}
-/* 巡览是绕着「画布中心」推近的:横版浮屏占满画布,推近后照样铺满;
-   竖版浮屏只占上部 1/3,还绕画布中心推就会整块飞出右下。
-   把缩放/透视原点挪到浮屏自己的中心(16% + 33%/2 = 32.5%)。 */
-.stage[data-ratio="v"] .dtr-stage { perspective-origin: 50% 33.5%; }
-.stage[data-ratio="v"] .dtr-plane { transform-origin: 50% 33.5%; }
-
-.stage[data-ratio="v"] .dtr-cam,
-.stage[data-ratio="v"] .dtr-camring {
-  left: calc(50% - 160px);
-  bottom: 180px;
-  width: 320px;
-  height: 320px;
-}
-
-/* ---- cam-pan:左右漂移改成上下漂移 ----
-   推近(in)/推远(out)/倾斜(tilt)跟画幅无关,不动 */
-.stage[data-ratio="v"] .cpn.is-in[data-motion="drift-l"] .cpn-move { animation-name: cpn-drift-u; }
-.stage[data-ratio="v"] .cpn.is-in[data-motion="drift-r"] .cpn-move { animation-name: cpn-drift-d; }
-@keyframes cpn-drift-u {
-  from { transform: scale(var(--cp-z, 1.18)) translateY(3.5%); }
-  to   { transform: scale(var(--cp-z, 1.18)) translateY(-3.5%); }
-}
-@keyframes cpn-drift-d {
-  from { transform: scale(var(--cp-z, 1.18)) translateY(-3.5%); }
-  to   { transform: scale(var(--cp-z, 1.18)) translateY(3.5%); }
-}
-
-/* ---- 竖版:另外两张定宽/不换行的卡 ---- */
-/* warp-title:大标题 108px 且 nowrap,长一点就撑到 2433px(体检里超得最多的一张)。
-   竖版允许换行并缩一档字号 —— 竖屏本来就该多行大标题 */
-.stage[data-ratio="v"] .wpt-title {
-  white-space: normal;
-  max-width: calc(var(--stage-w) - 120px);
-  font-size: 84px;
-  line-height: 1.14;
-  text-align: center;
-}
-/* timeline-h:横向时间轴定宽 1500 */
-.stage[data-ratio="v"] .th {
-  width: calc(var(--stage-w) - 96px);
-}
-
-/* ---- 竖版:卡片式并排改成竖着叠 ----
-   这三张是「三张独立小卡横排」,竖版画布 1080 一分,每列只剩 300 出头,
-   说明文字被挤成三行。竖版改成一张张叠下来,每张占满板宽。
-
-   只挑这三张:column-stack(堆叠柱)/ stack-share(份额条)/ stair-bars(阶梯条)
-   的横排是图表语义本身,改竖了就不是那个图;scale-swap 本来就是上下两把尺子。 ---- */
-.stage[data-ratio="v"] :is(.acb-cards, .cpb-cards, .mpg-row) {
-  flex-direction: column;
-  gap: 18px;
-}
-/* 子项横排时是 flex:1 均分宽度,竖排会变成均分高度、把卡拉长 —— 改回按内容 */
-.stage[data-ratio="v"] :is(.acb-card, .cpb-card, .mpg-card) {
-  flex: 0 0 auto;
-}
-
-/* ---- 竖版:固定宽度的玻璃板收进画布 ----
-   这七张卡都是「一块定宽玻璃板 + 板内自己排版」,板宽 1240~1460px,
-   在 1080 的竖版画布里一律溢出(体检里超 160~380px 的就是它们)。
-   板宽改成跟着画布走,板内是 flex/grid 会自己收;左右内边距同时收窄,
-   竖版屏窄,52px 的边距太吃地方。 ---- */
-.stage[data-ratio="v"] :is(
-  .acb-board, .cst-board, .cpb-board, .mpg-board, .sst-board, .stb-board, .ssw-board
-) {
-  width: calc(var(--stage-w) - 96px);
-  max-width: calc(var(--stage-w) - 96px);
-  padding-left: 40px;
-  padding-right: 40px;
-}
 .wpt.is-in { opacity: 1; }
 .wpt-line.is-tint {
   background: linear-gradient(90deg, transparent 0%, var(--hud-acc, var(--hud-orange)) 100%);
@@ -1864,7 +1622,7 @@
 .hud.is-in .cpb-board { opacity: 1; transform: none; }
 
 /* ============================================================
-   通用文字卡「玻璃底色」:黑/白/无 + 透明度(--hud-glass-alpha)
+   通用文字卡玻璃底:黑/白/无 + 透明度(--hud-glass-alpha)
    加在文字卡根节点上;none 时不加 class,布局与旧行为一致
    ============================================================ */
 .hud-glass { border-radius: 18px; padding: 26px 36px; }
@@ -1904,22 +1662,6 @@
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 .clp[data-side="left"] .clp-tile.is-list .clp-label { left: auto; right: calc(100% + 18px); }
-/* ---- 竖版:左右分改上下分 ----
-   横版是「录屏靠右 + 左侧步骤链」,竖版 1080 宽塞不下(默认窗宽 1180 直接溢出)。
-   改成录屏在上、步骤链在下,窗宽由组件按画布算。 */
-.stage[data-ratio="v"] .dmr-win {
-  right: auto;
-  left: 48px;
-  top: 140px;
-}
-.stage[data-ratio="v"] .dmr-left {
-  left: 60px;
-  right: 60px;
-  width: auto;
-  top: 800px;
-  bottom: calc(var(--dmr-safe, 12%) + 40px);
-  gap: 28px;
-}
 .isw-col--l { left: 92px; top: 356px; }
 .isw-col--r { right: 92px; top: 356px; align-items: flex-start; }
 .isw[data-layout="left"] .isw-col--l { top: 268px; }
@@ -1982,7 +1724,7 @@
 }
 .cfw-zone--app .cfw-zone-lb { font-size: 19px; }
 
-/* ---- CoverStack 竖版封面 ---- */
+/* ---- CoverStack 竖幅封面(3:4) ---- */
 .cvs--tall .cvs-item { width: 330px; }
 .cvs--tall .cvs-thumb { height: 440px; }
 .cfw-src.is-given { opacity: 0.38; }

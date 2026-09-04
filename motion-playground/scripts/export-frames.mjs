@@ -4,7 +4,7 @@
  * 原理:无头 Chrome + CDP 虚拟时间(Emulation.setVirtualTimePolicy),
  * 时钟完全由脚本控制,每帧精确推进 1000/fps 毫秒再截图(omitBackground → 透明)。
  * 用法: node scripts/export-frames.mjs <job.json>
- * job: { effectId, params, fps, duration, base }
+  * job: { mode: "timeline", doc, fps, duration, base }
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -22,9 +22,7 @@ if (!jobFile) {
 }
 const job = JSON.parse(fs.readFileSync(jobFile, "utf8"));
 const {
-  mode = "single", // single | timeline
-  effectId,
-  params = {},
+  mode = "timeline",
   doc = null, // timeline 模式:整份 overlay JSON
   scale = 1,
   speed = 1, // 动画速度倍率(与 Studio「动画速度」滑杆一致)
@@ -32,12 +30,9 @@ const {
   duration = 6,
   base = "http://localhost:5177",
   keepFrames = false, // true = 保留 PNG 中间目录(verify-effect 逐帧比对要用)
-  ratio: jobRatio = "h", // 画幅:h = 16:9 横版 / v = 9:16 竖版(single 模式用)
 } = job;
 
-// 画幅:timeline 以编排里的 doc.ratio 为准,single 看 job.ratio
-const RATIO = (mode === "timeline" ? doc?.ratio : jobRatio) === "v" ? "v" : "h";
-const STAGE = RATIO === "v" ? { w: 1080, h: 1920 } : { w: 1920, h: 1080 };
+const STAGE = { w: 1920, h: 1080 };
 
 // NTSC 29.97 的真身是 30000/1001(=29.970029970…),写成小数会有微小误差:
 // 帧号/时钟用精确值算,传给 ffmpeg 的帧率用分数字符串,避免它按 2997/100 编码
@@ -66,7 +61,7 @@ const gb = (n) => (n / 1024 ** 3).toFixed(1);
 // 工作目录 exports/<名称>-<时间戳>/(PNG 序列等中间产物)
 // 成品目录 exports/output/(给剪映用的 MOV/WebM 全部只放这里)
 const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-const name = mode === "timeline" ? "timeline" : effectId;
+const name = "timeline";
 const outDir = path.join(ROOT, "exports", `${name}-${stamp}`);
 const finalDir = path.join(ROOT, "exports", "output");
 
@@ -106,8 +101,6 @@ function collectVideoUses() {
       }
     }
     if (doc?.cam) add(doc.cam, duration);
-  } else {
-    for (const v of Object.values(params)) add(v, duration);
   }
   return need;
 }
@@ -221,12 +214,7 @@ const vidFrames = extractVideoFrames(videoUses);
 
 // timeline 的整份编排不放 URL:中文转码后网址会超过服务器 16KB 上限(HTTP 431),
 // 改在 page.goto 前用 evaluateOnNewDocument 注入 window.__EXPORT_DOC
-const url =
-  mode === "timeline"
-    ? `${base}/?export=1&mode=timeline&fx=${scale}&spd=${speed}`
-    : `${base}/?export=1&spd=${speed}&ratio=${RATIO}&effect=${encodeURIComponent(effectId)}&p=${encodeURIComponent(
-        JSON.stringify(params),
-      )}`;
+const url = `${base}/?export=1&mode=timeline&fx=${scale}&spd=${speed}`;
 
 // 等「虚拟时钟推进完毕」这个事件,**带超时**。以前是裸等:渲染器假死(没崩、只是不再响应)
 // 事件永远不来,这个进程就永远挂着 —— 服务端的导出锁也就永远解不开,用户之后每次点导出

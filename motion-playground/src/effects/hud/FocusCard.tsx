@@ -1,7 +1,6 @@
 import type { EffectDef, EffectProps } from "../types";
 import { useEnter } from "../useAnimation";
 import { FxVideo } from "./MediaImg";
-import { useStageRatio } from "../../stage";
 import { focusCamGeom } from "./camGeom";
 import {
   ACCENT_OPTIONS,
@@ -49,8 +48,8 @@ function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
   const entered = useEnter(playToken);
   const parsed = items.split("|").map((s) => s.trim()).filter(Boolean);
   // 口播框几何走 camGeom 那一份 —— 预览(Canvas)和导出(这里)必须同源,
-  // 以前两边各写一份,竖版改排版时只改了一处,人像和落位框就对不上了
-  const g = focusCamGeom({ side, camDX, camDY, camW, camH }, useStageRatio());
+  // 以前两边各写一份,改排版时只改了一处,人像和落位框就对不上了
+  const g = focusCamGeom({ side, camDX, camDY, camW, camH });
 
   return (
     <div

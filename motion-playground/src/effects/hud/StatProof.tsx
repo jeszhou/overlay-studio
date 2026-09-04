@@ -7,7 +7,6 @@ import {
   OFFSET_DEFAULTS,
   offsetVars,
   THEME_OPTIONS,
-  GLASS_CONTROLS,
   GLASS_DEFAULTS,
   glassClass,
   glassVars,
@@ -82,7 +81,6 @@ function StatProof({ params, playToken }: EffectProps<StatProofParams>) {
 
 export const statProofDef: EffectDef<StatProofParams> = {
   id: "stat-proof",
-  vTier: "half",
   name: "StatProof",
   description: "数字实证 · 巨号滚动计数 + 双语注脚",
   tags: ["滚动计数"],
@@ -125,7 +123,6 @@ export const statProofDef: EffectDef<StatProofParams> = {
     { key: "footZh", label: "注脚(中文)", type: "text" },
     { key: "countMs", label: "计数时长(卡点用)", type: "range", min: 400, max: 5000, step: 100, unit: "ms" },
     { key: "accent", label: "强调色", type: "select", options: ACCENT_OPTIONS },
-    ...GLASS_CONTROLS,
     ...OFFSET_CONTROLS,
   ],
   Component: StatProof,

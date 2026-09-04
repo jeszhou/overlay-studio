@@ -40,7 +40,6 @@ function TermCard({ params, playToken }: EffectProps<TermCardParams>) {
 
 export const termCardDef: EffectDef<TermCardParams> = {
   id: "term-card",
-  vTier: "half",
   name: "TermCard",
   description: "术语解释卡 · 名词 + 一句人话定义",
   tags: ["逐条落位"],

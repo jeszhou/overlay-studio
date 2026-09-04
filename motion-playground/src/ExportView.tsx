@@ -4,8 +4,7 @@ import "./fonts"; // 自定义字体注册:导出端也要有 @font-face,成片�
 import { EFFECTS } from "./effects/registry";
 import { FxSpeedScope } from "./effects/FxSpeedScope";
 import { backdropFirst, outroFade, parseOverlay, type OverlayDoc } from "./overlay/types";
-import { StageRatioContext, stageSize, type StageRatio } from "./stage";
-import { TIER } from "./tierFlags";
+import { STAGE } from "./stage";
 import "./effects/hud/hud.css";
 import "./App.css";
 
@@ -13,7 +12,6 @@ import "./App.css";
  * 导出专用视图(?export=1)
  * 只渲染动效本体:透明背景、无视频、无人物、无参考线、无UI。
  * 两种模式:
- *  - single:单个特效(&effect=<id>&p=<json>)
  *  - timeline:整条时间轴(&mode=timeline&doc=<overlay json>),卡片按 start/end 出现
  * 动效在导出脚本调用 window.__startExport() 后才开始,
  * 无头浏览器用「虚拟时间」从 t=0 逐帧精确推进。
@@ -62,13 +60,9 @@ function renderCard(
       }}
       /* 逐卡主题:与 Studio 预览一致 */
       data-card-theme={(card.params.theme as string) || undefined}
-      data-shadow={(card.params.shadow as string) || undefined}
       data-past={past ? "1" : undefined}
       data-outro={outro < 1 ? "1" : undefined}
       data-dim-mode={(card.params.dimMode as string) || undefined}
-      /* 竖版让位档(这一张卡自己的档,别和 .stage 上的 data-vtier 混——那个是同屏最重档)。
-         与 Canvas 预览一致,hud.css 靠它给 half 档的卡改锚点 */
-      data-card-vtier={def.vTier || undefined}
     >
       <FxSpeedScope speed={speed}>
         {def.selfPosition ? (
@@ -83,8 +77,8 @@ function renderCard(
   );
 }
 
-const stageStyle = (scale: number, ratio: StageRatio) => {
-  const { w, h } = stageSize(ratio);
+const stageStyle = (scale: number) => {
+  const { w, h } = STAGE;
   return {
     position: "fixed",
     left: 0,
@@ -156,18 +150,14 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
       </div>,
     );
   }
-  // 和编辑台同一道闸:分层关掉竖版时,编排里写着 ratio:"v" 也按横版导
-  const ratio: StageRatio = TIER.verticalRatio && doc.ratio === "v" ? "v" : "h";
   return (
-    <StageRatioContext.Provider value={ratio}>
       <div
         className={`stage is-hud is-export${doc.glow ? "" : " no-glow"}`}
         data-theme={doc.theme ?? "dark"}
         data-skin={doc.skin || undefined}
         data-style={doc.style || undefined}
-        data-ratio={ratio === "v" ? "v" : undefined}
         style={{
-          ...stageStyle(scale, ratio),
+          ...stageStyle(scale),
           ...(doc.font ? { ["--hud-font" as string]: `"${doc.font}"` } : {}),
           ...(doc.sideColor ? { ["--hud-side" as string]: doc.sideColor } : {}),
           ...inkVars(doc.inkColor),
@@ -175,71 +165,9 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
       >
         {rendered}
       </div>
-    </StageRatioContext.Provider>
   );
 }
 
-/** 单特效导出 */
-function SingleExport({
-  effectId,
-  params,
-  speed,
-  ratio = "h",
-}: {
-  effectId: string;
-  params: Record<string, unknown>;
-  speed: number;
-  ratio?: StageRatio;
-}) {
-  const [go, setGo] = useState(false);
-  const [, setFrame] = useState(0);
-  useEffect(() => {
-    // 单卡导出同样接收每帧时间。除了写时钟,还要 setState 触发重渲染 ——
-    // 卡内钩子在渲染期读时钟,没有重渲染就不会取到新时间(timeline 分支由 setT 负责)。
-    (window as unknown as { __setExportT?: (sec: number) => void }).__setExportT = (sec) => {
-      (window as unknown as { __fxExportMs?: number }).__fxExportMs = sec * 1000;
-      setFrame((n) => n + 1);
-    };
-    (window as unknown as { __startExport: () => void }).__startExport = () => {
-      setGo(true);
-      // 单卡导出同样实测 CSS 动画钟校正系数(见 TimelineExport 注释)
-      const t0 = performance.now();
-      let raf0: number | null = null;
-      const tick = (rafTs: number) => {
-        if (raf0 === null) raf0 = rafTs;
-        else if (rafTs - raf0 > 50) {
-          const r = (performance.now() - t0) / (rafTs - raf0);
-          if (Number.isFinite(r) && r > 0.01 && r < 100)
-            (window as unknown as { __fxClockRate?: number }).__fxClockRate = r;
-        }
-        requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    };
-  }, []);
-  const def = EFFECTS.find((e) => e.id === effectId);
-  if (!def) return <div style={{ color: "red" }}>unknown effect: {effectId}</div>;
-  // defaults 打底:Studio 导出总是传全量参数,但自检脚本/外部调用可能只给 effectId,
-  // 缺字段会渲染成空画面。合并后行为与 Studio 完全一致(全量传入时 merged === params)。
-  const merged = { ...(def.defaults as Record<string, unknown>), ...params };
-  return (
-    <StageRatioContext.Provider value={ratio}>
-      <div
-        className="stage is-hud is-export no-glow"
-        data-theme={(merged.theme as string) ?? "dark"}
-        data-ratio={ratio === "v" ? "v" : undefined}
-        style={stageStyle((merged.__scale as number) ?? 1, ratio)}
-      >
-        {go &&
-          renderCard(
-            { id: "single", kind: effectId, params: merged },
-            (merged.__scale as number) ?? 1,
-            speed,
-          )}
-      </div>
-    </StageRatioContext.Provider>
-  );
-}
 
 export function ExportView() {
   const q = new URLSearchParams(location.search);
@@ -295,12 +223,5 @@ export function ExportView() {
       .map((c) => ({ kind: c.kind, start: c.start, end: c.end }));
     return <TimelineExport doc={doc} scale={Number(q.get("fx") ?? 1)} speed={speed} />;
   }
-  return (
-    <SingleExport
-      effectId={q.get("effect") ?? ""}
-      params={JSON.parse(q.get("p") ?? "{}")}
-      speed={speed}
-      ratio={TIER.verticalRatio && q.get("ratio") === "v" ? "v" : "h"}
-    />
-  );
+  return <div style={{ color: "red" }}>unknown export mode</div>;
 }

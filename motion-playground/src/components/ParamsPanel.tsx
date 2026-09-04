@@ -1,20 +1,17 @@
 import { useRef, useState } from "react";
 import { uploadErrText } from "../uploadErr";
-import { TIER } from "../tierFlags";
 import type { Control, EffectDef } from "../effects/types";
 import { EFFECT_GROUPS } from "../effects/registry";
 import { kindColor } from "../effects/kindColor";
 import type { OverlayCard } from "../overlay/types";
 
 interface ParamsPanelProps {
-  /** 一次改一批(应用预设):走一次状态更新,只占一步撤销 */
+  /** 一次改一批:走一次状态更新,只占一步撤销 */
   onChangeMany?: (patch: Record<string, unknown>) => void;
   /** 查不到时是 undefined:编排里可能有本档没有的卡(基础版卡少),
       面板要能说清楚,不能崩 —— 见下面的 pp-empty 分支 */
   effect: EffectDef<any> | undefined;
   params: any;
-  /** 画幅:竖版才给「竖版让位」这一栏 */
-  ratio?: string;
   onChange: (key: string, value: unknown) => void;
   /** 时间轴模式:当前选中的卡片(可编辑出现/消失时间) */
   card?: OverlayCard | null;
@@ -58,19 +55,6 @@ const SCALE_CONTROL: Control = {
 };
 
 /** 所有卡片通用的速度滑块(只影响这一张卡的动画节奏) */
-/** 竖版让位:只在竖版画幅下进面板 —— 横版没有让位这回事。
-    空 = 用卡片自带的出厂默认(registry 里的 vTier),选了就以这张卡为准 */
-const VTIER_CONTROL: Control = {
-  key: "vTier",
-  label: "竖版让位(这张卡出现时人退到哪)",
-  type: "select",
-  options: [
-    { label: "跟卡片默认", value: "" },
-    { label: "不让 · 人不动", value: "still" },
-    { label: "半让 · 人沉到下半屏", value: "half" },
-    { label: "全让 · 人缩成角落小窗", value: "full" },
-  ],
-};
 
 const SPEED_CONTROL: Control = {
   key: "speed",
@@ -82,18 +66,6 @@ const SPEED_CONTROL: Control = {
   unit: "×",
 };
 
-/** 所有卡片通用的投影(把卡从画面里托出来;用 filter 不吃「文字光晕」总开关) */
-const SHADOW_CONTROL: Control = {
-  key: "shadow",
-  label: "投影(把卡从画面里托出来)",
-  type: "select",
-  options: [
-    { label: "无", value: "none" },
-    { label: "柔和投影", value: "soft" },
-    { label: "硬投影(参考片那种)", value: "hard" },
-    { label: "深色描边", value: "outline" },
-  ],
-};
 
 /** 所有卡片通用的音效选择(导出时烤进 MOV 音轨;选中即试听) */
 export const SFX_OPTIONS = [
@@ -135,7 +107,7 @@ const GROUP_META: { id: Group; label: string; en: string }[] = [
 ];
 
 function groupOf(c: Control): Group {
-  if (["offsetX", "offsetY", "position", "side", "corner", "scale", "vTier"].includes(c.key))
+  if (["offsetX", "offsetY", "position", "side", "corner", "scale"].includes(c.key))
     return "layout";
   if (c.key === "speed" || c.key === "sfx") return "timing";
   if (c.type === "range" && (c.unit === "ms" || c.unit === "s")) return "timing";
@@ -143,119 +115,6 @@ function groupOf(c: Control): Group {
   return "content";
 }
 
-/* ---- 预设:把一张卡当前的全部参数存成可复用组合(localStorage,跨会话长期有效) ---- */
-const PRESET_KEY = "fx-presets-v1";
-type PresetStore = Record<string, { name: string; params: Record<string, unknown> }[]>;
-
-function loadPresets(): PresetStore {
-  try {
-    return JSON.parse(localStorage.getItem(PRESET_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-}
-
-/**
- * 预设**只套样式,不套文案**。
- * 判定很简单:text / textarea 控件装的就是"这张卡自己的内容"——
- * 标题、金句、步骤、素材路径(img1、videoSrc、src、camSrc 都是 text 控件)、
- * 卡点秒串(times)、巡览路线(stops),换一张卡这些必须是新的。
- * 再额外排掉 clipStart*(素材起始秒,是 range 但同样跟素材绑死)。
- * 剩下的 range / select / toggle —— 颜色、字号、窗形、倾斜、落位、速度 —— 才是"风格"。
- */
-function contentKeys(controls: Control[]): Set<string> {
-  const skip = new Set<string>();
-  for (const c of controls)
-    if (c.type === "text" || c.type === "textarea") skip.add(c.key);
-  for (const c of controls) if (/^clipStart\d*$/.test(c.key)) skip.add(c.key);
-  // 再排掉 *At 结尾的:subAt / firstAt / intoAt / noteAt … 都是"这张卡第几秒点亮"的卡点,
-  // 按 SRT 算出来的,跟样式没关系。它们是 range+秒,不排的话会被预设当样式带过去,
-  // 挨张套预设时把所有卡的点亮时刻抹成同一个值(实际踩到过)。
-  for (const c of controls) if (/At$/.test(c.key)) skip.add(c.key);
-  return skip;
-}
-
-function PresetRow({
-  effectId,
-  controls,
-  params,
-  onChange,
-  onChangeMany,
-}: {
-  effectId: string;
-  controls: Control[];
-  params: any;
-  onChange: (key: string, value: unknown) => void;
-  onChangeMany?: (patch: Record<string, unknown>) => void;
-}) {
-  const [store, setStore] = useState<PresetStore>(loadPresets);
-  const [sel, setSel] = useState("");
-  const mine = store[effectId] ?? [];
-  const persist = (next: PresetStore) => {
-    setStore(next);
-    localStorage.setItem(PRESET_KEY, JSON.stringify(next));
-  };
-  const save = () => {
-    const name = window.prompt("给这套参数起个名字(如:黑玻璃·右侧·带音效):")?.trim();
-    if (!name) return;
-    // __ 开头的是时间轴运行时注入的内部值;文案/素材也不进预设(见 contentKeys)
-    const skip = contentKeys(controls);
-    const clean: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(params as Record<string, unknown>))
-      if (!k.startsWith("__") && !skip.has(k)) clean[k] = v;
-    persist({
-      ...store,
-      [effectId]: [...mine.filter((p) => p.name !== name), { name, params: clean }],
-    });
-    setSel(name);
-  };
-  const apply = (name: string) => {
-    setSel(name);
-    const p = mine.find((x) => x.name === name);
-    if (!p) return;
-    // 只套样式:文案 / 素材那几个键跳过,当前卡自己的内容原样留着
-    const skip = contentKeys(controls);
-    const patch: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(p.params)) if (!skip.has(k)) patch[k] = v;
-    // 必须一次写进去:逐个 onChange 会被状态更新的批处理吃掉,只剩最后一个 key 生效
-    if (onChangeMany) onChangeMany(patch);
-    else for (const [k, v] of Object.entries(patch)) onChange(k, v);
-  };
-  const del = () => {
-    if (!sel || !window.confirm(`删除预设「${sel}」?`)) return;
-    persist({ ...store, [effectId]: mine.filter((p) => p.name !== sel) });
-    setSel("");
-  };
-  return (
-    <div className="ctrl">
-      <div className="ctrl-head">
-        <span>预设(只套样式,文案不动)</span>
-      </div>
-      <div className="preset-line">
-        <select
-          className="ctrl-input kind-select"
-          value={sel}
-          onChange={(e) => apply(e.target.value)}
-        >
-          <option value="">{mine.length ? "选一套应用…" : "还没有预设,调好后存一套"}</option>
-          {mine.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <button className="video-btn preset-btn" onClick={save} title="把当前参数存为预设">
-          💾
-        </button>
-        {sel && (
-          <button className="video-btn preset-btn" onClick={del} title="删除选中的预设">
-            🗑
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /** 媒体路径控件:选文件 → 上传进 public/demo/ → 自动填路径(预览和导出都可用) */
 function MediaRow({
@@ -637,7 +496,6 @@ export function ParamsPanel({
   onAddToTimeline,
   addAt = 0,
   addSec = 5,
-  ratio,
 }: ParamsPanelProps) {
   // 「更换特效」搜索词(卡片越来越多,先搜再换)
   const [kindQuery, setKindQuery] = useState("");
@@ -692,20 +550,14 @@ export function ParamsPanel({
   }
 
   // 所有控件(含通用大小/速度)按组归类,顺序:内容 → 节奏 → 样式 → 落位
-  // 发行版功能开关:基础版关掉的控件直接不进面板(见 tierFlags.ts)
-  const own = effect.controls.filter(
-    (c) => TIER.glassControl || (c.key !== "glass" && c.key !== "glassAlpha"),
-  );
+  const own = effect.controls;
   // 通用控件给卡自带的同名控件让位:比如 warp-title 自带 speed(穿梭速度),
   // 再叠通用 SPEED_CONTROL 就是两个滑杆写同一个参数 + React 重复 key
   const ownKeys = new Set(own.map((c) => c.key));
   const universal = [
-    ...(TIER.shadowControl ? [SHADOW_CONTROL] : []),
     SCALE_CONTROL,
     SPEED_CONTROL,
     SFX_CONTROL,
-    // 竖版才给:让位是竖屏特有的问题,横版面板不该多这一栏
-    ...(TIER.verticalRatio && ratio === "v" ? [VTIER_CONTROL] : []),
   ].filter((c) => !ownKeys.has(c.key));
   const all: Control[] = [...own, ...universal];
   // 这张卡有几个图片槽位(img1、img2…):有两个以上才给「一次选多张」
@@ -737,14 +589,7 @@ export function ParamsPanel({
         {card && onKindChange && (
           <div className="ctrl">
             <div className="ctrl-head">
-              {/* 标签跟着分档走:基础版关掉了内容搬家(kindSwapCarry),换卡给的是新卡默认值。
-                  写死「内容保留」的话,基础版用户换完发现文案没了,而时间和落位又确实还在,
-                  只会以为是自己手滑 —— 失败是静默的,不会有人来问。 */}
-              <span>
-                {TIER.kindSwapCarry
-                  ? "更换特效(内容/时间/位置保留)"
-                  : "更换特效(时间/位置保留,文案重置)"}
-              </span>
+              <span>更换特效(时间/位置保留,文案重置)</span>
             </div>
             <input
               className="ctrl-input"
@@ -849,15 +694,6 @@ export function ParamsPanel({
           </div>
         )}
 
-        {/* 预设:这张卡的常用参数组合(存本机,长期有效) */}
-        {TIER.presets && <PresetRow
-          key={effect.id}
-          effectId={effect.id}
-          controls={effect.controls}
-          params={params}
-          onChange={onChange}
-          onChangeMany={onChangeMany}
-        />}
 
         {/* 四组参数:内容 / 节奏 / 样式 / 落位与大小 */}
         {GROUP_META.map(({ id, label, en }) => {

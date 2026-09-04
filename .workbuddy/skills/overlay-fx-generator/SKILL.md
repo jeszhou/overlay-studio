@@ -165,7 +165,7 @@ description: 特效生成——当用户提供 SRT 字幕文件(或带时间戳�
 ### 步骤流程(有先后顺序的过程)
 | kind | 用途 | 触发条件 | 关键 params |
 |---|---|---|---|
-| `step-timeline` | 竖版章节卡 | 本期章节/教程大纲 | `title`(`*关键词*`)、`steps`(`\|`分隔)、`revealed`(讲到第几章)、`position`(left/right) |
+| `step-timeline` | 竖排章节卡 | 本期章节/教程大纲 | `title`(`*关键词*`)、`steps`(`\|`分隔)、`revealed`(讲到第几章)、`position`(left/right) |
 | `checklist` | 步骤打勾 | 流程逐项完成 | `title`、`items`(`\|`分隔)、`checked`(已完成数)、`stepMs`(每项间隔,按SRT算)、`position`(left/right) |
 
 ### 教程标注(讲界面、解释术语、给提示)

@@ -100,7 +100,6 @@ function Terminal3D({ params, playToken }: EffectProps<Terminal3DParams>) {
 
 export const terminal3DDef: EffectDef<Terminal3DParams> = {
   id: "terminal-3d",
-  vTier: "full",
   name: "Terminal3D",
   description: "3D 终端打字机 · 多色逐字打命令",
   tags: ["3D 浮屏", "逐条落位"],

@@ -7,7 +7,6 @@ import {
   OFFSET_DEFAULTS,
   offsetVars,
   THEME_OPTIONS,
-  GLASS_CONTROLS,
   GLASS_DEFAULTS,
   glassClass,
   glassVars,
@@ -80,7 +79,6 @@ function RankBars({ params, playToken }: EffectProps<RankBarsParams>) {
 
 export const rankBarsDef: EffectDef<RankBarsParams> = {
   id: "rank-bars",
-  vTier: "half",
   name: "RankBars",
   description: "数据排名条 · 条形生长 + 数值滚动",
   tags: ["生长描画", "滚动计数"],
@@ -110,7 +108,6 @@ export const rankBarsDef: EffectDef<RankBarsParams> = {
     { key: "rows", label: "数据(名称,数值 用 | 分隔)", type: "text" },
     { key: "suffix", label: "后缀单位", type: "text" },
     { key: "accent", label: "第一名强调色", type: "select", options: ACCENT_OPTIONS },
-    ...GLASS_CONTROLS,
     ...OFFSET_CONTROLS,
   ],
   Component: RankBars,

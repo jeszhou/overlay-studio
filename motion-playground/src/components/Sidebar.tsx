@@ -1,4 +1,3 @@
-import { TIER } from "../tierFlags";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { uploadErrText } from "../uploadErr";
 import type { EffectDef, VisualTag } from "../effects/types";
@@ -25,15 +24,11 @@ interface SidebarProps {
   onVideoScale: (v: number) => void;
   animSpeed: number;
   onAnimSpeed: (v: number) => void;
-  exportSec: number;
   exporting: boolean;
   overlay: OverlayDoc | null;
   selCardId: string | null;
   /** 全局底色:一键统一所有卡片亮/暗 */
   onGlobalTheme: (theme: "dark" | "light") => void;
-  /** 画幅(doc.ratio):h = 16:9 横版,v = 9:16 竖版。换的是画布本身,比皮肤更上位 */
-  ratio: string;
-  onRatio: (r: string) => void;
   /** 皮肤(doc.skin):一键给所有卡换配色令牌组 */
   skin: string;
   onSkin: (s: string) => void;
@@ -57,7 +52,6 @@ interface SidebarProps {
   onClearOverlay: () => void;
   onVideo: (file: File | null) => void;
   onFxScale: (v: number) => void;
-  onExportSec: (v: number) => void;
   onExport: () => void;
 }
 
@@ -80,13 +74,10 @@ export function Sidebar({
   onVideoScale,
   animSpeed,
   onAnimSpeed,
-  exportSec,
   exporting,
   overlay,
   selCardId,
   onGlobalTheme,
-  ratio,
-  onRatio,
   skin,
   onSkin,
   docStyle,
@@ -105,7 +96,6 @@ export function Sidebar({
   onClearOverlay,
   onVideo,
   onFxScale,
-  onExportSec,
   onExport,
 }: SidebarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -435,24 +425,6 @@ export function Sidebar({
           </div>
         )}
 
-        {/* 画幅:换的是画布本身(1920×1080 / 1080×1920),存进编排、导出跟着走。
-            排在皮肤上面——先定画布,再谈配色和骨架 */}
-        {tab === "edit" && overlay && TIER.verticalRatio && (
-          <label className="ctrl">
-            <div className="ctrl-head">
-              <span>画幅</span>
-            </div>
-            <select className="ctrl-input" value={ratio} onChange={(e) => onRatio(e.target.value)}>
-              <option value="h">▭ 横版 16:9(1920×1080)</option>
-              <option value="v">▯ 竖版 9:16(1080×1920)· 试验中</option>
-            </select>
-            {ratio === "v" && (
-              <div className="ctrl-hint">
-                竖版刚上线,还没经过完整成片检验,效果可能不稳。导出前整条预览一遍;遇到问题欢迎反馈。
-              </div>
-            )}
-          </label>
-        )}
 
         {/* 皮肤:一键给所有卡换配色令牌组(hud.css data-skin),存进编排、导出同步生效 */}
         {tab === "edit" && overlay && (
@@ -601,29 +573,12 @@ export function Sidebar({
           </>
         )}
 
-        {/* 导出透明动效层(编辑台=整条时间轴;效果库=这张卡,可选秒数) */}
-        {(tab === "edit" || TIER.singleCardExport) && (
+        {/* 导出透明动效层 */}
+        {tab === "edit" && (
         <div className="export-row">
           <button className="export-btn" onClick={onExport} disabled={exporting}>
-            {exporting
-              ? "⏳ 导出中…请稍候"
-              : tab === "edit"
-                ? "⬇ 导出整条时间轴(透明)"
-                : "⬇ 导出这张卡(透明)"}
+            {exporting ? "⏳ 导出中…请稍候" : "⬇ 导出整条时间轴(透明)"}
           </button>
-          {tab === "library" && (
-            <label className="export-sec">
-              <input
-                type="range"
-                min={2}
-                max={15}
-                step={1}
-                value={exportSec}
-                onChange={(e) => onExportSec(Number(e.target.value))}
-              />
-              <span>{exportSec}s</span>
-            </label>
-          )}
         </div>
         )}
 

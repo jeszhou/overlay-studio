@@ -1,4 +1,3 @@
-import { TIER } from "./tierFlags";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EFFECTS } from "./effects/registry";
 import { Sidebar } from "./components/Sidebar";
@@ -14,7 +13,6 @@ import {
 } from "./components/TopBar";
 import { parseOverlay, type OverlayCard, type OverlayDoc } from "./overlay/types";
 import { parseSrt, type SrtLine } from "./overlay/srt";
-import { canCarryContent, swapCardParams } from "./overlay/kindSwap";
 import { lintOverlay, mergeLintConfig, type LintConfig, type LintIssue } from "./overlay/lint";
 import { uploadErrText } from "./uploadErr";
 import lintDefaults from "../lint-rules.default.json";
@@ -68,7 +66,6 @@ export default function App() {
   // 特效整体缩放(1 = 100%)
   const [fxScale, setFxScale] = useState(1);
   // 导出透明动效层
-  const [exportSec, setExportSec] = useState(6);
   const [exporting, setExporting] = useState(false);
   // 导出进度(每秒轮询 /api/export-status)
   const [exportProg, setExportProg] = useState<{
@@ -81,9 +78,6 @@ export default function App() {
 
   // ---- 编辑台:时间轴 ----
   const [overlay, setOverlay] = useState<OverlayDoc | null>(null);
-  // 画幅的唯一出口:分层关掉竖版时,哪怕导入的编排里写着 ratio:"v" 也按横版走。
-  // 只关侧栏那个开关是不够的 —— 用户导入一份竖版 JSON 照样能把画布变竖。
-  const docRatio: "h" | "v" = TIER.verticalRatio && overlay?.ratio === "v" ? "v" : "h";
   const [curT, setCurT] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [selCardId, setSelCardId] = useState<string | null>(null);
@@ -739,18 +733,10 @@ export default function App() {
     patchCardParams({ [key]: value });
   };
 
-  // 更换选中卡片的特效类型:内容搬家(标题/条目/节奏/落位/通用设置全部翻译到新卡)
+  // 更换选中卡片的特效类型(时间/落位保留,参数回到新卡默认值)
   const handleCardKindChange = (kind: string) => {
     if (!overlay || !selCardId) return;
     if (!EFFECTS.some((e) => e.id === kind)) return;
-    const cur = overlay.cards.find((c) => c.id === selCardId);
-    if (cur && !canCarryContent(cur.kind, kind)) {
-      alert(
-        "⚠️ 这两种卡结构差别太大,文字内容搬不过去,先用模板占位了。\n\n" +
-          "想让内容也重写成新卡的样子:📤 导出 JSON 后对 Codex 说\n" +
-          `「特效生成:把 ${selCardId} 换成 ${kind},内容按 SRT 对应时间段重写,其他卡不动」`,
-      );
-    }
     pushHistory(true);
     setOverlay({
       ...overlay,
@@ -759,10 +745,7 @@ export default function App() {
           ? {
               ...c,
               kind,
-              // 基础版关掉内容搬家:换卡给空模板,文案/节奏要重填
-              params: TIER.kindSwapCarry
-                ? swapCardParams(c.kind, c.params, kind)
-                : { ...(EFFECTS.find((e) => e.id === kind)?.defaults ?? {}) },
+              params: { ...(EFFECTS.find((e) => e.id === kind)?.defaults ?? {}) },
             }
           : c,
       ),
@@ -929,26 +912,10 @@ export default function App() {
       // 导出帧率:相机/手机拍的素材是 NTSC 29.97fps(30000/1001),动效层按 30 导会
       // 越走越快 —— 166s 累计漂移约 5 帧,片尾能看出动效和口型对不上
       const EXPORT_FPS = 29.97;
-      // 编辑台:导出整条 overlay(时长 = 最后一张卡结束 + 0.5s 尾巴);效果库:导出这张卡
+      // 导出整条 overlay(时长 = 最后一张卡结束 + 0.5s 尾巴)
       // 尾巴是留给末尾音效收干净的,别用 ceil 取整 —— 28.0s 的片子会被抬到 29s,
       // 白白多出整整一秒空帧(卡片走到 end 就卸掉了,尾巴里什么都没有)。
-      const body =
-        tab === "edit" && overlay
-          ? {
-              mode: "timeline",
-              doc: overlay,
-              scale: fxScale,
-              speed: animSpeed,
-              fps: EXPORT_FPS,
-              duration: Math.max(...overlay.cards.map((c) => c.end)) + 0.5,
-            }
-          : {
-              effectId: selectedId,
-              params: { ...paramsById[selectedId], __scale: fxScale },
-              speed: animSpeed,
-              fps: EXPORT_FPS,
-              duration: exportSec,
-            };
+      if (!overlay) return; const body = { mode: "timeline", doc: overlay, scale: fxScale, speed: animSpeed, fps: EXPORT_FPS, duration: Math.max(...overlay.cards.map((c) => c.end)) + 0.5 };
       const res = await fetch("/api/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1199,15 +1166,12 @@ export default function App() {
         onVideoScale={setVideoScale}
         animSpeed={animSpeed}
         onAnimSpeed={setAnimSpeed}
-        exportSec={exportSec}
         exporting={exporting}
         overlay={overlay}
         selCardId={selCardId}
         onGlobalTheme={handleGlobalTheme}
         skin={overlay?.skin ?? ""}
         onSkin={(s) => setOverlay((o) => (o ? { ...o, skin: s || undefined } : o))}
-        ratio={docRatio}
-        onRatio={(r) => setOverlay((o) => (o ? { ...o, ratio: r === "v" ? "v" : undefined } : o))}
         docStyle={overlay?.style ?? ""}
         onDocStyle={(s) => setOverlay((o) => (o ? { ...o, style: s || undefined } : o))}
         sideColor={overlay?.sideColor ?? ""}
@@ -1232,7 +1196,6 @@ export default function App() {
         videoBusy={videoBusy}
         onVideo={handleVideo}
         onFxScale={setFxScale}
-        onExportSec={setExportSec}
         onExport={handleExport}
       />
 
@@ -1250,7 +1213,6 @@ export default function App() {
           overlayTheme={overlay?.theme}
           glow={overlay?.glow ?? false}
           font={overlay?.font}
-          ratio={docRatio}
           skin={overlay?.skin}
           docStyle={overlay?.style}
           sideColor={overlay?.sideColor}
@@ -1277,7 +1239,6 @@ export default function App() {
       </main>
 
       <ParamsPanel
-        ratio={docRatio}
         effect={panelEffect}
         params={panelParams}
         onChange={panelOnChange}

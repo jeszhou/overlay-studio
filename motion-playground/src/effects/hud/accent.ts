@@ -46,21 +46,10 @@ export const SKIN_OPTIONS = [{ label: "默认", value: "" }];
  *  同样不用碰任何卡片。 */
 export const STYLE_OPTIONS = [{ label: "HUD", value: "" }];
 
-/** 文字卡通用「玻璃底色」:黑/白/无 三选 + 透明度,字看不清就加一块垫底 */
-export const GLASS_OPTIONS = [
-  { label: "无", value: "none" },
-  { label: "🌙 黑玻璃", value: "dark" },
-  { label: "🌞 白玻璃", value: "light" },
-];
 
 /** 玻璃底默认值:默认无底,视觉与旧行为一致 */
 export const GLASS_DEFAULTS = { glass: "none" as const, glassAlpha: 0.6 };
 
-/** 玻璃底参数面板控件,放在 OFFSET_CONTROLS 前 */
-export const GLASS_CONTROLS = [
-  { key: "glass", label: "玻璃底色", type: "select", options: GLASS_OPTIONS },
-  { key: "glassAlpha", label: "底色透明度(越小越透)", type: "range", min: 0.2, max: 1, step: 0.05, unit: "" },
-] as const;
 
 /** 玻璃底 class:none/未设时返回空串,不改变原布局 */
 export function glassClass(glass?: string) {

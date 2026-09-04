@@ -1,4 +1,3 @@
-import { TIER } from "../tierFlags";
 import { VERSION_LABEL, VERSION_TITLE } from "../version";
 import { PROMO_URL } from "../promo";
 import { useEffect, useRef, useState } from "react";
@@ -497,13 +496,9 @@ export function TopBar({
         >
           {videoBusy ? "⏳ 上传中…" : hasVideo ? "换视频" : "导入视频"}
         </button>
-        {(tab === "edit" || TIER.singleCardExport) && (
+        {tab === "edit" && (
           <button className="tb-btn tb-btn--primary" onClick={onExport} disabled={exporting}>
-            {exporting
-              ? "导出中…"
-              : tab === "edit"
-                ? "⬇ 导出透明 MOV"
-                : "⬇ 导出这张卡"}
+            {exporting ? "导出中…" : "⬇ 导出透明 MOV"}
           </button>
         )}
       </div>

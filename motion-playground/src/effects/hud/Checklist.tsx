@@ -55,7 +55,6 @@ function Checklist({ params, playToken }: EffectProps<ChecklistParams>) {
 
 export const checklistDef: EffectDef<ChecklistParams> = {
   id: "checklist",
-  vTier: "half",
   name: "Checklist",
   description: "步骤打勾 · 流程逐项完成打√",
   tags: ["逐条落位"],
