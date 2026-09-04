@@ -1,5 +1,6 @@
 import { TIER } from "../tierFlags";
 import { VERSION_LABEL, VERSION_TITLE } from "../version";
+import { PROMO_URL } from "../promo";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ACCENT_OPTIONS } from "../effects/hud/accent";
@@ -234,7 +235,23 @@ export function TopBar({
   return (
     <div className="topbar">
       <div className="tb-brand">
-        OVERLAY<em>/</em>STUDIO<span className="tb-ver" title={VERSION_TITLE}>{VERSION_LABEL}</span>
+        OVERLAY<em>/</em>STUDIO
+        {PROMO_URL ? (
+          /* 有地址(基础版)时徽章是入口:点开版本指南,看两版差在哪、怎么联系作者 */
+          <a
+            className="tb-ver tb-ver--link"
+            href={PROMO_URL}
+            target="_blank"
+            rel="noreferrer"
+            title={`${VERSION_TITLE} · 点开看两版对比`}
+          >
+            {VERSION_LABEL} 基础版 ↗
+          </a>
+        ) : (
+          <span className="tb-ver" title={VERSION_TITLE}>
+            {VERSION_LABEL}
+          </span>
+        )}
       </div>
 
       {/* 模式切换:一眼看清自己在哪 */}

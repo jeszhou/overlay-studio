@@ -969,6 +969,34 @@ input[type="range"]::-moz-range-thumb {
   letter-spacing: 0;
 }
 
+/* ---- 版本指南入口 ----
+   只有基础版会渲染(promo.ts 的地址非空时)。用虚线框和弱化的字,
+   让它读起来像列表末尾的一句注脚,而不是横插进来的广告条。 */
+.fx-promo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px dashed var(--hairline);
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+}
+.fx-promo:hover {
+  border-color: var(--accent);
+  border-style: solid;
+}
+.fx-promo-t {
+  font-size: 12px;
+  color: var(--ink);
+}
+.fx-promo-d {
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--ink-faint);
+}
+
 /* ---- 录屏 Demo 运镜:口播画面缩到角落(3:4,cover 裁剪不拉伸) ---- */
 .stage-video {
   inset: auto;
@@ -1067,6 +1095,15 @@ input[type="range"]::-moz-range-thumb {
   padding: 1px 6px;
   /* 徽章带悬停详情(档位+发布日期),给个手型光标让人知道可以停一下 */
   cursor: help;
+}
+/* 基础版:徽章是版本指南的入口,所以是链接而不是悬停提示 */
+.tb-ver--link {
+  cursor: pointer;
+  text-decoration: none;
+}
+.tb-ver--link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 .tb-tab {
   padding: 0 18px;

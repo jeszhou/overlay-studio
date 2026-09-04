@@ -759,7 +759,7 @@ export default function App() {
           ? {
               ...c,
               kind,
-              // 免费版关掉内容搬家:换卡给空模板,文案/节奏要重填
+              // 基础版关掉内容搬家:换卡给空模板,文案/节奏要重填
               params: TIER.kindSwapCarry
                 ? swapCardParams(c.kind, c.params, kind)
                 : { ...(EFFECTS.find((e) => e.id === kind)?.defaults ?? {}) },

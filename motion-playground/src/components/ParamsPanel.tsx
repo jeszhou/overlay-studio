@@ -9,7 +9,7 @@ import type { OverlayCard } from "../overlay/types";
 interface ParamsPanelProps {
   /** 一次改一批(应用预设):走一次状态更新,只占一步撤销 */
   onChangeMany?: (patch: Record<string, unknown>) => void;
-  /** 查不到时是 undefined:编排里可能有本档没有的卡(免费版卡少),
+  /** 查不到时是 undefined:编排里可能有本档没有的卡(基础版卡少),
       面板要能说清楚,不能崩 —— 见下面的 pp-empty 分支 */
   effect: EffectDef<any> | undefined;
   params: any;
@@ -644,7 +644,7 @@ export function ParamsPanel({
   // 加入时间轴之后不再跳回编辑台,所以按钮自己要给一下「加成功了」的回执
   const [justAdded, setJustAdded] = useState(false);
   const addedTimer = useRef<number | null>(null);
-  // 选中的卡这一档没有(免费版卡少,别人用完整版做的编排里就会有)。
+  // 选中的卡这一档没有(基础版卡少,别人用专业版做的编排里就会有)。
   // 以前这里是 EFFECTS.find(...)! 直接当它一定在,结果 effect.controls 读了个
   // undefined —— **整页白屏**,连哪张卡出问题都看不到。画布和导出早就写了
   // `if (!def) return null` 跳过,只有这块面板会炸。
@@ -692,7 +692,7 @@ export function ParamsPanel({
   }
 
   // 所有控件(含通用大小/速度)按组归类,顺序:内容 → 节奏 → 样式 → 落位
-  // 发行版功能开关:免费版关掉的控件直接不进面板(见 tierFlags.ts)
+  // 发行版功能开关:基础版关掉的控件直接不进面板(见 tierFlags.ts)
   const own = effect.controls.filter(
     (c) => TIER.glassControl || (c.key !== "glass" && c.key !== "glassAlpha"),
   );
@@ -737,8 +737,8 @@ export function ParamsPanel({
         {card && onKindChange && (
           <div className="ctrl">
             <div className="ctrl-head">
-              {/* 标签跟着分档走:免费版关掉了内容搬家(kindSwapCarry),换卡给的是新卡默认值。
-                  写死「内容保留」的话,免费版用户换完发现文案没了,而时间和落位又确实还在,
+              {/* 标签跟着分档走:基础版关掉了内容搬家(kindSwapCarry),换卡给的是新卡默认值。
+                  写死「内容保留」的话,基础版用户换完发现文案没了,而时间和落位又确实还在,
                   只会以为是自己手滑 —— 失败是静默的,不会有人来问。 */}
               <span>
                 {TIER.kindSwapCarry

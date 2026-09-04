@@ -31,9 +31,9 @@ const VTIER_ZH = {
   full: "full 人缩小窗",
 };
 
-/** 这一份有没有竖版画幅。没有的(免费版)卡表就不出「竖版」列 ——
+/** 这一份有没有竖版画幅。没有的(基础版)卡表就不出「竖版」列 ——
  *  否则等于告诉读它的 AI「有竖版、每张卡怎么让位」,而这一份根本切不到竖版。
- *  直接读本目录的 tierFlags.ts,读到的就是这一份自己的开关;完整版是 true,表不变。 */
+ *  直接读本目录的 tierFlags.ts,读到的就是这一份自己的开关;专业版是 true,表不变。 */
 const HAS_VERTICAL = (() => {
   try {
     const t = fs.readFileSync(path.join(ROOT, "src/tierFlags.ts"), "utf8");
@@ -280,7 +280,7 @@ if (iBegin >= 0 && iEnd > iBegin) {
 
 // 火柴人动作表:接管 STICK 标记区(没有就插在卡片库之后)
 // stickPoses.ts 在发行版里会被裁掉(stick-fall 不在发行档,构建也会删掉这一整节)。
-// 以前这里直接读文件,免费版用户跑 `npm run sync:cards` 第一步就 ENOENT 崩 ——
+// 以前这里直接读文件,基础版用户跑 `npm run sync:cards` 第一步就 ENOENT 崩 ——
 // 而那条命令正是 SKILL.md 教他们「加了新卡就跑一次」的必经步骤(2026-09-01 查出来)。
 // 裁卡没裁「引用卡的地方」的老毛病,这次的引用处是构建脚本本身。
 if (fs.existsSync(STICK_POSES)) {

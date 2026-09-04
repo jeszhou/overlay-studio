@@ -4,6 +4,7 @@ import { uploadErrText } from "../uploadErr";
 import type { EffectDef, VisualTag } from "../effects/types";
 import { VISUAL_TAGS } from "../effects/types";
 import { EFFECT_GROUPS } from "../effects/registry";
+import { PROMO_URL } from "../promo";
 import { kindColor } from "../effects/kindColor";
 import type { OverlayDoc } from "../overlay/types";
 import { SKIN_OPTIONS, STYLE_OPTIONS } from "../effects/hud/accent";
@@ -387,6 +388,17 @@ export function Sidebar({
                 </div>
               ));
             })()}
+            {/* 列表末尾的入口:人正在翻卡、正在找"有没有更合适的表达"的时候才遇到。
+                搜索状态下不出现 —— 那时他要的是某一张具体的卡,不是版本对比。
+                地址为空(专业版 / dev)时整块不渲染。 */}
+            {PROMO_URL && !fxQuery ? (
+              <a className="fx-promo" href={PROMO_URL} target="_blank" rel="noreferrer">
+                <span className="fx-promo-t">没找到想要的表达?</span>
+                <span className="fx-promo-d">
+                  这一份是基础版。专业版有更多动效卡、更懂内容的 AI 编排,也可以直接找作者聊 —— 看两版差在哪 ↗
+                </span>
+              </a>
+            ) : null}
           </div>
         </>
       )}

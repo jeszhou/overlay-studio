@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
  * 授权协议门:首次使用先读协议、点「我已阅读并同意」才能进 Studio。
  *
  * 协议文本取自 /LICENSE.txt —— 它是当前这份仓库的 LICENSE 的副本,所以:
- *   - 完整版弹付费协议,免费版弹免费协议,各弹各的;
+ *   - 专业版弹付费协议,基础版弹免费协议,各弹各的;
  *   - 没有这个文件就永远不弹。
  *
  * 同意记录存 localStorage(按协议文本 hash):协议改版 → hash 变 → 重新弹。
