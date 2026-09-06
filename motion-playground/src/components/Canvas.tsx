@@ -9,7 +9,14 @@ import {
 } from "react";
 import type { EffectDef } from "../effects/types";
 import { EFFECTS } from "../effects/registry";
-import { STAGE } from "../stage";
+import {
+  DEFAULT_ASPECT,
+  snapGuidesForAspect,
+  stageForAspect,
+  type StageAspect,
+  type StageSize,
+  type StageSnapGuides,
+} from "../stage";
 import { PZ_ORIGIN, camFrameGeom, focusCamGeom } from "../effects/hud/camGeom";
 import { backdropFirst, outroFade, type OverlayCard } from "../overlay/types";
 import { useEnter } from "../effects/useAnimation";
@@ -26,6 +33,8 @@ interface CanvasProps {
   showPerson: boolean;
   videoUrl: string | null;
   fxScale: number;
+  /** 工程画幅；缺省保持旧版 16:9。 */
+  aspect?: StageAspect;
   /** 时间轴模式:当前时间点应显示的卡片(null = 单特效预览模式) */
   overlayCards?: OverlayCard[] | null;
   /** 时间轴模式:当前播放头时刻(秒),注入给时间感知卡(章节条/字幕层) */
@@ -82,6 +91,8 @@ function CardShell({
   onNudge,
   onPick,
   snapCtx,
+  snapGuides,
+  stage,
   children,
 }: {
   cardId: string | null;
@@ -96,9 +107,11 @@ function CardShell({
   onNudge?: NudgeFn;
   onPick?: (id: string) => void;
   snapCtx?: SnapCtx;
+  snapGuides: StageSnapGuides;
+  stage: StageSize;
   children: ReactNode;
 }) {
-  const { w: STAGE_W, h: STAGE_H } = STAGE;
+  const { w: STAGE_W, h: STAGE_H } = stage;
   const scale = fxScale * (Number(params.scale) || 1);
   // 有效倍速 = 全局「动画速度」×该卡自己的「动画速度(此卡)」
   const speed = animSpeed * (Number(params.speed) || 1);
@@ -167,9 +180,9 @@ function CardShell({
           const g = { v: [] as number[], h: [] as number[] };
           if (snap) {
             const { m0, others } = snap;
-            // 吸附目标:左列脊柱线 x120 / 画布中线 x960 / 段头基线 y96 / 画布中线 y540 + 其他元素的边和中心
-            const vCands = [120, STAGE_W / 2, ...others.flatMap((o) => [o.l, (o.l + o.r) / 2, o.r])];
-            const hCands = [96, STAGE_H / 2, ...others.flatMap((o) => [o.t, (o.t + o.b) / 2, o.b])];
+            // 吸附目标:当前画幅的安全脊柱/顶部基线、画布中线、其他元素的边和中心。
+            const vCands = [snapGuides.x, STAGE_W / 2, ...others.flatMap((o) => [o.l, (o.l + o.r) / 2, o.r])];
+            const hCands = [snapGuides.y, STAGE_H / 2, ...others.flatMap((o) => [o.t, (o.t + o.b) / 2, o.b])];
             const pick = (edges: number[], cands: number[]) => {
               let best: { d: number; adj: number; at: number } | null = null;
               for (const ed of edges)
@@ -224,6 +237,7 @@ export function Canvas({
   showPerson,
   videoUrl,
   fxScale,
+  aspect,
   overlayCards,
   now,
   overlayTheme,
@@ -241,8 +255,9 @@ export function Canvas({
   onNudge,
   onPickCard,
 }: CanvasProps) {
-  // 画布逻辑尺寸:1920×1080
-  const { w: STAGE_W, h: STAGE_H } = STAGE;
+  const stage = stageForAspect(aspect);
+  const snapGuides = snapGuidesForAspect(aspect);
+  const { w: STAGE_W, h: STAGE_H } = stage;
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const videoNodeRef = useRef<HTMLVideoElement | null>(null);
@@ -253,7 +268,7 @@ export function Canvas({
   // 运镜:播放后从满屏缩到左侧
   const camIn = useEnter(playToken);
 
-  // 把 1920×1080 逻辑画布等比缩放塞进可用空间
+  // 把工程逻辑画布等比缩放塞进可用空间
   useLayoutEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -300,7 +315,7 @@ export function Canvas({
       style: { left: 56, top: STAGE_H - 48 - 252, width: 252, height: 252, borderRadius: "50%" },
     }),
     "cam-frame": (p) => {
-      const g = camFrameGeom(p ?? {});
+      const g = camFrameGeom(p ?? {}, aspect);
       return {
         cls: "is-pip-frame",
         style: { left: g.x, top: g.y, width: g.w, height: g.h, borderRadius: g.r },
@@ -327,6 +342,7 @@ export function Canvas({
         ref={stageRef}
         className={`stage${isHud ? " is-hud" : ""}${glow ? "" : " no-glow"}`}
         data-theme={theme}
+        data-aspect={aspect ?? DEFAULT_ASPECT}
         data-skin={skin || undefined}
         data-style={docStyle || undefined}
         data-pip={framingPip ? (pipCard?.kind ?? "1") : undefined}
@@ -335,6 +351,8 @@ export function Canvas({
           height: STAGE_H,
           transform: `translate(-50%, -50%) scale(${scale})`,
           ["--hud-scale" as string]: fxScale,
+          ["--stage-w" as string]: `${STAGE_W}px`,
+          ["--stage-h" as string]: `${STAGE_H}px`,
           ...(font ? { ["--hud-font" as string]: `"${font}"` } : {}),
           ...(sideColor ? { ["--hud-side" as string]: sideColor } : {}),
           ...inkVars(inkColor),
@@ -363,7 +381,7 @@ export function Canvas({
                   : pipCard?.kind === "focus-card"
                     ? (() => {
                         // 口播框几何走 camGeom 里那一份,和卡自己用的是同一个函数
-                        const g = focusCamGeom(pipCard.params as any);
+                        const g = focusCamGeom(pipCard.params as any, aspect);
                         return {
                           left: g.x,
                           top: g.y,
@@ -442,6 +460,7 @@ export function Canvas({
                   __t: now,
                   __start: card.start,
                   __end: card.end,
+                  __aspect: aspect ?? DEFAULT_ASPECT,
                 };
                 // demo-tour 口播圆窗:预览时没填 camSrc 就用导入的口播视频(与导出的全局口播注入对齐)
                 if (card.kind === "demo-tour" && videoUrl && !cardParams.camSrc)
@@ -461,6 +480,8 @@ export function Canvas({
                     onNudge={onNudge}
                     onPick={onPickCard}
                     snapCtx={snapCtx}
+                    snapGuides={snapGuides}
+                    stage={stage}
                   >
                     {def.selfPosition ? (
                       <C params={cardParams} playToken={1} />
@@ -502,10 +523,10 @@ export function Canvas({
           : /* 单特效预览:HUD 族自锚定;极简族落进左右槽 */
             (() => {
               // demo-tour 口播圆窗:预览时没填 camSrc 就用导入的口播视频(与导出的全局口播注入对齐)
-              const previewParams =
+              const previewParams: Record<string, unknown> =
                 effect.id === "demo-tour" && videoUrl && !(params as Record<string, unknown>).camSrc
-                  ? { ...params, camSrc: videoUrl }
-                  : params;
+                  ? { ...params, camSrc: videoUrl, __aspect: aspect ?? DEFAULT_ASPECT }
+                  : { ...params, __aspect: aspect ?? DEFAULT_ASPECT };
               return (
                 <CardShell
                   cardId={null}
@@ -515,6 +536,8 @@ export function Canvas({
                   animSpeed={animSpeed ?? 1}
                   onNudge={onNudge}
                   snapCtx={snapCtx}
+                  snapGuides={snapGuides}
+                  stage={stage}
                 >
                   {effect.selfPosition ? (
                     <Effect params={previewParams} playToken={playToken} />

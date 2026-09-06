@@ -319,6 +319,39 @@
   right: 120px;
 }
 
+/* 9:16 竖屏：上下组织信息，给短视频平台底部控件留出空间。 */
+.stage[data-aspect="9:16"] .guide-safe {
+  inset: 120px 72px 180px;
+}
+.stage[data-aspect="9:16"] .guide-slot {
+  left: 72px;
+  right: auto;
+  width: 936px;
+  height: 720px;
+  bottom: auto;
+}
+.stage[data-aspect="9:16"] .guide-slot-left { top: 120px; }
+.stage[data-aspect="9:16"] .guide-slot-right { top: auto; bottom: 180px; }
+
+.stage[data-aspect="9:16"] .slot {
+  left: 72px;
+  right: auto;
+  width: 936px;
+  height: 720px;
+  bottom: auto;
+}
+.stage[data-aspect="9:16"] .slot-left {
+  top: 120px;
+  justify-content: center;
+  transform-origin: center;
+}
+.stage[data-aspect="9:16"] .slot-right {
+  top: auto;
+  bottom: 180px;
+  justify-content: center;
+  transform-origin: center;
+}
+
 /* 动效槽位:左右各一,内容垂直居中 */
 .slot {
   position: absolute;
@@ -2404,4 +2437,143 @@ input[type="range"]::-moz-range-thumb {
   background: rgba(0, 0, 0, 0.14);
   border-radius: 3px;
   padding: 1px 5px;
+}
+
+/* ---- 9:16 成片布局 ----
+   横屏把人物夹在左右信息之间；竖屏改为上/下两段，避免沿用横向绝对坐标。 */
+.stage[data-aspect="9:16"] .hud-anchor--top-left {
+  left: 72px;
+  top: 192px;
+}
+.stage[data-aspect="9:16"] .hud-anchor--top-right {
+  right: 72px;
+  top: 192px;
+}
+.stage[data-aspect="9:16"] .hud-anchor--left {
+  left: 72px;
+}
+.stage[data-aspect="9:16"] .hud-anchor--right {
+  right: 72px;
+}
+.stage[data-aspect="9:16"] .hud-anchor--top {
+  top: 192px;
+}
+.stage[data-aspect="9:16"] .hud-anchor--bottom {
+  bottom: 180px;
+}
+.stage[data-aspect="9:16"] .seg-stack {
+  left: 72px;
+  top: 192px;
+  max-width: 936px;
+  max-height: 1620px;
+}
+.stage[data-aspect="9:16"] .cbar {
+  left: 72px;
+  right: 72px;
+  top: 120px;
+  width: auto;
+  border: 1px solid var(--hud-glass-brd);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.stage[data-aspect="9:16"] .ctrack {
+  left: 72px;
+  right: 72px;
+  bottom: 180px;
+}
+.stage[data-aspect="9:16"] .ctrack-cue {
+  max-width: 880px;
+}
+
+/* 默认 UI 圈注左移 300px 时会擦出竖屏 5px；只在竖屏补回这点边界余量。 */
+.stage[data-aspect="9:16"] .uc {
+  margin-left: 8px;
+}
+
+.stage[data-aspect="9:16"] .pp-pill {
+  box-sizing: border-box;
+  max-width: 880px;
+  white-space: normal;
+  justify-content: center;
+  text-align: center;
+}
+.stage[data-aspect="9:16"] .tc-card,
+.stage[data-aspect="9:16"] .ql-card {
+  box-sizing: border-box;
+  width: 840px;
+  max-width: calc(100% - 144px);
+}
+.stage[data-aspect="9:16"] .ck,
+.stage[data-aspect="9:16"] .st {
+  max-width: 840px;
+}
+.stage[data-aspect="9:16"] .t3-card {
+  box-sizing: border-box;
+  width: 840px;
+}
+.stage[data-aspect="9:16"] .ts {
+  width: 840px;
+  text-align: center;
+}
+.stage[data-aspect="9:16"] .ts-line {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.stage[data-aspect="9:16"] .ts.pB .ts-line[data-role="hero"] {
+  font-size: 76px;
+}
+.stage[data-aspect="9:16"] .etc-row {
+  flex-direction: column;
+  width: 840px;
+}
+.stage[data-aspect="9:16"] .etc-note {
+  padding: 8px 4px;
+}
+
+/* 双栏对比在竖屏上改成上下对照。 */
+.stage[data-aspect="9:16"] .vs {
+  flex-direction: column;
+}
+.stage[data-aspect="9:16"] .vs-side {
+  box-sizing: border-box;
+  width: 840px;
+  min-height: 300px;
+}
+.stage[data-aspect="9:16"] .vs-badge {
+  margin: -28px 0;
+}
+
+/* 人物聚焦卡：人物在上半屏，要点在下半屏。 */
+.stage[data-aspect="9:16"] .fcd-list {
+  left: 120px;
+  right: 120px;
+  top: 1040px;
+  transform: none;
+  gap: 24px;
+}
+.stage[data-aspect="9:16"] .fcd-chip {
+  padding: 24px 30px;
+  font-size: 34px;
+}
+.stage[data-aspect="9:16"] .stage-video.is-pip-br {
+  left: 608px;
+  top: 1206px;
+}
+.stage[data-aspect="9:16"] .stage-video.is-pip-bl {
+  left: 72px;
+  top: 1206px;
+}
+.stage[data-aspect="9:16"] .stage-video.is-pip-focus-r {
+  left: 190px;
+}
+
+.stage[data-aspect="9:16"] .person {
+  width: 720px;
+  height: 1240px;
+}
+.stage[data-aspect="9:16"] .person-body {
+  width: 460px;
+  height: 760px;
+  border-radius: 230px 230px 0 0;
 }

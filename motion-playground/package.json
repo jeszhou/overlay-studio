@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "test": "tsx --tsconfig tsconfig.app.json --test tests/**/*.test.ts",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "lint:overlay": "tsx --tsconfig tsconfig.app.json scripts/lint-overlay.ts",

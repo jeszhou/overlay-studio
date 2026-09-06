@@ -6,6 +6,7 @@ import { EFFECT_GROUPS } from "../effects/registry";
 import { PROMO_URL } from "../promo";
 import { kindColor } from "../effects/kindColor";
 import type { OverlayDoc } from "../overlay/types";
+import type { StageAspect } from "../stage";
 import { SKIN_OPTIONS, STYLE_OPTIONS } from "../effects/hud/accent";
 import type { SrtLine } from "../overlay/srt";
 import type { StudioTab } from "./TopBar";
@@ -29,6 +30,8 @@ interface SidebarProps {
   selCardId: string | null;
   /** 全局底色:一键统一所有卡片亮/暗 */
   onGlobalTheme: (theme: "dark" | "light") => void;
+  /** 成片画幅:预览、JSON 与透明导出同步 */
+  onGlobalAspect: (aspect: StageAspect) => void;
   /** 皮肤(doc.skin):一键给所有卡换配色令牌组 */
   skin: string;
   onSkin: (s: string) => void;
@@ -78,6 +81,7 @@ export function Sidebar({
   overlay,
   selCardId,
   onGlobalTheme,
+  onGlobalAspect,
   skin,
   onSkin,
   docStyle,
@@ -400,6 +404,28 @@ export function Sidebar({
           <button className="play-btn" onClick={onReplay}>
             <span className="play-tri" /> 重放动画
           </button>
+        )}
+
+        {tab === "edit" && overlay && (
+          <div className="ctrl scale-row">
+            <div className="ctrl-head">
+              <span>成片画幅</span>
+            </div>
+            <div className="seg" aria-label="成片画幅">
+              <button
+                className={`seg-btn ${overlay.aspect !== "9:16" ? "is-on" : ""}`}
+                onClick={() => onGlobalAspect("16:9")}
+              >
+                横屏 16:9
+              </button>
+              <button
+                className={`seg-btn ${overlay.aspect === "9:16" ? "is-on" : ""}`}
+                onClick={() => onGlobalAspect("9:16")}
+              >
+                竖屏 9:16
+              </button>
+            </div>
+          </div>
         )}
 
         {/* 全局底色:一键统一所有卡的亮/暗(单卡可在右栏再单独覆盖) */}

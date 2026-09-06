@@ -4,7 +4,7 @@ import "./fonts"; // 自定义字体注册:导出端也要有 @font-face,成片�
 import { EFFECTS } from "./effects/registry";
 import { FxSpeedScope } from "./effects/FxSpeedScope";
 import { backdropFirst, outroFade, parseOverlay, type OverlayDoc } from "./overlay/types";
-import { STAGE } from "./stage";
+import { DEFAULT_ASPECT, stageForAspect, type StageAspect } from "./stage";
 import "./effects/hud/hud.css";
 import "./App.css";
 
@@ -29,6 +29,7 @@ function renderCard(
   jobSpeed: number,
   t?: number,
   cam?: string,
+  aspect?: StageAspect,
 ) {
   const def = EFFECTS.find((e) => e.id === card.kind);
   if (!def) return null;
@@ -36,7 +37,13 @@ function renderCard(
   const side = (card.params.side as string) ?? "left";
   // __start:让卡内视频(screen-demo 录屏)知道自己相对整条时间轴的起点
   // __t/__end:让时间感知卡(章节条/字幕层)拿到时间轴当前秒和自己的终点
-  const params: Record<string, unknown> = { ...card.params, __start: card.start ?? 0, __t: t, __end: card.end };
+  const params: Record<string, unknown> = {
+    ...card.params,
+    __start: card.start ?? 0,
+    __t: t,
+    __end: card.end,
+    __aspect: aspect ?? DEFAULT_ASPECT,
+  };
   // 运镜卡的口播:单卡没传就用全局口播(doc.cam),按时间轴自动对位
   if (cam && !params.camSrc) params.camSrc = cam;
   // 每卡缩放/倍速 × 全局值,和 Studio 预览一致
@@ -77,8 +84,8 @@ function renderCard(
   );
 }
 
-const stageStyle = (scale: number) => {
-  const { w, h } = STAGE;
+const stageStyle = (scale: number, aspect?: StageAspect) => {
+  const { w, h } = stageForAspect(aspect);
   return {
     position: "fixed",
     left: 0,
@@ -86,6 +93,8 @@ const stageStyle = (scale: number) => {
     width: w,
     height: h,
     ["--hud-scale" as string]: scale,
+    ["--stage-w" as string]: `${w}px`,
+    ["--stage-h" as string]: `${h}px`,
   } as React.CSSProperties;
 };
 
@@ -131,7 +140,7 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
   const seen = new Set<string>();
   for (const c of active) {
     if (!c.seg) {
-      rendered.push(renderCard(c, scale, speed, t, doc.cam));
+      rendered.push(renderCard(c, scale, speed, t, doc.cam, doc.aspect));
       continue;
     }
     if (seen.has(c.seg)) continue;
@@ -146,7 +155,7 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
           transform: `translate(${Number(head.params.offsetX) || 0}px, ${Number(head.params.offsetY) || 0}px)`,
         }}
       >
-        {members.map((m) => renderCard(m, scale, speed, t, doc.cam))}
+        {members.map((m) => renderCard(m, scale, speed, t, doc.cam, doc.aspect))}
       </div>,
     );
   }
@@ -154,10 +163,11 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
       <div
         className={`stage is-hud is-export${doc.glow ? "" : " no-glow"}`}
         data-theme={doc.theme ?? "dark"}
+        data-aspect={doc.aspect ?? DEFAULT_ASPECT}
         data-skin={doc.skin || undefined}
         data-style={doc.style || undefined}
         style={{
-          ...stageStyle(scale),
+          ...stageStyle(scale, doc.aspect),
           ...(doc.font ? { ["--hud-font" as string]: `"${doc.font}"` } : {}),
           ...(doc.sideColor ? { ["--hud-side" as string]: doc.sideColor } : {}),
           ...inkVars(doc.inkColor),
