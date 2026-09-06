@@ -1,4 +1,4 @@
-import { STAGE } from "../../stage";
+import { stageForAspect, type StageAspect } from "../../stage";
 
 /**
  * 运镜几何 —— 画布(预览)和卡片(导出)共用,两边必须算出同一个结果。
@@ -25,15 +25,16 @@ export interface CamFrameGeomInput {
 }
 
 /** 人物取景框的落位与尺寸 */
-export function camFrameGeom(p: CamFrameGeomInput) {
-  const { w: SW, h: SH } = STAGE;
+export function camFrameGeom(p: CamFrameGeomInput, aspect?: StageAspect) {
+  const { w: SW, h: SH } = stageForAspect(aspect);
   const shape = p.shape ?? "circle";
-  const w = Number(p.size) || 520;
+  const w = Math.min(Number(p.size) || 520, SW - (aspect === "9:16" ? 144 : 300));
   const h = shape === "portrait" ? Math.round((w * 4) / 3) : w;
-  const margin = 150;
-  const x = (p.side ?? "left") === "right" ? SW - margin - w : margin;
-  // 垂直居中
-  const y = Math.round((SH - h) / 2);
+  const margin = aspect === "9:16" ? 72 : 150;
+  const x = aspect === "9:16"
+    ? Math.round((SW - w) / 2)
+    : (p.side ?? "left") === "right" ? SW - margin - w : margin;
+  const y = aspect === "9:16" ? 220 : Math.round((SH - h) / 2);
   const r = shape === "circle" ? w / 2 : 36;
   return { x: x + (Number(p.camDX) || 0), y: y + (Number(p.camDY) || 0), w, h, r };
 }
@@ -55,11 +56,15 @@ export interface FocusCamGeomInput {
  *
   * 人缩到左/右侧 700×700 方框,要点在另一侧。
  */
-export function focusCamGeom(p: FocusCamGeomInput) {
-  const x = (p.side ?? "left") === "right" ? 1110 : 110;
+export function focusCamGeom(p: FocusCamGeomInput, aspect?: StageAspect) {
+  const stage = stageForAspect(aspect);
+  const portrait = aspect === "9:16";
+  const w = Math.min(Number(p.camW) || 700, portrait ? stage.w - 144 : 1200);
+  const h = Math.min(Number(p.camH) || 700, portrait ? 760 : 1000);
+  const x = portrait
+    ? Math.round((stage.w - w) / 2)
+    : (p.side ?? "left") === "right" ? 1110 : 110;
   const y = 190;
-  const w = Number(p.camW) || 700;
-  const h = Number(p.camH) || 700;
   return {
     x: x + (Number(p.camDX) || 0),
     y: y + (Number(p.camDY) || 0),

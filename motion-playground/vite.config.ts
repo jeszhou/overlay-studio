@@ -5,6 +5,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { isStageAspect } from './src/stage.ts'
 
 /** 上传落盘:写草稿 → 誊正。两件事必须守住 ——
  *
@@ -99,7 +100,7 @@ async function renameWithRetry(tmp: string, dest: string) {
 }
 
 /** 导出透明动效层:POST /api/export → 起无头 Chrome 逐帧渲染 PNG 序列到 exports/ */
-function overlayExport(): Plugin {
+export function overlayExport(spawnExport: typeof spawn = spawn): Plugin {
   let busy = false
   // 导出进度(GET /api/export-status 轮询用):从脚本 stdout 解析
   let prog: {
@@ -149,14 +150,21 @@ function overlayExport(): Plugin {
         let body = ''
         req.on('data', (c) => (body += c))
         req.on('end', () => {
-          busy = true
           try {
-            const job = JSON.parse(body || '{}')
+            const job = JSON.parse(body || '{}') as {
+              base?: string
+              doc?: { aspect?: unknown }
+            }
+            const aspect = job?.doc?.aspect
+            if (aspect !== undefined && !isStageAspect(aspect))
+              throw new Error(`画幅非法: ${String(aspect)}（仅支持 16:9 或 9:16）`)
+
+            busy = true
             job.base = `http://localhost:${server.config.server.port ?? 5177}`
             const jobFile = path.join(os.tmpdir(), `overlay-export-${Date.now()}.json`)
             fs.writeFileSync(jobFile, JSON.stringify(job))
 
-            const child = spawn('node', ['scripts/export-frames.mjs', jobFile], {
+            const child = spawnExport('node', ['scripts/export-frames.mjs', jobFile], {
               cwd: server.config.root,
               stdio: ['ignore', 'pipe', 'pipe'],
             })
@@ -223,6 +231,7 @@ function overlayExport(): Plugin {
           } catch (e) {
             busy = false
             res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json')
             res.end(JSON.stringify({ ok: false, error: String(e) }))
           }
         })

@@ -12,6 +12,8 @@ import {
   type StudioTab,
 } from "./components/TopBar";
 import { parseOverlay, type OverlayCard, type OverlayDoc } from "./overlay/types";
+import { parseOverlayAutosave } from "./overlay/autosave";
+import type { StageAspect } from "./stage";
 import { parseSrt, type SrtLine } from "./overlay/srt";
 import { lintOverlay, mergeLintConfig, type LintConfig, type LintIssue } from "./overlay/lint";
 import { uploadErrText } from "./uploadErr";
@@ -233,23 +235,25 @@ export default function App() {
     try {
       const raw = localStorage.getItem(AUTOSAVE_KEY);
       if (!raw) return;
-      const saved = JSON.parse(raw);
-      if (saved.overlay?.cards?.length) {
-        // 也走一遍 parseOverlay:导入 JSON 会做的字段迁移(letter-glitch 的 speed→flipMs 之类)
-        // 和「认不出的卡跳过」,刷新恢复以前全跳过了 —— 升级后旧草稿翻动快 N 倍,就是这个原因。
-        const { doc: migrated, dropped } = parseOverlay(saved.overlay);
-        if (dropped?.length)
-          console.warn("恢复上次编排时跳过了认不出的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
-        setOverlay(migrated ?? saved.overlay);
-        originRef.current = saved.origin ?? null;
-        if (Array.isArray(saved.srt) && saved.srt.length) setSrt(saved.srt);
-        setSelCardId(saved.overlay.cards[0]?.id ?? null);
+      const restored = parseOverlayAutosave(raw);
+      if (restored.error || !restored.doc) {
+        // 不把坏对象放回 state，也不覆盖原始 localStorage；用户仍可从浏览器存储中找回原文。
+        console.warn("忽略无法恢复的自动存档:", restored.error);
+        return;
       }
+      const { doc: migrated, dropped } = restored;
+      if (dropped?.length)
+        console.warn("恢复上次编排时跳过了认不出的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
+      setOverlay(migrated);
+      originRef.current = restored.origin;
+      if (restored.srt?.length) setSrt(restored.srt);
+      setSelCardId(migrated.cards[0]?.id ?? null);
       // 视频:落盘过的走 /_media/ 真实路径,刷新后直接恢复,不用重新导入。
       // 先探一下还在不在(用户可能清过 public/_media),不在就当没存过,别留个坏的 <video>。
-      if (typeof saved.videoUrl === "string" && saved.videoUrl.startsWith("/_media/")) {
-        fetch(saved.videoUrl, { method: "HEAD" })
-          .then((r) => r.ok && setVideoUrl(saved.videoUrl))
+      const restoredVideoUrl = restored.videoUrl;
+      if (restoredVideoUrl) {
+        fetch(restoredVideoUrl, { method: "HEAD" })
+          .then((r) => r.ok && setVideoUrl(restoredVideoUrl))
           .catch(() => {});
       }
     } catch {
@@ -849,6 +853,12 @@ export default function App() {
     }
   };
 
+  const handleGlobalAspect = (aspect: StageAspect) => {
+    if (!overlay) return;
+    pushHistory(true);
+    setOverlay({ ...overlay, aspect });
+  };
+
   // 效果库 → 时间轴:把当前效果(带调好的参数)插到当前时刻
   const handleAddToTimeline = () => {
     const start = Math.round(curTRef.current * 10) / 10;
@@ -1170,6 +1180,7 @@ export default function App() {
         overlay={overlay}
         selCardId={selCardId}
         onGlobalTheme={handleGlobalTheme}
+        onGlobalAspect={handleGlobalAspect}
         skin={overlay?.skin ?? ""}
         onSkin={(s) => setOverlay((o) => (o ? { ...o, skin: s || undefined } : o))}
         docStyle={overlay?.style ?? ""}
@@ -1208,6 +1219,7 @@ export default function App() {
           showPerson={showPerson}
           videoUrl={videoUrl}
           fxScale={fxScale}
+          aspect={overlay?.aspect}
           overlayCards={inEdit ? activeCards : null}
           now={curT}
           overlayTheme={overlay?.theme}

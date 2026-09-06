@@ -2,6 +2,7 @@ import type { EffectDef, EffectProps } from "../types";
 import { useEnter } from "../useAnimation";
 import { FxVideo } from "./MediaImg";
 import { focusCamGeom } from "./camGeom";
+import type { StageAspect } from "../../stage";
 import {
   ACCENT_OPTIONS,
   ACCENT_VAR,
@@ -32,6 +33,8 @@ export interface FocusCardParams {
   camH?: number;
   offsetX?: number;
   offsetY?: number;
+  /** 编辑器/导出器注入，不在参数面板展示。 */
+  __aspect?: StageAspect;
 }
 
 /** 导出模式下视频不自动播,由导出脚本逐帧 seek */
@@ -49,7 +52,7 @@ function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
   const parsed = items.split("|").map((s) => s.trim()).filter(Boolean);
   // 口播框几何走 camGeom 那一份 —— 预览(Canvas)和导出(这里)必须同源,
   // 以前两边各写一份,改排版时只改了一处,人像和落位框就对不上了
-  const g = focusCamGeom({ side, camDX, camDY, camW, camH });
+  const g = focusCamGeom({ side, camDX, camDY, camW, camH }, params.__aspect);
 
   return (
     <div

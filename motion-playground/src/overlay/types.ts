@@ -1,4 +1,5 @@
 import { EFFECTS } from "../effects/registry";
+import { isStageAspect, type StageAspect } from "../stage";
 
 /** 时间轴上的一张动效卡 */
 export interface OverlayCard {
@@ -52,6 +53,8 @@ export function outroFade(t: number, card: { start: number; end: number }): numb
 /** Overlay 工程文件(Skill 生成 / Studio 导入导出) */
 export interface OverlayDoc {
   version: 1;
+  /** 成片画幅；旧工程缺省为 16:9。 */
+  aspect?: StageAspect;
   theme?: "dark" | "light"; // 全局主题,卡片 params.theme 可覆盖
   /** 文字可读性光晕(默认关;true 才开)——开了字会发虚,按画面自己定 */
   glow?: boolean;
@@ -132,11 +135,14 @@ export function parseOverlay(raw: unknown): {
           .join("、")}${dropCount.size > 3 ? " 等" : ""})`,
       };
     const dropped = [...dropCount].map(([kind, n]) => ({ kind, n }));
+    if (o.aspect !== undefined && !isStageAspect(o.aspect))
+      return { error: `画幅非法: ${String(o.aspect)}（仅支持 16:9 或 9:16）` };
     const theme = o.theme === "light" ? "light" : o.theme === "dark" ? "dark" : undefined;
     return {
       dropped: dropped.length ? dropped : undefined,
       doc: {
         version: 1,
+        aspect: o.aspect,
         theme,
         glow: o.glow === true,
         cam: typeof o.cam === "string" && o.cam ? o.cam : undefined,

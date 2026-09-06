@@ -11,6 +11,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer";
+import { exportStageForDoc } from "./export-stage.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -32,7 +33,7 @@ const {
   keepFrames = false, // true = 保留 PNG 中间目录(verify-effect 逐帧比对要用)
 } = job;
 
-const STAGE = { w: 1920, h: 1080 };
+const STAGE = exportStageForDoc(doc);
 
 // NTSC 29.97 的真身是 30000/1001(=29.970029970…),写成小数会有微小误差:
 // 帧号/时钟用精确值算,传给 ffmpeg 的帧率用分数字符串,避免它按 2997/100 编码
