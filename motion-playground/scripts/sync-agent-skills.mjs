@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 把 Claude Code 目录里的 Skill 真源同步到其他 Agent 的项目级发现目录。
+ * 把 Claude Code 目录里的 Skill 真源复制到其他 Agent 的项目级发现目录。
  *
  *   node scripts/sync-agent-skills.mjs [仓库根目录]
  *   node scripts/sync-agent-skills.mjs [仓库根目录] --check

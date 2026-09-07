@@ -5,7 +5,7 @@
  *   npm run sync:cards          写入 SKILL.md
  *   npm run sync:cards -- --check   只检查,有差异就非 0 退出(收工自检用)
  *
-  * 自动来自源码:分组、kind、用途(description)、关键 params(controls)
+ * 自动来自源码:分组、kind、用途(description)、关键 params(controls)
  * 人工维护并原样保留:每张卡的「触发条件」,以及被人精修过的「用途/params」文案
  */
 import fs from "node:fs";
@@ -19,11 +19,6 @@ const SKILL = path.resolve(ROOT, "../.claude/skills/overlay-fx-generator/SKILL.m
 const BEGIN = "<!-- CARDS:AUTO-BEGIN";
 const END = "<!-- CARDS:AUTO-END -->";
 const TODO = "⬜ 待补";
-const STK_BEGIN = "<!-- STICK:AUTO-BEGIN";
-const STK_END = "<!-- STICK:AUTO-END -->";
-const STICK_POSES = path.join(FX_DIR, "hud/stickPoses.ts");
-const STICK_PROPS = path.join(FX_DIR, "hud/stickProps.tsx");
-
 
 /** 每组的编排提示:影响 AI 选卡优先级,人工维护 */
 const GROUP_NOTES = {
@@ -33,7 +28,6 @@ const GROUP_NOTES = {
   "对比取舍": "两个东西对撞/否定一个立一个",
   "金句观点": "口播最常用,一句话一张",
   "步骤流程": "有先后顺序的过程",
-  "信息结构": "一个概念的完整版式/多要点并列",
   "教程标注": "讲界面、解释术语、给提示",
   "文字进场": "纯文字的进场方式,内容轻时用",
   "人物锚定": "效果直接「碰」人物,会盖住脸,交付时提醒抠像",
@@ -90,8 +84,7 @@ function scanGroups(byVar) {
   return groups;
 }
 
-
-/** 只取卡片库那一段 —— 文档别处的表格(如火柴人动作表)不该被当成卡片表读 */
+/** 只取卡片库那一段 —— 文档别处的表格不该被当成卡片表读 */
 function cardsRegion(md) {
   const b = md.indexOf(BEGIN), e = md.indexOf(END);
   if (b >= 0 && e > b) return md.slice(b, e);
@@ -104,7 +97,6 @@ function cardsRegion(md) {
 /** 从卡片库一段里解析已有表格行:kind → [用途, 触发条件, params] */
 function parseExisting(md) {
   const rows = new Map();
-  const ghosts = new Set(); // 禁用区(2 列表格)里的 kind,必须跨次保留
   for (const line of md.split("\n")) {
     if (!line.startsWith("|")) continue;
     // 未转义的 | 才是列分隔符;最后一列取到行尾,
@@ -117,21 +109,18 @@ function parseExisting(md) {
     const cut = (a, b) => line.slice(a + 1, b).trim();
     const kind = (cut(bars[0], bars[1]).match(/^`([a-z0-9-]+)`/) || [])[1];
     if (!kind) continue;
-    if (bars.length === 3) { ghosts.add(kind); continue; } // 禁用区那张 2 列表
     const last = bars[bars.length - 1];
-    const shift = /^(still|half|full)\b/.test(cut(bars[1], bars[2])) ? 1 : 0;
     rows.set(kind, {
-      use: cut(bars[1 + shift], bars[2 + shift]),
-      when: cut(bars[2 + shift], bars[3 + shift]),
-      // params 一路取到行尾:少数人工行的 params 里有没转义的 |(如 info-board)
-      params: bars.length > 4 + shift ? cut(bars[3 + shift], last) : "",
+      use: cut(bars[1], bars[2]),
+      when: cut(bars[2], bars[3]),
+      // params 一路取到行尾:少数人工行的 params 里有没转义的 |
+      params: bars.length > 4 ? cut(bars[3], last) : "",
     });
   }
-  return { rows, ghosts };
+  return rows;
 }
 
-function buildSection(groups, old, knownGhosts) {
-  const seen = new Set();
+function buildSection(groups, old) {
   const out = [];
   let n = 0;
   for (const g of groups) {
@@ -141,7 +130,6 @@ function buildSection(groups, old, knownGhosts) {
     out.push("| kind | 用途 | 触发条件 | 关键 params |");
     out.push("|---|---|---|---|");
     for (const c of g.cards) {
-      seen.add(c.id);
       n++;
       const prev = old.get(c.id);
       // 已有行:用途/触发条件/params 全部保留人工版本
@@ -153,81 +141,15 @@ function buildSection(groups, old, knownGhosts) {
     }
     out.push("");
   }
-  // 表里有、源码没有的:禁用区(如 title-lock)
-  const ghosts = [...new Set([...old.keys(), ...knownGhosts])].filter((k) => !seen.has(k));
-  if (ghosts.length) {
-    out.push("### ⚠️ 已下架/未实现(禁止使用)");
-    out.push("| kind | 说明 |");
-    out.push("|---|---|");
-    for (const k of ghosts) out.push(`| \`${k}\` | 卡片库里已无此卡,生成时禁止使用 |`);
-    out.push("");
-  }
-  return { body: out.join("\n"), count: n, ghosts };
+  return { body: out.join("\n"), count: n };
 }
 
 const byVar = scanEffects();
 const groups = scanGroups(byVar);
 const md = fs.readFileSync(SKILL, "utf8");
-const { rows: old, ghosts: knownGhosts } = parseExisting(cardsRegion(md));
+const old = parseExisting(cardsRegion(md));
 
-
-/** 道具表:从 stickProps.tsx 生成。道具不在这张表里,生成动效时就想不起来用它 */
-function buildPropRows() {
-  const src = fs.readFileSync(STICK_PROPS, "utf8");
-  const ANCHOR_ZH = { hand: "手上", hands: "双手中间", head: "头顶", ground: "地面" };
-  const rows = [];
-  for (const m of src.matchAll(
-    /^  (\w+): \{\s*\n\s*zh: "([^"]*)", says: "([^"]*)", anchor: "(\w+)"/gm,
-  )) {
-    rows.push(`| \`${m[1]}\` | ${m[2]} | ${m[3]} | ${ANCHOR_ZH[m[4]] ?? m[4]} |`);
-  }
-  return rows;
-}
-
-/** 火柴人动作表:从 stickPoses.ts 的 ACT_ZH / ACT_SAYS 生成 —— 加了新动作,skill 文档自动跟上 */
-function buildStickSection() {
-  const src = fs.readFileSync(STICK_POSES, "utf8");
-  const grab = (name) => {
-    const m = src.match(new RegExp(`export const ${name}[^=]*= \\{([^}]*)\\}`, "s"));
-    const out = new Map();
-    if (!m) return out;
-    for (const kv of m[1].matchAll(/(\w+)\s*:\s*"([^"]*)"/g)) out.set(kv[1], kv[2]);
-    return out;
-  };
-  const zh = grab("ACT_ZH");
-  const says = grab("ACT_SAYS");
-  const loops = new Set(
-    [...src.matchAll(/^\s{2}(\w+)A:\{/gm)].map((m) => m[1]),
-  );
-  const rows = [...zh.entries()].map(([en, cn]) =>
-    `| \`${en}\` | ${cn} | ${says.get(en) ?? "—"} | ${loops.has(en) ? "循环" : ""} |`,
-  );
-  return (
-    `## 火柴人动作表(\`stick-fall\` 专用)\n\n` +
-    `${STK_BEGIN} 由 \`npm run sync:cards\` 从 stickPoses.ts 生成,别手改。 -->\n\n` +
-    `\`stick-fall\` 不是固定的一出戏,是把下面的动作按时间串起来。\n` +
-    `剧本写在 \`acts\` 参数里,**一行一拍**:\n\n` +
-    "```\n0|举相机拍\n3|跪\n4.4|趴\n```\n\n" +
-    `格式 \`秒|动作\`,秒是相对这张卡 start 的时间。要带道具写 \`秒|动作+道具\`,\n` +
-    `举相机拍、坐、扛、推这四个不写也会自动配上道具,写 \`+无\` 可以去掉。\n` +
-    `背景由 \`scene\` 定:素材堆(越堆越高)/ 赛道(地面往后滚)/ 无。\n\n` +
-    `**选动作看「口播说法」那一列** —— 用户原话里出现类似的意思就用对应动作。\n` +
-    `标了「循环」的会自己来回演(跑、走、鼓掌这些),适合放在一段话的持续状态上。\n\n` +
-    `| 动作 | 中文名 | 口播说法 | |\n|---|---|---|---|\n` +
-    rows.join("\n") + "\n\n" +
-    `### 道具\n\n` +
-    `同样**看「口播说法」选**。道具挂在身上跟着动作走,挂点是自动的。\n\n` +
-    `| 道具 | 中文名 | 口播说法 | 挂在哪 |\n|---|---|---|---|\n` +
-    buildPropRows().join("\n") + "\n\n" +
-    `编剧本的三个例子:\n\n` +
-    "```\n素材越堆越高最后累趴   scene=素材堆   0|举相机拍 / 3|跪 / 4.4|趴\n" +
-    "让大模型无限跑到跑不动   scene=赛道     0|跑 / 4|走 / 5.6|趴\n" +
-    "无语到直接躺平          scene=无       0|扶额 / 1.8|投降 / 3.4|躺平\n```\n\n" +
-    STK_END
-  );
-}
-
-const { body, count, ghosts } = buildSection(groups, old, knownGhosts);
+const { body, count } = buildSection(groups, old);
 
 const header =
   `## 卡片库(${count} 种,只能用这些 kind)\n\n` +
@@ -254,23 +176,6 @@ if (iBegin >= 0 && iEnd > iBegin) {
   next = md.slice(0, hStart) + header + body + END + "\n\n" + md.slice(tailStart);
 }
 
-// 火柴人动作表:接管 STICK 标记区(没有就插在卡片库之后)
-// stickPoses.ts 在发行版里会被裁掉(stick-fall 不在发行档,构建也会删掉这一整节)。
-// 以前这里直接读文件,基础版用户跑 `npm run sync:cards` 第一步就 ENOENT 崩 ——
-// 而那条命令正是 SKILL.md 教他们「加了新卡就跑一次」的必经步骤(2026-09-01 查出来)。
-// 裁卡没裁「引用卡的地方」的老毛病,这次的引用处是构建脚本本身。
-if (fs.existsSync(STICK_POSES)) {
-  const stick = buildStickSection();
-  const b = next.indexOf(STK_BEGIN), e = next.indexOf(STK_END);
-  if (b >= 0 && e > b) {
-    const hStart = next.lastIndexOf("## 火柴人动作表", b);
-    next = next.slice(0, hStart) + stick + next.slice(e + STK_END.length);
-  } else {
-    const after = next.indexOf(END) + END.length;
-    next = next.slice(0, after) + "\n\n" + stick + next.slice(after);
-  }
-}
-
 const todos = [...next.matchAll(/^\| `([a-z0-9-]+)` \|[^|]*\| ⬜ 待补 \|/gm)].map((m) => m[1]);
 const check = process.argv.includes("--check");
 
@@ -287,5 +192,4 @@ if (check) {
 
 fs.writeFileSync(SKILL, next);
 console.log(`✓ 已写入 SKILL.md:${count} 种卡`);
-if (ghosts.length) console.log(`  下架卡(已移入禁用区):${ghosts.join(", ")}`);
 if (todos.length) console.log(`\n⬜ 这 ${todos.length} 张卡还缺「触发条件」,需要人工补一句:\n   ${todos.join("\n   ")}`);

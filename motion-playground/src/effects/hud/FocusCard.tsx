@@ -41,7 +41,7 @@ const IS_EXPORT =
 
 /**
  * 人物聚焦卡:全屏纯色底,口播缩进左侧圆角方框,右侧要点胶囊逐条弹入。
- * 成片时口播轨放在动效层之上,按落位框缩放对齐(同 screen-demo 的用法)。
+ * 成片时口播轨放在动效层之上,按落位框缩放对齐。
  */
 function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
   const { bg, side, items, stepMs, camSrc, accent, showRing, camDX, camDY, camW, camH } = params;

@@ -1,42 +1,8 @@
-import { STAGE } from "../../stage";
-
 /**
  * 运镜几何 —— 画布(预览)和卡片(导出)共用,两边必须算出同一个结果。
  *
- * 这些工具原先住在 PunchZoom / CamFrame 两张卡的文件里,但画布始终需要它们,
- * 而卡片可能不在某个发行版中(基础版只带一部分卡)。所以放进共享模块:
- * 卡片来去自如,画布不受影响。
+ * 画布和卡片都需要这份几何,所以放进共享模块,两边引用同一份。
  */
-
-/** 推近的变换原点:焦点名 → CSS transform-origin */
-export const PZ_ORIGIN: Record<string, string> = {
-  center: "50% 38%",
-  left: "32% 38%",
-  right: "68% 38%",
-};
-
-/** camFrameGeom 需要的字段(CamFrameParams 的子集,结构兼容,直接传整个 params 即可) */
-export interface CamFrameGeomInput {
-  shape?: "circle" | "portrait" | "square";
-  side?: "left" | "right";
-  size?: number;
-  camDX?: number;
-  camDY?: number;
-}
-
-/** 人物取景框的落位与尺寸 */
-export function camFrameGeom(p: CamFrameGeomInput) {
-  const { w: SW, h: SH } = STAGE;
-  const shape = p.shape ?? "circle";
-  const w = Number(p.size) || 520;
-  const h = shape === "portrait" ? Math.round((w * 4) / 3) : w;
-  const margin = 150;
-  const x = (p.side ?? "left") === "right" ? SW - margin - w : margin;
-  // 垂直居中
-  const y = Math.round((SH - h) / 2);
-  const r = shape === "circle" ? w / 2 : 36;
-  return { x: x + (Number(p.camDX) || 0), y: y + (Number(p.camDY) || 0), w, h, r };
-}
 
 /** focus-card 需要的字段 */
 export interface FocusCamGeomInput {
@@ -51,9 +17,9 @@ export interface FocusCamGeomInput {
  * focus-card 的口播落位框 —— 预览(Canvas)、导出(卡片 --fcd-*)共用这一份。
  *
  * 这套几何以前在 Canvas 和 FocusCard 里各写了一份,注释说「严格同源」其实是
-  * 复制的;改排版时只改了一处,画面里人像和落位框就对不上了。收进这里。
+ * 复制的;改排版时只改了一处,画面里人像和落位框就对不上了。收进这里。
  *
-  * 人缩到左/右侧 700×700 方框,要点在另一侧。
+ * 人缩到左/右侧 700×700 方框,要点在另一侧。
  */
 export function focusCamGeom(p: FocusCamGeomInput) {
   const x = (p.side ?? "left") === "right" ? 1110 : 110;

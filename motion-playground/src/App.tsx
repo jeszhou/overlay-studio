@@ -33,7 +33,7 @@ import "./App.css";
     右栏那颗「加到 x:xx,时长 n 秒」按钮和真正的插入逻辑共用这一个数,
     避免文案说 5 秒、插进去却是别的。 */
 function addSecFor(kind: string) {
-  return ["screen-demo", "cam-pan", "focus-card"].includes(kind) ? 15 : 5;
+  return kind === "focus-card" ? 15 : 5;
 }
 
 export default function App() {
@@ -127,7 +127,7 @@ export default function App() {
   const FORM_KEY = "overlayStudioForm";
   const PALETTE_KEY = "overlayStudioPalette";
   const LEGACY_SKIN_KEY = "overlayStudioSkin"; // 单轴时代的旧键,读到就迁移
-  // 老用户开机时把旧皮肤 id 拆成两轴;拆完删掉旧键,只会跑这一次
+  // 老用户开机时把旧皮肤 id 拆成两轴;拆完删除旧键,只会跑这一次
   const restoreLook = () => {
     try {
       const legacy = localStorage.getItem(LEGACY_SKIN_KEY);
@@ -235,8 +235,8 @@ export default function App() {
       if (!raw) return;
       const saved = JSON.parse(raw);
       if (saved.overlay?.cards?.length) {
-        // 也走一遍 parseOverlay:导入 JSON 会做的字段迁移(letter-glitch 的 speed→flipMs 之类)
-        // 和「认不出的卡跳过」,刷新恢复以前全跳过了 —— 升级后旧草稿翻动快 N 倍,就是这个原因。
+        // 也走一遍 parseOverlay:导入 JSON 会做的补默认值和「认不出的卡跳过」,
+        // 刷新恢复也得做同一套,不然旧草稿会绕过这些处理。
         const { doc: migrated, dropped } = parseOverlay(saved.overlay);
         if (dropped?.length)
           console.warn("恢复上次编排时跳过了认不出的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
@@ -590,7 +590,7 @@ export default function App() {
         alert(`❌ 示例载入失败:${error}`);
         return;
       }
-      // 内置示例是按本档生成的,理论上不该有认不出的卡。真出现了就是发行版做漏了 ——
+      // 内置示例理论上不该有认不出的卡。
       // 留这行 warn 当信号,别让示例悄悄少几张卡还没人发现。
       if (dropped?.length)
         console.warn("[示例] 跳过了认不出的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
@@ -712,9 +712,9 @@ export default function App() {
   })();
 
   // 编辑选中卡片的参数(编辑台)
-  // 一次改一批参数(预设应用走这里):必须用函数式 setOverlay。
-  // 以前是 setOverlay({...overlay, …}),循环里连着调 N 次会 N 次都从同一份旧
-  // overlay 出发 —— 只有最后一个 key 生效,应用预设看着就像"点了没反应"。
+  // 改选中卡的参数:必须用函数式 setOverlay。
+  // 以前是 setOverlay({...overlay, …}),连着调 N 次会 N 次都从同一份旧
+  // overlay 出发 —— 只有最后一个 key 生效。
   const patchCardParams = (patch: Record<string, unknown>) => {
     if (!selCardId) return;
     pushHistory();
@@ -788,7 +788,7 @@ export default function App() {
 
   /**
    * 叠放:把选中卡片在 cards 数组里挪位置。
-   * 画布是按数组顺序画的(backdropFirst 只把底幕类提到最前),**排在后面的压在上面**。
+   * 画布是按数组顺序画的,**排在后面的压在上面**。
    * 只在"和它时间上有重叠"的卡之间挪 —— 跟不同时出现的卡换先后没有任何视觉意义,
    * 白白把数组搅乱。挪不动(上面/下面没有重叠的卡了)就原样返回。
    */
@@ -807,7 +807,7 @@ export default function App() {
     if (j < 0) return;
     pushHistory();
     cards.splice(i, 1);
-    // 往上挪:插到目标后面(删掉自己后目标退了一格,插在 j 正好就是它后面)
+    // 往上挪:插到目标后面(删除自己后目标退了一格,插在 j 正好就是它后面)
     // 往下挪:插到目标前面(目标索引比自己小,删除不影响它,插在 j 就是它前面)
     cards.splice(j, 0, me);
     setOverlay({ ...overlay, cards });
@@ -877,7 +877,7 @@ export default function App() {
 
   const handleExport = async () => {
     if (exporting) return;
-    if (tab === "edit" && (!overlay || overlay.cards.length === 0)) {
+    if (!overlay || overlay.cards.length === 0) {
       alert("时间轴上还没有卡片:先 📥 导入 JSON,或去 ✨ 效果库 ➕ 加入卡片。");
       return;
     }
@@ -896,18 +896,16 @@ export default function App() {
       }
     }, 1000);
     // 学习闭环:定稿导出时也落一份「初选 vs 终选」日志
-    if (tab === "edit" && overlay) {
-      fetch("/api/review-log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          savedAt: new Date().toISOString(),
-          origin: originRef.current,
-          final: overlay,
-        }),
-      }).catch(() => {});
-      maybeShowLearnTip();
-    }
+    fetch("/api/review-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        savedAt: new Date().toISOString(),
+        origin: originRef.current,
+        final: overlay,
+      }),
+    }).catch(() => {});
+    maybeShowLearnTip();
     try {
       // 导出帧率:相机/手机拍的素材是 NTSC 29.97fps(30000/1001),动效层按 30 导会
       // 越走越快 —— 166s 累计漂移约 5 帧,片尾能看出动效和口型对不上
@@ -915,7 +913,13 @@ export default function App() {
       // 导出整条 overlay(时长 = 最后一张卡结束 + 0.5s 尾巴)
       // 尾巴是留给末尾音效收干净的,别用 ceil 取整 —— 28.0s 的片子会被抬到 29s,
       // 白白多出整整一秒空帧(卡片走到 end 就卸掉了,尾巴里什么都没有)。
-      if (!overlay) return; const body = { mode: "timeline", doc: overlay, scale: fxScale, speed: animSpeed, fps: EXPORT_FPS, duration: Math.max(...overlay.cards.map((c) => c.end)) + 0.5 };
+      const body = {
+        doc: overlay,
+        scale: fxScale,
+        speed: animSpeed,
+        fps: EXPORT_FPS,
+        duration: Math.max(...overlay.cards.map((c) => c.end)) + 0.5,
+      };
       const res = await fetch("/api/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -924,7 +928,7 @@ export default function App() {
       // 线上试玩版没有导出后端(逐帧渲染要本地无头 Chrome + ffmpeg):给友好提示,不甩报错。
       // 判断依据只能是「返回的不是 JSON」—— 静态托管会回 HTML(404 或 SPA 回退)。
       // 不能用 !res.ok:本地导出失败时服务端返回的是 500 + JSON,里面带着真正的
-      // 失败原因,当成"线上版"会把这条信息直接丢掉,客户和你都不知道到底为什么失败。
+      // 失败原因,当成"线上版"会把这条信息直接丢掉,用户和你都不知道到底为什么失败。
       if (!(res.headers.get("content-type") ?? "").includes("json")) {
         alert(
           "🌐 当前是线上试玩版,不支持导出。\n\n导出透明 MOV 需要在本地运行:\n  git clone 仓库 → npm install → npm run dev\n\n完整步骤见 README「快速开始」。",
@@ -1044,17 +1048,11 @@ export default function App() {
   // 参数面板:编辑台改选中的卡,效果库改当前效果
   const inEdit = tab === "edit";
   const panelEffect =
-    // 这里以前的 ! 是「整页白屏」的根因:编排里只要有一张本档没有的卡,
+    // 这里以前的 ! 是「整页白屏」的根因:编排里只要有一张不认识的卡,
     // 查出来就是 undefined。现在照实传下去,由 ParamsPanel 说清楚是哪张。
     inEdit && selCard ? EFFECTS.find((e) => e.id === selCard.kind) : effect;
   const panelParams = inEdit && selCard ? selCard.params : params;
   const panelOnChange = inEdit && selCard ? handleCardParamChange : handleParamChange;
-  // 批量改(预设):编辑台走一次 setOverlay,单卡预览合成一次 setParamsById
-  const panelOnChangeMany = (patch: Record<string, unknown>) => {
-    if (inEdit && selCard) return patchCardParams(patch);
-    setParamsById((prev) => ({ ...prev, [selectedId]: { ...prev[selectedId], ...patch } }));
-    setPlayToken((t) => t + 1);
-  };
 
   return (
     <div
@@ -1170,12 +1168,6 @@ export default function App() {
         overlay={overlay}
         selCardId={selCardId}
         onGlobalTheme={handleGlobalTheme}
-        skin={overlay?.skin ?? ""}
-        onSkin={(s) => setOverlay((o) => (o ? { ...o, skin: s || undefined } : o))}
-        docStyle={overlay?.style ?? ""}
-        onDocStyle={(s) => setOverlay((o) => (o ? { ...o, style: s || undefined } : o))}
-        sideColor={overlay?.sideColor ?? ""}
-        onSideColor={(c) => setOverlay((o) => (o ? { ...o, sideColor: c || undefined } : o))}
         cam={overlay?.cam ?? ""}
         onSetCam={(src) => {
           camClearedRef.current = !src; // 清空 = 用户主动清过,自动挂载别再填回来
@@ -1213,9 +1205,6 @@ export default function App() {
           overlayTheme={overlay?.theme}
           glow={overlay?.glow ?? false}
           font={overlay?.font}
-          skin={overlay?.skin}
-          docStyle={overlay?.style}
-          sideColor={overlay?.sideColor}
           inkColor={overlay?.inkColor}
           videoMuted={muted}
           videoScale={videoScale}
@@ -1242,7 +1231,6 @@ export default function App() {
         effect={panelEffect}
         params={panelParams}
         onChange={panelOnChange}
-        onChangeMany={panelOnChangeMany}
         card={inEdit ? selCard : null}
         editMode={inEdit}
         onLayer={handleCardLayer}

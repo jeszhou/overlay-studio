@@ -10,11 +10,11 @@ import path from 'node:path'
  *
  *  一、草稿名要唯一。以前草稿固定叫「素材名.part」,同一个素材传两遍(前一遍还没传完
  *  又点了一次)时两次写的是同一份草稿,先完成的把它改名拿走,后完成的 renameSync 抛
- *  ENOENT。2026-09-01 客户两台电脑(Mac + Windows)都栽在这儿。
+ *  ENOENT。Mac 和 Windows 上都栽过这个坑。
  *
  *  二、誊正失败不许把服务带走。这个异常在流的回调里,中间件外面的 try/catch 兜不住,
- *  Vite 也没注册 uncaughtException —— 于是整个 dev server 进程直接退出。页面还在内存里,
- *  看着一切正常,但后台没了,此后每一次导入都失败。客户看到的就是这一幕。
+ *  Vite 也没注册 uncaughtException —— 于是整个开发服务器进程直接退出。页面还在内存里,
+ *  看着一切正常,但后台没了,此后每一次导入都失败。用户看到的就是这一幕。
  */
 let uploadSeq = 0
 function saveUpload(
@@ -43,7 +43,7 @@ function saveUpload(
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify(body))
     } catch (e) {
-      console.error('[upload] 回应失败(多半是客户端已断开):', e)
+      console.error('[upload] 回应失败(多半是浏览器那头已断开):', e)
     }
   }
   // 先把写流关干净、等它真的关掉,再删草稿:Windows 上文件句柄还开着时删不掉
@@ -55,7 +55,7 @@ function saveUpload(
       ws.destroy()
     }
   }
-  // 客户端中途断开(刷新 / 关标签页 / 断网):pipe 只会解绑,finish 和 error 都不会来,
+  // 浏览器那头中途断开(刷新 / 关标签页 / 断网):pipe 只会解绑,finish 和 error 都不会来,
   // 草稿会永远留在磁盘上,而且改成唯一草稿名之后每断一次就多留一份。这里自己收尾。
   req.on('close', () => {
     if (!req.complete) fail('上传中断')

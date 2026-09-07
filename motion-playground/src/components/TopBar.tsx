@@ -141,7 +141,7 @@ function usePrefsPopover() {
 }
 
 /* 顶栏放不下时,读数按「整格」藏,不能切半个字。
-   ——切一半会正好切在按钮组左边缘,看起来像按钮压住了数字(实测反馈)。
+   ——切一半会正好切在按钮组左边缘,看起来像按钮压住了数字。
    格子自己不参与压缩(nowrap + 自然宽度),所以量到的位置和裁没裁无关,
    直接比右边缘就知道谁露在外面;用 visibility 藏是为了留住布局,
    下次量还是同一份坐标,不会藏一格→变宽→又该显示→抖起来。
@@ -250,7 +250,7 @@ export function TopBar({
       </button>
       {/* 版本指南入口。放在两个模式切换的紧右边 —— 眼睛本来就扫这一片,
           又不混进右边那排干活的按钮(那儿每次导出都会看到,容易烦)。
-          地址为空(专业版 / dev)时整个不渲染。 */}
+          地址为空时整个不渲染。 */}
       {PROMO_URL ? (
         <a
           className="tb-pro"
@@ -327,8 +327,7 @@ export function TopBar({
           </button>
           {/* 挂到 body 上,不能留在顶栏里:「玻璃」风格给 .topbar 加了 backdrop-filter,
               带 filter 的元素会变成后代 fixed 的包含块 —— 面板于是相对顶栏定位、
-              又被顶栏的 overflow:hidden 裁成一道白边,看起来就是「设置拉不下来」
-              (实测反馈)。 */}
+              又被顶栏的 overflow:hidden 裁成一道白边,看起来就是「设置拉不下来」。 */}
           {prefsOpen &&
             createPortal(
               <div className="tb-prefs-pop" ref={popRef} style={{ top: pos.top, left: pos.left }}>
@@ -364,7 +363,7 @@ export function TopBar({
                     disabled={!hasDoc}
                   />
                   <button className="tb-mini" onClick={() => onInkColor("")} disabled={!hasDoc || !inkColor}>
-                    恢复皮肤默认
+                    恢复默认
                   </button>
                 </span>
               </div>
@@ -485,7 +484,7 @@ export function TopBar({
           </>
         )}
         {/* 示例两个标签页都放:在效果库里点会载入演示并自动切回编辑台。
-            实测反馈:只放编辑台的话,人在效果库页会以为这个按钮"没有了" */}
+            只放编辑台的话,人在效果库页会以为这个按钮"没有了" */}
         <button className="tb-btn" onClick={onLoadDemo} title="载入内置演示编排,不需要自己的视频">
           🎬 示例
         </button>

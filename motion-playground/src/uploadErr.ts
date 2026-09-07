@@ -1,9 +1,9 @@
 /**
  * 上传失败时给人看的话。
  *
- * fetch 请求不通时浏览器抛的是 `TypeError: Failed to fetch` —— 对客户是天书,
+ * fetch 请求不通时浏览器抛的是 `TypeError: Failed to fetch` —— 对用户是天书,
  * 而它的真实含义几乎永远只有一个:本地服务没在跑。以前直接把这行英文弹出去,
- * 客户只能理解成「这软件坏了」。
+ * 用户只能理解成「这软件坏了」。
  */
 export function uploadErrText(e: unknown): string {
   const raw = String(e);

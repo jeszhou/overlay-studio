@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import "./fonts"; // 自定义字体注册:导出端也要有 @font-face,成片字体才和预览一致
 import { EFFECTS } from "./effects/registry";
 import { FxSpeedScope } from "./effects/FxSpeedScope";
-import { backdropFirst, outroFade, parseOverlay, type OverlayDoc } from "./overlay/types";
+import { outroFade, parseOverlay, type OverlayDoc } from "./overlay/types";
 import { STAGE } from "./stage";
 import "./effects/hud/hud.css";
 import "./App.css";
@@ -11,8 +11,7 @@ import "./App.css";
 /**
  * 导出专用视图(?export=1)
  * 只渲染动效本体:透明背景、无视频、无人物、无参考线、无UI。
- * 两种模式:
- *  - timeline:整条时间轴(&mode=timeline&doc=<overlay json>),卡片按 start/end 出现
+ * 渲染整条时间轴(&doc=<overlay json>),卡片按 start/end 出现;
  * 动效在导出脚本调用 window.__startExport() 后才开始,
  * 无头浏览器用「虚拟时间」从 t=0 逐帧精确推进。
  */
@@ -34,7 +33,7 @@ function renderCard(
   if (!def) return null;
   const C = def.Component;
   const side = (card.params.side as string) ?? "left";
-  // __start:让卡内视频(screen-demo 录屏)知道自己相对整条时间轴的起点
+  // __start:让卡内视频知道自己相对整条时间轴的起点
   // __t/__end:让时间感知卡(章节条/字幕层)拿到时间轴当前秒和自己的终点
   const params: Record<string, unknown> = { ...card.params, __start: card.start ?? 0, __t: t, __end: card.end };
   // 运镜卡的口播:单卡没传就用全局口播(doc.cam),按时间轴自动对位
@@ -99,7 +98,7 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
       let raf0: number | null = null;
       const tick = (rafTs: number) => {
         const p = performance.now();
-        // 实测 CSS 动画钟(rAF 时间戳)相对虚拟时钟的快慢,写进 __fxClockRate,
+        // 量出 CSS 动画钟(rAF 时间戳)相对虚拟时钟的快慢,写进 __fxClockRate,
         // 各卡的 FxSpeedScope 每帧用它校正 CSS 动画/过渡的 playbackRate
         if (raf0 === null) raf0 = rafTs;
         else if (rafTs - raf0 > 50) {
@@ -113,7 +112,7 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
       setT(0);
     };
     // 时间轴时间由导出脚本每帧显式下发:页面时钟(performance.now)在帧图
-    // 加载时会被 Chrome 的虚拟时间偷偷快进(实测约 +10ms/帧),不可信——
+    // 加载时会被 Chrome 的虚拟时间偷偷快进(约 +10ms/帧),不可信——
     // 用它推 t 会让视频段之后的所有卡片提前进场
     (window as unknown as { __setExportT?: (sec: number) => void }).__setExportT = (sec) => {
       // 卡内计时钩子的权威时钟(见 useAnimation.clockNow)
@@ -123,9 +122,7 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
   }, []);
 
   // 提前 0.05s 挂载:进场动画等 2 帧才触发,让"可见的出现"卡在 start 上(与 Studio 预览一致)
-  const active = backdropFirst(
-    t < 0 ? [] : doc.cards.filter((c) => t >= c.start - 0.05 && t < c.end),
-  );
+  const active = t < 0 ? [] : doc.cards.filter((c) => t >= c.start - 0.05 && t < c.end);
   // 同 seg 的卡进左列自动顺排容器(与 Canvas 预览一致);容器位置 = 段头(首成员)offset
   const rendered: React.ReactNode[] = [];
   const seen = new Set<string>();
@@ -154,12 +151,9 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
       <div
         className={`stage is-hud is-export${doc.glow ? "" : " no-glow"}`}
         data-theme={doc.theme ?? "dark"}
-        data-skin={doc.skin || undefined}
-        data-style={doc.style || undefined}
         style={{
           ...stageStyle(scale),
           ...(doc.font ? { ["--hud-font" as string]: `"${doc.font}"` } : {}),
-          ...(doc.sideColor ? { ["--hud-side" as string]: doc.sideColor } : {}),
           ...inkVars(doc.inkColor),
         }}
       >
@@ -167,7 +161,6 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
       </div>
   );
 }
-
 
 export function ExportView() {
   const q = new URLSearchParams(location.search);
@@ -204,24 +197,21 @@ export function ExportView() {
   }, []);
 
   const speed = Number(q.get("spd") ?? 1) || 1;
-  if (q.get("mode") === "timeline") {
-    // 编排优先读导出脚本注入的 __EXPORT_DOC(整份编排走 URL 会超长 → HTTP 431);
-    // URL 的 ?doc= 仅作短编排/手工调试的兜底
-    const injected = (window as unknown as { __EXPORT_DOC?: string }).__EXPORT_DOC;
-    const { doc, error } = parseOverlay(injected ?? q.get("doc") ?? "{}");
-    if (error || !doc) return <div style={{ color: "red" }}>{error}</div>;
-    // 烤入人物的卡:这几段导出后在剪映里要盖掉原始口播轨,否则会看到两层人。
-    // 判断依据是卡有没有 camSrc 控件(不写死卡名,以后新加的卡自动算进来)。
-    // 时间段挂到 window,导出脚本读了在成品旁边生成一份「合成说明」——
-    // 用户打开 exports/output/ 拿 MOV 的那一刻,正好是他要去剪映的前一秒。
-    (window as unknown as { __CAM_SEGMENTS?: unknown }).__CAM_SEGMENTS = doc.cards
-      .filter((c) => {
-        const def = EFFECTS.find((e) => e.id === c.kind);
-        const takesCam = def?.controls?.some((x) => (x as { key?: string }).key === "camSrc");
-        return takesCam && (c.params.camSrc || doc.cam);
-      })
-      .map((c) => ({ kind: c.kind, start: c.start, end: c.end }));
-    return <TimelineExport doc={doc} scale={Number(q.get("fx") ?? 1)} speed={speed} />;
-  }
-  return <div style={{ color: "red" }}>unknown export mode</div>;
+  // 编排优先读导出脚本注入的 __EXPORT_DOC(整份编排走 URL 会超长 → HTTP 431);
+  // URL 的 ?doc= 仅作短编排/手工调试的兜底
+  const injected = (window as unknown as { __EXPORT_DOC?: string }).__EXPORT_DOC;
+  const { doc, error } = parseOverlay(injected ?? q.get("doc") ?? "{}");
+  if (error || !doc) return <div style={{ color: "red" }}>{error}</div>;
+  // 烤入人物的卡:这几段导出后在剪映里要盖掉原始口播轨,否则会看到两层人。
+  // 判断依据是卡有没有 camSrc 控件(不写死卡名,以后新加的卡自动算进来)。
+  // 时间段挂到 window,导出脚本读了在成品旁边生成一份「合成说明」——
+  // 用户打开 exports/output/ 拿 MOV 的那一刻,正好是他要去剪映的前一秒。
+  (window as unknown as { __CAM_SEGMENTS?: unknown }).__CAM_SEGMENTS = doc.cards
+    .filter((c) => {
+      const def = EFFECTS.find((e) => e.id === c.kind);
+      const takesCam = def?.controls?.some((x) => (x as { key?: string }).key === "camSrc");
+      return takesCam && (c.params.camSrc || doc.cam);
+    })
+    .map((c) => ({ kind: c.kind, start: c.start, end: c.end }));
+  return <TimelineExport doc={doc} scale={Number(q.get("fx") ?? 1)} speed={speed} />;
 }

@@ -8,7 +8,6 @@ export const GROUP_COLORS: Record<string, string> = {
   对比取舍: "#ef8e7d",
   金句观点: "#f87bac",
   步骤流程: "#45c6cf",
-  信息结构: "#8f86ea",
   教程标注: "#b9b2ee",
   文字进场: "#d9c07f",
   人物锚定: "#f2a35f",

@@ -70,7 +70,7 @@ export const versusCardDef: EffectDef<VersusCardParams> = {
     aKicker: "主推 · 会点亮",
     aTitle: "选项 A",
     aSub: "胜出的一边高亮",
-    aAccent: "pink",
+    aAccent: "blue",
     bKicker: "对照 · 会变灰",
     bTitle: "选项 B",
     bSub: "落败的一边压暗",

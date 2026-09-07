@@ -27,7 +27,6 @@
   padding: 28px 0;
 }
 
-
 .panel-title {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -56,7 +55,7 @@
   flex-direction: column;
   gap: 8px;
   flex: 1;
-  /* 不能是 0:标签栏占掉空间后会把列表压没(实测 height 变 0,筛出来也看不见) */
+  /* 不能是 0:标签栏占掉空间后会把列表压没(height 会变 0,筛出来也看不见) */
   min-height: 260px;
   overflow-y: auto;
 }
@@ -165,14 +164,6 @@
   border-left: 9px solid var(--bg-app);
   border-top: 6px solid transparent;
   border-bottom: 6px solid transparent;
-}
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  color: var(--ink-muted);
-  padding: 6px 2px;
 }
 
 /* ---- 开关 ---- */
@@ -740,7 +731,7 @@ input[type="range"]::-moz-range-thumb {
      轨道内容整体上跳 7px;跳完纵向溢出变 9px,竖滚动条再冒出来把内容挤窄,
      播放头 100% 的位置左移、横向又不溢出了……来回抖两下。片尾"闪一下"就是这么来的。
      clip 把探出部分排除在滚动范围外(元素自身宽度照常撑 .tlb-track 的横向滚动)。
-     clip-margin 必须是 0:留多少就漏多少(实测 8px→仍溢出 6px、2px→溢出 2px),
+     clip-margin 必须是 0:留多少就漏多少(留 8px 仍溢出 6px、留 2px 仍溢出 2px),
      代价是播放头手柄在最两端会被切掉外面那一半 —— 换不抖,这个价值得。 */
   overflow: clip;
   overflow-clip-margin: 0;
@@ -958,7 +949,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ---- 版本指南入口 ----
-   只有基础版会渲染(promo.ts 的地址非空时)。用虚线框和弱化的字,
+   只在 promo.ts 的地址非空时渲染。用虚线框和弱化的字,
    让它读起来像列表末尾的一句注脚,而不是横插进来的广告条。 */
 .fx-promo {
   display: flex;
@@ -1003,16 +994,8 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 30px;
   z-index: 5; /* 模拟成片:口播小窗在特效层之上 */
 }
-/* screen-demo:角落 3:4 小窗 */
-.stage-video.is-pip-br { left: 1424px; top: 482px; width: 400px; height: 534px; }
-.stage-video.is-pip-bl { left: 96px; top: 482px; width: 400px; height: 534px; }
-/* focus-card:左侧圆角方框(和 .fc-ring 严格同几何) */
+/* focus-card:左侧圆角方框(和 focusCamGeom 同几何) */
 .stage-video.is-pip-focus { left: 110px; top: 190px; width: 700px; height: 700px; border-radius: 36px; }
-/* cam-frame:几何由卡片参数算,这里只负责"别被 is-pip 的圆角覆盖"
-   (left/top/width/height/border-radius 全部走内联样式) */
-.stage-video.is-pip-frame { border-radius: 0; }
-/* demo-tour:口播缩成左下圆窗(几何走内联样式,描边由卡里的 .dtr-camring 画) */
-.stage-video.is-pip-dtr { border-radius: 50%; }
 
 /* 右栏:删除选中卡 */
 .del-card-btn {
@@ -1084,7 +1067,7 @@ input[type="range"]::-moz-range-thumb {
   /* 徽章带悬停详情(档位+发布日期),给个手型光标让人知道可以停一下 */
   cursor: help;
 }
-/* 基础版:徽章是版本指南的入口,所以是链接而不是悬停提示 */
+/* 徽章作为版本指南入口时是链接而不是悬停提示 */
 .tb-ver--link {
   cursor: pointer;
   text-decoration: none;
@@ -1109,7 +1092,7 @@ input[type="range"]::-moz-range-thumb {
   color: var(--ink);
   box-shadow: inset 0 -2px 0 var(--accent);
 }
-/* 版本指南入口(只有基础版渲染)。和两个模式切换同高同边框,所以读起来是顶栏的一部分;
+/* 版本指南入口(promo.ts 的地址非空时渲染)。和两个模式切换同高同边框,所以读起来是顶栏的一部分;
    靠强调色和淡底把它和"当前在哪个模式"区分开 —— 它不是第三个模式。 */
 .tb-pro {
   display: flex;
@@ -1224,7 +1207,6 @@ input[type="range"]::-moz-range-thumb {
   color: var(--ink);
 }
 
-
 /* 编辑台空状态提示 */
 .fx-empty {
   padding: 24px 10px;
@@ -1232,7 +1214,6 @@ input[type="range"]::-moz-range-thumb {
   line-height: 2;
   color: var(--ink-faint);
 }
-
 
 /* 录屏路径回显 */
 .demo-src {
@@ -1250,18 +1231,6 @@ input[type="range"]::-moz-range-thumb {
   resize: vertical;
   white-space: pre;
   overflow-x: auto;
-}
-
-/* punch-zoom 预览:底层视频原位推近(覆盖 is-pip 的缩角几何)。
-   注意 z 回到底层:推近的是背景画面,不能像小窗那样盖住同窗的特效卡 */
-.stage-video.is-pip.is-punch-zoom {
-  left: 0;
-  top: 0;
-  width: var(--stage-w);
-  height: var(--stage-h);
-  border-radius: 0;
-  z-index: 0;
-  animation: pz-push var(--pz-ms, 1400ms) cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* focus-card 口播缩右侧的预览落位(镜像) */
@@ -1451,7 +1420,7 @@ input[type="range"]::-moz-range-thumb {
   border-top: 1px solid var(--hairline);
 }
 
-/* ── 授权协议门(仅发行版,dev 无 /LICENSE.txt 不出现)── */
+/* ── 授权协议门(public/ 里没有 LICENSE.txt 时不出现)── */
 .eula {
   position: fixed;
   inset: 0;
@@ -1517,12 +1486,6 @@ input[type="range"]::-moz-range-thumb {
   color: var(--ink-faint);
   cursor: not-allowed;
 }
-
-/* ============ 风格骨架(form) ============
-   这一节只管**形状**:圆角、边框、控件长相。颜色一律走令牌(index.css 的
-   data-palette),所以任何风格 × 任何配色都能组合。
-   data-form 缺省 = 「编辑部」:直角、hairline 分区、按钮组共享细线熔接,
-   也就是文件上半部分的基础样式本身,不需要额外覆盖。 */
 
 /* ---- iOS 家族共享的控件语言(iOS / iOS·玻璃 / 浮岛) ----
    iOS 的控件语言和编辑部正好相反:那边靠 hairline 和熔接分区,iOS 靠圆角
@@ -2331,7 +2294,6 @@ input[type="range"]::-moz-range-thumb {
   margin-top: 4px;
 }
 
-
 /* ---- 顶栏偏好设置(齿轮弹出面板) ---- */
 .tb-prefs { position: relative; display: inline-flex; }
 /* 齿轮 = 熔接按钮组里的一枚 .tb-btn(几何/配色都在上面那条规则里),
@@ -2359,7 +2321,7 @@ input[type="range"]::-moz-range-thumb {
 }
 /* 分组小标题(「影响成片」/「仅编辑时可见」)统领的是它**下面**那几行。
    4px 时它离上一行只有 4px、离下一行 10px(容器 gap),读起来像在给上一行
-   加注解 —— 实测被误读成「文字光晕不影响导出」。拉开上边距,
+   加注解 —— 容易被误读成「文字光晕不影响导出」。拉开上边距,
    让它明确贴住下面的组。 */
 .tb-prefs-kicker:not(:first-child) { margin-top: 14px; }
 .tb-prefs-row {

@@ -96,7 +96,7 @@ export function FxVideo({
 
 /**
  * 图/视频通用媒体槽:同一个参数位,填图片路径出图,填视频路径出会动的小窗
- * (参考片心得:证据素材本身要是活的)。
+ * (证据素材本身要是活的)。
  * 视频预览时静音循环;导出时由 __seekVideos 按时间轴对位,data-fx-loop 表示循环短素材。
  */
 export function MediaImg({

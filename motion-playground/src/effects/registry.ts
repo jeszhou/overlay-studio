@@ -1,4 +1,4 @@
-/* 【这个文件由软件自动生成】改这里没用 —— 每次更新都会被整个替换。
+/* 更新(git pull)会覆盖这个文件,不要直接改;要改请复制一份。
    想调整动效卡,请改卡片组件本身,不要改这里。 */
 import type { EffectDef } from "./types";
 import { quoteLockupDef } from "./QuoteLockup";
@@ -55,7 +55,6 @@ export const EFFECT_GROUPS: EffectGroup[] = [
     title: "步骤流程",
     effects: [stepTimelineDef, checklistDef],
   },
-  
   {
     title: "教程标注",
     effects: [termCardDef, uiCalloutDef],
@@ -65,7 +64,7 @@ export const EFFECT_GROUPS: EffectGroup[] = [
     effects: [blurTextDef, typeShiftDef],
   },
   {
-    /* 人物锚定:效果直接"碰"人物——爆点光环、镜头推近 */
+    /* 人物锚定:效果直接"碰"人物 */
     title: "人物锚定",
     effects: [entityChipsDef],
   },
@@ -77,9 +76,6 @@ export const EFFECT_GROUPS: EffectGroup[] = [
     title: "场景 · B-roll",
     effects: [terminal3DDef],
   },
-  
-  
-  
 ];
 
 // 平铺列表(消费端按 id 取用;id 即 overlay JSON 的 kind)

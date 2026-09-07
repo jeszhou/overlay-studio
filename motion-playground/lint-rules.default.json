@@ -1,12 +1,10 @@
 {
-  "_说明": "overlay 检查器公共默认阈值(温和)。个人偏好写 lint-rules.local.json(gitignore),同名字段覆盖这里。风格类规则默认关闭:warnBackdropStack / blockTitleMinOffsetY / scaleTiers —— 它们是审美约定,不是对错。",
+  "_说明": "overlay 检查器公共默认阈值(温和)。个人偏好写 lint-rules.local.json(gitignore),同名字段覆盖这里。风格类规则默认关闭:scaleTiers —— 它是审美约定,不是对错。",
   "minDwell": 2,
   "maxQuietGap": 10,
   "minOffsetGap": 90,
   "scaleTiers": [],
   "scaleTolerance": 0.06,
   "warnCaptionTrack": true,
-  "warnDecimalPercent": true,
-  "warnBackdropStack": false,
-  "blockTitleMinOffsetY": 0
+  "warnDecimalPercent": true
 }

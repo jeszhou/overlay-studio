@@ -76,7 +76,7 @@
     "file": "src/effects/hud/UICallout.tsx"
   },
   "versus-card": {
-    "hash": "87febfffb2b1",
+    "hash": "312ac4854fa6",
     "file": "src/effects/hud/VersusCard.tsx"
   }
 }

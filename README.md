@@ -79,7 +79,7 @@ npm run dev
 | CodeBuddy / WorkBuddy Enterprise | `.codebuddy/skills/overlay-fx-generator/` |
 | WorkBuddy 桌面版 | `.workbuddy/skills/overlay-fx-generator/` |
 
-四个入口由构建自动同步,内容必须一致。可在 `motion-playground` 里运行
+四个入口内容一致。可在 `motion-playground` 里运行
 `npm run check:agent-skills` 检查;看到“4 个 Agent 入口一致”才算完整。
 
 > 每张卡分别什么时候用、要填哪些字段,见任一入口里的 `SKILL.md`。卡片表由 registry 自动生成,永远和仓库里的卡一致。

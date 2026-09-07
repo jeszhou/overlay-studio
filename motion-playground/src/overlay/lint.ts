@@ -21,7 +21,7 @@ export interface LintIssue {
 export interface LintConfig {
   /** 内容卡最短驻留秒数(快闪警告) */
   minDwell: number;
-  /** 不受驻留规则约束的卡型(氛围/运镜/常驻类) */
+  /** 不受驻留规则约束的卡型(常驻类) */
   dwellExemptKinds: string[];
   /** 同段同屏卡 offsetY 至少要错开的像素 */
   minOffsetGap: number;
@@ -35,37 +35,17 @@ export interface LintConfig {
   warnCaptionTrack: boolean;
   /** 文案里出现精确小数百分比时提醒口语化取整 */
   warnDecimalPercent: boolean;
-  /** 底板叠层检查:用常驻玻璃底幕(frost-screen/glass-pane)当垫层的工作流才打开。
-   *  默认关 —— 「板要不要自带底」是风格选择,不是对错 */
-  warnBackdropStack: boolean;
-  /** 块级小标题(section-head size=s)的 offsetY 下限;0 = 不检查。
-   *  只有把 size=s 当"钉在别处的块级标题"用的工作流才需要设 */
-  blockTitleMinOffsetY: number;
 }
 
 export const LINT_DEFAULTS: LintConfig = {
   minDwell: 2,
-  dwellExemptKinds: [
-    "burst-halo",
-    "light-sweep",
-    "punch-zoom",
-    "cam-pan",
-    "ambient-wash",
-    "glass-pane",
-    "frost-screen",
-    "chapter-bar",
-    "caption-track",
-    "ghost-video",
-    "icon-pop",
-  ],
+  dwellExemptKinds: ["chapter-bar", "caption-track"],
   minOffsetGap: 90,
   maxQuietGap: 10,
   scaleTiers: [],
   scaleTolerance: 0.06,
   warnCaptionTrack: true,
   warnDecimalPercent: true,
-  warnBackdropStack: false,
-  blockTitleMinOffsetY: 0,
 };
 
 export function mergeLintConfig(...parts: (Partial<LintConfig> | null | undefined)[]): LintConfig {
@@ -101,36 +81,10 @@ interface SeqSpec {
 }
 
 const SEQ_SPECS: Record<string, SeqSpec[]> = {
-  "clip-parade": [
-    { at: "buildAt", step: "buildStepMs", list: "tiles" },
-    { at: "paradeAt", step: "paradeStepMs", list: "tiles" },
-    // 自由摆放模式的块数看 img1-3
-    { at: "buildAt", step: "buildStepMs", list: "__imgs" },
-    { at: "paradeAt", step: "paradeStepMs", list: "__imgs" },
-  ],
-  "video-showcase": [{ at: "startAt", step: "stepMs", list: "clips" }],
-  "icon-swarm": [{ at: "startAt", step: "stepMs", list: "items" }],
-  "glow-badges": [{ at: "badgesAt", step: "stepMs", list: "badges", sep: "|" }],
   "terminal-3d": [{ step: "__span", list: "lines", sep: "|" }],
-  "kinetic-words": [{ step: "holdMs", list: "chunks", sep: "|" }],
-  "karaoke-line": [{ step: "wordMs", list: "words", sep: "|" }],
   "checklist": [{ step: "stepMs", list: "items", sep: "|" }],
-  "pain-points": [{ step: "stepMs", list: "pains", sep: "|" }],
-  "chip-cluster": [{ step: "stepMs", list: "chips", sep: "|" }],
-  "stepper-flow": [{ step: "stepMs", list: "steps", sep: "|" }],
-  "flow-chart": [{ step: "stepMs", list: "nodes", sep: "|" }],
-  "fact-stack": [{ step: "stepMs", list: "items", sep: "|" }],
-  "rule-card": [{ step: "stepMs", list: "bans", sep: "|" }],
-  "bar-race": [{ step: "stepMs", list: "rows", sep: "|" }],
   "entity-chips": [{ step: "stepMs", list: "chips" }],
-  "outline-tree": [{ step: "stepMs", list: "kids", sep: "|" }],
-  "number-beats": [{ step: "holdMs", list: "points", sep: "|" }],
-  "word-spin": [{ step: "spinMs", list: "words", sep: "|" }],
-  "card-swap": [{ step: "swapMs", list: "cards", sep: "|" }],
   "focus-card": [{ step: "stepMs", list: "items", sep: "|" }],
-  "focus-takeover": [{ step: "stepMs", list: "items", sep: "|" }],
-  "proof-shot": [{ step: "stepMs", list: "__imgs" }],
-  "phone-shot": [{ step: "stepMs", list: "__imgs" }],
 };
 
 /** 从 times 类参数 + 卡内逐条节奏里抽出动作时间点(板内行点亮、逐块铺开都算) */
@@ -149,42 +103,14 @@ function actionTimes(card: OverlayCard): number[] {
     );
   }
 
-  // 复刻入库:三站 + 落库 + 小注,各算一个动作
-  if (card.kind === "replicate-loop") {
-    for (const v of String(p.stopsAt ?? "").split("|").map(Number))
-      if (Number.isFinite(v)) out.push(card.start + v);
-    for (const k of ["intoAt", "noteAt"]) {
-      const v = Number(p[k]);
-      if (Number.isFinite(v)) out.push(card.start + v);
-    }
-  }
-
-  // 基建三拍:三拍各算一个动作(一张卡陪跑整段,靠内部卡点撑节奏)
-  if (card.kind === "studio-build") {
-    for (const k of ["libAt", "deckAt", "payAt"]) {
-      const v = Number(p[k]);
-      if (Number.isFinite(v)) out.push(card.start + v);
-    }
-  }
-
-  // 手托展示:左右两次托起各算一个动作
-  if (card.kind === "hand-lift") {
-    for (const k of ["leftAt", "rightAt"]) {
-      const v = Number(p[k]);
-      if (Number.isFinite(v)) out.push(card.start + v);
-    }
-  }
-
   for (const spec of SEQ_SPECS[card.kind] ?? []) {
     const n =
-      spec.list === "__imgs"
-        ? ["img1", "img2", "img3"].filter((k) => typeof p[k] === "string" && p[k]).length
-        : typeof p[spec.list] === "string"
-          ? (p[spec.list] as string)
-              .split(spec.sep ?? "\n")
-              .map((x) => x.trim())
-              .filter(Boolean).length
-          : 0;
+      typeof p[spec.list] === "string"
+        ? (p[spec.list] as string)
+            .split(spec.sep ?? "\n")
+            .map((x) => x.trim())
+            .filter(Boolean).length
+        : 0;
     if (n < 1) continue;
     const at = spec.at ? Number(p[spec.at]) || 0 : 0;
     const stepSec =
@@ -310,69 +236,14 @@ export function lintOverlay(
         level: "warn",
         cardId: cap.id,
         rule: "caption-track",
-        message: `编排里有字幕卡「${cap.id}」——先确认原片没有烧录字幕,有就删掉这张`,
+        message: `编排里有字幕卡「${cap.id}」——先确认原片没有烧录字幕,有就删除这张`,
       });
     }
-  }
-
-  // warn: 块级小标题(section-head size=s)没挪开落位。
-  // 默认关(blockTitleMinOffsetY: 0)。这条只对"把 size=s 当块级标题、钉在画面别处"
-  // 的工作流成立;把 size=s 当小一号段头、就该待在段头位置的人不该被它烦。
-  if (cfg.blockTitleMinOffsetY > 0) {
-    for (const c of cards) {
-      if (c.kind !== "section-head" || c.params?.size !== "s") continue;
-      if (ruleOff(c, "block-title-anchor")) continue;
-      const oy = Number(c.params?.offsetY) || 0;
-      if (oy < cfg.blockTitleMinOffsetY) {
-        push({
-          level: "warn",
-          cardId: c.id,
-          rule: "block-title-anchor",
-          message: `「${c.id}」是块级小标题(size=s)但 offsetY=${oy}(< ${cfg.blockTitleMinOffsetY}),会和同段的大段头叠在左上角——给它一个明确的落位`,
-        });
-      }
-    }
-  }
-
-  // warn: 底板叠了两层 / 亮画面上没有底板
-  // 实践里遇到过:把 8 块 info-board 的 bg 全从 dark 改成 none —— 因为那一期已经有
-  // 常驻的 frost-screen/glass-pane 垫在下面,单卡再垫一块就是两层灰板。反过来,没有
-  // 垫层的时间段上 bg:"none" 的白字浮在日光米白墙上,导出合成后基本看不清。
-  if (cfg.warnBackdropStack) {
-  const SOLID_BACKDROPS = ["frost-screen", "glass-pane"];
-  // 只查"板底"类的 bg。demo-rail / clip-parade / video-showcase 的 bg 是"全屏底"
-  // (整块盖住原片换景),和垫在文字后面的玻璃板不是一回事,叠着是对的
-  const BOARD_BG_KINDS = ["info-board", "glow-badges", "diverge-lines"];
-  const panes = cards.filter((c) => SOLID_BACKDROPS.includes(c.kind));
-  const coveredAt = (t: number) => panes.some((p) => t >= p.start && t < p.end);
-  for (const c of cards) {
-    const bg = c.params?.bg;
-    if (!BOARD_BG_KINDS.includes(c.kind)) continue;
-    if (typeof bg !== "string" || ruleOff(c, "backdrop-stack")) continue;
-    const mid = (c.start + c.end) / 2;
-    if (bg !== "none" && coveredAt(mid)) {
-      push({
-        level: "warn",
-        cardId: c.id,
-        rule: "backdrop-stack",
-        message: `「${c.id}」(${c.kind}) bg="${bg}",但这一刻已经有常驻玻璃底幕垫着了——两层灰板叠一起,底板留一层就够(改 bg:"none")`,
-      });
-    } else if (bg === "none" && !coveredAt(mid)) {
-      push({
-        level: "warn",
-        cardId: c.id,
-        rule: "backdrop-stack",
-        message: `「${c.id}」(${c.kind}) bg="none" 且这一刻没有玻璃底幕垫着——白字直接压实拍画面,亮片里会看不清`,
-      });
-    }
-  }
   }
 
   // warn: 同屏散卡叠在一起。同 seg 的卡有自动顺排容器不会叠,只查没进段的散卡:
   // 时间重叠 + 同落位 + offsetX/offsetY 都没错开 = 真的压在一起
-  // 背景垫层(glass-pane/ambient-wash 这类)本来就该铺在别的卡下面,不算叠卡
-  const BACKDROP_KINDS = ["glass-pane", "frost-screen", "ambient-wash", "letter-glitch"];
-  const loose = cards.filter((c) => !c.seg && !BACKDROP_KINDS.includes(c.kind));
+  const loose = cards.filter((c) => !c.seg);
   for (let i = 0; i < loose.length; i++) {
     for (let j = i + 1; j < loose.length; j++) {
       const a = loose[i];
@@ -381,7 +252,7 @@ export function lintOverlay(
       if (ruleOff(later, "stack-overlap")) continue;
       const overlap = Math.min(a.end, b.end) - Math.max(a.start, b.start);
       if (overlap <= 0.5) continue;
-      // 没有落位参数的卡是全屏氛围/常驻层(ambient-wash/chapter-bar 等),不参与叠卡检查
+      // 没有落位参数的卡是全屏/常驻层(chapter-bar 等),不参与叠卡检查
       const posA = String(a.params?.position ?? a.params?.side ?? "");
       const posB = String(b.params?.position ?? b.params?.side ?? "");
       if (!posA || !posB || posA !== posB) continue;

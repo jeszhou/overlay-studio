@@ -13,8 +13,8 @@ export function easeOutExpo(t: number): number {
  * 预览时:该值不存在,回落到 performance.now(),行为与改动前完全一致。
  *
  * 改动前三个计时钩子都直接用 performance.now() 自己计时,而它和虚拟时钟的
- * 对应关系每次运行都不同(实测差一帧量级)。静止/短进场的卡看不出来,
- * 全程连续运动的卡(粒子类)每帧都错位,两次导出 PSNR 只有 31dB。
+ * 对应关系每次运行都不同(差一帧量级)。静止/短进场的卡看不出来,
+ * 全程连续运动的卡每帧都错位,两次导出的画面对不上。
  */
 function clockNow(): number {
   const t = (window as unknown as { __fxExportMs?: number }).__fxExportMs;
@@ -42,7 +42,7 @@ export function useFxSpeed(getEl: () => HTMLElement | null, speed: number) {
     if (!el) return;
     let raf = 0;
     const apply = () => {
-      // __fxClockRate:导出时由 ExportView 实测写入的"CSS 动画钟校正系数"。
+      // __fxClockRate:导出时由 ExportView 量出并写入的"CSS 动画钟校正系数"。
       // 无头浏览器虚拟时间下 CSS 动画钟比虚拟时钟快好几倍(滚动/过渡瞬间播完),
       // 乘上它把所有 CSS 动画拉回和时间轴一致;预览时为空 = 1,不影响。
       const eff =
@@ -65,7 +65,7 @@ export function useFxSpeed(getEl: () => HTMLElement | null, speed: number) {
  * 关键:这个值在**渲染期**直接从时钟算出,不经过 rAF 回调 + setState。
  * 只换时间源是不够的 —— 导出每帧的顺序是「下发时间 → 推进虚拟时钟 → 截图」,
  * 而 rAF→setState→React 重渲染这条链在那一小段里有时跑得完、有时跑不完,
- * 跑不完就截到上一帧的画面。实测只换时间源后仍有近半数卡两次导出不一致,
+ * 跑不完就截到上一帧的画面。只换时间源后仍有不少卡两次导出不一致,
  * 且不同的帧散乱分布 —— 正是竞态的特征。渲染期直接读就没有这个窗口。
  *
  * 起点在 playToken 变化时重置(渲染期比对,不用 effect —— effect 跑在首次渲染之后,

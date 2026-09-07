@@ -28,11 +28,3 @@ export function useTimelineTime(params: { __t?: number }, playToken: number): nu
   return injected ?? selfT;
 }
 
-/** 本卡已进场秒数(卡内翻页/轮播用):时间轴时间 − 卡片 start */
-export function useCardElapsed(
-  params: { __t?: number; __start?: number },
-  playToken: number,
-): number {
-  const t = useTimelineTime(params, playToken);
-  return Math.max(0, t - (params.__start ?? 0));
-}

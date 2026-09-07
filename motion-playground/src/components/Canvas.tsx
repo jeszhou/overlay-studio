@@ -4,14 +4,13 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 import type { EffectDef } from "../effects/types";
 import { EFFECTS } from "../effects/registry";
 import { STAGE } from "../stage";
-import { PZ_ORIGIN, camFrameGeom, focusCamGeom } from "../effects/hud/camGeom";
-import { backdropFirst, outroFade, type OverlayCard } from "../overlay/types";
+import { focusCamGeom } from "../effects/hud/camGeom";
+import { outroFade, type OverlayCard } from "../overlay/types";
 import { useEnter } from "../effects/useAnimation";
 import { FxSpeedScope } from "../effects/FxSpeedScope";
 
@@ -35,13 +34,7 @@ interface CanvasProps {
   glow?: boolean;
   /** 全局字体(doc.font):空 = 默认 */
   font?: string;
-  /** 皮肤(doc.skin):hud.css 的 data-skin 令牌组,空 = 默认配色 */
-  skin?: string;
-  /** 风格骨架(doc.style):hud.css 的 data-style 令牌组,空 = HUD 现状 */
-  docStyle?: string;
-  /** 侧边色块(doc.sideColor,仅 sketch):写进 --hud-side */
-  sideColor?: string;
-  /** 全局文字色(doc.inkColor):盖住皮肤的 --hud-ink,次要文字同色降透明度 */
+  /** 全局文字色(doc.inkColor):盖住主题的 --hud-ink,次要文字同色降透明度 */
   inkColor?: string;
   /** 时间轴模式下是否静音(单特效模式恒静音,自动播放要求) */
   videoMuted?: boolean;
@@ -112,7 +105,7 @@ function CardShell({
       }}
       /* 逐卡主题:这张卡自己选的亮/暗覆盖全局(未选则继承) */
       data-card-theme={(params.theme as string) || undefined}
-      /* 逐卡投影:挂在这个 display:contents 的壳上,靠后代选择器落到卡根元素,
+      /* 讲过变浅:挂在这个 display:contents 的壳上,靠后代选择器落到卡根元素,
          所以每一张卡都能用,不必逐卡加参数 */
       data-past={past ? "1" : undefined}
       /* 退场淡出:同样靠后代选择器落到卡根元素,不必逐卡加参数 */
@@ -229,9 +222,6 @@ export function Canvas({
   overlayTheme,
   glow,
   font,
-  skin,
-  docStyle,
-  sideColor,
   inkColor,
   videoMuted,
   videoScale,
@@ -283,29 +273,10 @@ export function Canvas({
   const isHud = overlayMode || effect.selfPosition === true;
   const theme = overlayMode ? (overlayTheme ?? "dark") : (params.theme ?? "dark");
 
-  // 满屏运镜卡激活时,口播画面缩进对应落位框:
-  // screen-demo → 角落 3:4 小窗;focus-card → 左侧圆角方框
-  // 落位靠 class 的用 cls;几何由参数算出来的(cam-frame)再给一份 style,
-  // 和卡片自己用的是同一个 camFrameGeom,预览和导出不会各画各的
-  const PIP_KINDS: Record<string, (p: any) => { cls: string; style?: CSSProperties }> = {
-    "screen-demo": (p) => ({ cls: `is-pip-${(p?.corner as string) ?? "br"}` }),
-    "focus-card": (p) => ({
-      cls: p?.side === "right" ? "is-pip-focus is-pip-focus-r" : "is-pip-focus",
-    }),
-    "punch-zoom": () => ({ cls: "is-punch-zoom" }),
-    // demo-tour 的口播圆窗:和 .dtr-cam / .dtr-camring 同一份几何
-    // 蹲左下角
-    "demo-tour": () => ({
-      cls: "is-pip-dtr",
-      style: { left: 56, top: STAGE_H - 48 - 252, width: 252, height: 252, borderRadius: "50%" },
-    }),
-    "cam-frame": (p) => {
-      const g = camFrameGeom(p ?? {});
-      return {
-        cls: "is-pip-frame",
-        style: { left: g.x, top: g.y, width: g.w, height: g.h, borderRadius: g.r },
-      };
-    },
+  // 满屏运镜卡激活时,口播画面缩进对应落位框:focus-card → 左侧圆角方框。
+  // 落位靠 class,几何走 camGeom 里那一份,和卡片自己用的是同一个函数,预览和导出不会各画各的
+  const PIP_KINDS: Record<string, (p: any) => string> = {
+    "focus-card": (p) => (p?.side === "right" ? "is-pip-focus is-pip-focus-r" : "is-pip-focus"),
   };
   const pipCard = overlayMode
     ? overlayCards.find((c) => c.kind in PIP_KINDS)
@@ -313,13 +284,7 @@ export function Canvas({
       ? { kind: effect.id, params }
       : null;
   const pip = overlayMode ? pipCard != null : pipCard != null && camIn;
-  const pipRes = pipCard ? PIP_KINDS[pipCard.kind](pipCard.params) : null;
-  const pipClass = pipRes?.cls ?? "";
-  const pipStyle = pipRes?.style;
-
-  // 会改人像落位的运镜(推近不算)
-  const framingPip = pip && pipCard != null && pipCard.kind !== "punch-zoom";
-
+  const pipClass = pipCard ? PIP_KINDS[pipCard.kind](pipCard.params) : "";
 
   return (
     <div className="canvas-wrap" ref={wrapRef}>
@@ -327,16 +292,13 @@ export function Canvas({
         ref={stageRef}
         className={`stage${isHud ? " is-hud" : ""}${glow ? "" : " no-glow"}`}
         data-theme={theme}
-        data-skin={skin || undefined}
-        data-style={docStyle || undefined}
-        data-pip={framingPip ? (pipCard?.kind ?? "1") : undefined}
+        data-pip={pip && pipCard ? pipCard.kind : undefined}
         style={{
           width: STAGE_W,
           height: STAGE_H,
           transform: `translate(-50%, -50%) scale(${scale})`,
           ["--hud-scale" as string]: fxScale,
           ...(font ? { ["--hud-font" as string]: `"${font}"` } : {}),
-          ...(sideColor ? { ["--hud-side" as string]: sideColor } : {}),
           ...inkVars(inkColor),
         }}
       >
@@ -349,30 +311,20 @@ export function Canvas({
             }}
             className={`stage-video${pip ? ` is-pip ${pipClass}` : ""}`}
             src={videoUrl}
-            /* 缩角小窗时不叠加缩放,保证和落位框对齐;
-               punch-zoom 把推近参数交给 CSS 变量 */
+            /* 缩角小窗时不叠加缩放,保证和落位框对齐 */
             style={
-              pip
-                ? pipCard?.kind === "punch-zoom"
-                  ? ({
-                      ["--pz-amount" as string]: pipCard.params.amount ?? 1.15,
-                      ["--pz-ms" as string]: `${pipCard.params.pushMs ?? 1400}ms`,
-                      transformOrigin:
-                        PZ_ORIGIN[(pipCard.params.focus as string) ?? "center"],
-                    } as React.CSSProperties)
-                  : pipCard?.kind === "focus-card"
-                    ? (() => {
-                        // 口播框几何走 camGeom 里那一份,和卡自己用的是同一个函数
-                        const g = focusCamGeom(pipCard.params as any);
-                        return {
-                          left: g.x,
-                          top: g.y,
-                          width: g.w,
-                          height: g.h,
-                          borderRadius: g.r,
-                        } as React.CSSProperties;
-                      })()
-                    : (pipStyle as React.CSSProperties | undefined)
+              pip && pipCard
+                ? (() => {
+                    // 口播框几何走 camGeom 里那一份,和卡自己用的是同一个函数
+                    const g = focusCamGeom(pipCard.params as any);
+                    return {
+                      left: g.x,
+                      top: g.y,
+                      width: g.w,
+                      height: g.h,
+                      borderRadius: g.r,
+                    } as React.CSSProperties;
+                  })()
                 : { transform: `scale(${videoScale ?? 1})` }
             }
             autoPlay={!overlayMode}
@@ -387,7 +339,7 @@ export function Canvas({
               const err = el.error;
               // 错误码 4 有两种截然不同的原因,却长得一模一样:一是编码真的放不了,
               // 二是文件根本没读全 —— 大视频写盘要时间,上传还没落完就点播放就会撞上。
-              // 以前一律赖 H.265,客户就跑去重导一遍格式,白折腾。
+              // 以前一律赖 H.265,用户就跑去重导一遍格式,白折腾。
               // 拿浏览器自己的解码能力来分辨:它连 H.265 都放得了,那锅就不在编码上。
               const hevcOk =
                 el.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"') !== "" &&
@@ -436,16 +388,13 @@ export function Canvas({
                 if (!def) return null;
                 const C = def.Component;
                 const cardSide = (card.params.side as string) ?? "left";
-                // __t/__start/__end:时间感知卡据此高亮当前章、切字幕行、卡内翻页
+                // __t/__start/__end:时间感知卡据此高亮当前章、切字幕行
                 const cardParams: Record<string, unknown> = {
                   ...card.params,
                   __t: now,
                   __start: card.start,
                   __end: card.end,
                 };
-                // demo-tour 口播圆窗:预览时没填 camSrc 就用导入的口播视频(与导出的全局口播注入对齐)
-                if (card.kind === "demo-tour" && videoUrl && !cardParams.camSrc)
-                  cardParams.camSrc = videoUrl;
                 // 退场淡出:卡片走到 end 就被卸掉,先在这最后一小段把它淡走
                 const outro = now === undefined ? 1 : outroFade(now, card);
                 return (
@@ -475,15 +424,14 @@ export function Canvas({
               // 分组:同 seg 的卡进一个竖排容器;容器位置 = 段头(首成员)的 offset,拖段头即拖整段
               const out: ReactNode[] = [];
               const seen = new Set<string>();
-              const ordered = backdropFirst(overlayCards);
-              for (const card of ordered) {
+              for (const card of overlayCards) {
                 if (!card.seg) {
                   out.push(renderOne(card));
                   continue;
                 }
                 if (seen.has(card.seg)) continue;
                 seen.add(card.seg);
-                const members = ordered.filter((c) => c.seg === card.seg);
+                const members = overlayCards.filter((c) => c.seg === card.seg);
                 const head = members[0];
                 out.push(
                   <div
@@ -500,32 +448,23 @@ export function Canvas({
               return out;
             })()
           : /* 单特效预览:HUD 族自锚定;极简族落进左右槽 */
-            (() => {
-              // demo-tour 口播圆窗:预览时没填 camSrc 就用导入的口播视频(与导出的全局口播注入对齐)
-              const previewParams =
-                effect.id === "demo-tour" && videoUrl && !(params as Record<string, unknown>).camSrc
-                  ? { ...params, camSrc: videoUrl }
-                  : params;
-              return (
-                <CardShell
-                  cardId={null}
-                  params={params}
-                  stageScale={scale}
-                  fxScale={fxScale}
-                  animSpeed={animSpeed ?? 1}
-                  onNudge={onNudge}
-                  snapCtx={snapCtx}
-                >
-                  {effect.selfPosition ? (
-                    <Effect params={previewParams} playToken={playToken} />
-                  ) : (
-                    <div className={`slot slot-${side}`}>
-                      <Effect params={previewParams} playToken={playToken} />
-                    </div>
-                  )}
-                </CardShell>
-              );
-            })()}
+            <CardShell
+              cardId={null}
+              params={params}
+              stageScale={scale}
+              fxScale={fxScale}
+              animSpeed={animSpeed ?? 1}
+              onNudge={onNudge}
+              snapCtx={snapCtx}
+            >
+              {effect.selfPosition ? (
+                <Effect params={params} playToken={playToken} />
+              ) : (
+                <div className={`slot slot-${side}`}>
+                  <Effect params={params} playToken={playToken} />
+                </div>
+              )}
+            </CardShell>}
       </div>
     </div>
   );

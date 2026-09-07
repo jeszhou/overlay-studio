@@ -1,15 +1,15 @@
-/* 【这个文件每次更新都会被替换】你在这里改的东西,更新后不会自动保留,需要手工搬运。 */
+/* 更新(git pull)会覆盖这个文件,不要直接改;要改请复制一份再引用。 */
 import type { CSSProperties } from "react";
 
 /** HUD 族共用的强调色映射(对应 hud.css 里的主题令牌) */
 export const ACCENT_VAR: Record<string, string> = {
-  pink: "var(--hud-blue)" /* 未启用的色,统一走蓝 */,
+  pink: "var(--hud-blue)" /* 兼容旧值,渲染为蓝 */,
   blue: "var(--hud-blue)",
-  teal: "var(--hud-blue)" /* 未启用的色,统一走蓝 */,
-  violet: "var(--hud-blue)" /* 未启用的色,统一走蓝 */,
-  lav: "var(--hud-blue)" /* 未启用的色,统一走蓝 */,
+  teal: "var(--hud-blue)" /* 兼容旧值,渲染为蓝 */,
+  violet: "var(--hud-blue)" /* 兼容旧值,渲染为蓝 */,
+  lav: "var(--hud-blue)" /* 兼容旧值,渲染为蓝 */,
   alert: "var(--hud-alert)",
-  green: "var(--hud-blue)" /* 未启用的色,统一走蓝 */,
+  green: "var(--hud-blue)" /* 兼容旧值,渲染为蓝 */,
   orange: "var(--hud-orange)",
 };
 
@@ -28,28 +28,8 @@ export const THEME_OPTIONS = [
   { label: "🌙 暗底", value: "dark" },
 ];
 
-/** 皮肤下拉选项(对应 hud.css 里的 data-skin 令牌组;空 = 默认配色)。
- *
- *  想要自己的一套配色,两步:
- *    1) hud.css 里照默认那组令牌,复制一份改成 [data-skin="你的名字"] 的覆盖
- *       (暗/亮两个主题各写一组,只需覆盖要改的令牌,其余自动继承默认)
- *    2) 回到这里加一行 { label: "你的名字", value: "你的名字" }
- *  卡片一个都不用改 —— 卡里的颜色全部走 var(--hud-*),换令牌就换全场。 */
-export const SKIN_OPTIONS = [{ label: "默认", value: "" }];
-
-/** 风格骨架下拉选项(对应 hud.css 里的 data-style 令牌组;和皮肤正交:
- *  skin 换配色,style 换材质骨架 —— 圆角、描边、阴影、底纹这类"手感"。
- *
- *  本仓带一套 HUD 骨架。想长出第二套(比如手绘、纸质、拟物),两步:
- *    1) hud.css 末尾加一段 .stage[data-style="你的名字"] 的覆盖
- *    2) 回到这里加一行 { label: "你的名字", value: "你的名字" }
- *  同样不用碰任何卡片。 */
-export const STYLE_OPTIONS = [{ label: "HUD", value: "" }];
-
-
 /** 玻璃底默认值:默认无底,视觉与旧行为一致 */
 export const GLASS_DEFAULTS = { glass: "none" as const, glassAlpha: 0.6 };
-
 
 /** 玻璃底 class:none/未设时返回空串,不改变原布局 */
 export function glassClass(glass?: string) {
@@ -86,13 +66,13 @@ export function offsetVars(p: { offsetX?: number; offsetY?: number }): CSSProper
  * 全局文字色 → CSS 令牌。
  * 只需要给一个主文字色,次要/更次要文字按同色自动降到 0.68 / 0.44 透明度 —— 免得
  * 每换一次配色都要调三个值,也保证主次对比关系不会被调乱。
- * 空值返回空对象 = 用皮肤自带的取值。
+ * 空值返回空对象 = 用主题自带的取值。
  *
- * 为什么要多写一份 `-doc` 变量:主题/皮肤令牌是写在「舞台」和「逐卡主题」两层上的
+ * 为什么要多写一份 `-doc` 变量:主题令牌是写在「舞台」和「逐卡主题」两层上的
  * (hud.css 里 `[data-card-theme="dark"]` 会在卡片自己身上重新定义 --hud-ink)。
  * 只在舞台上写 --hud-ink,带逐卡主题的卡会就地覆盖掉,全局色一点都落不下去
- * (实测:0/16 处文字跟随)。所以令牌定义统一改成
- * `--hud-ink: var(--hud-ink-doc, 皮肤默认值)`,这里只需要把 `-doc` 一层挂在舞台上,
+ * (没有一处文字跟着变)。所以令牌定义统一改成
+ * `--hud-ink: var(--hud-ink-doc, 主题默认值)`,这里只需要把 `-doc` 一层挂在舞台上,
  * 各层重新定义时会自动接住它。--hud-ink/--hud-muted/--hud-faint 也照旧写一份,
  * 兜底卡片之外、不走主题令牌的文字。
  */

@@ -6,7 +6,6 @@ import { EFFECT_GROUPS } from "../effects/registry";
 import { PROMO_URL } from "../promo";
 import { kindColor } from "../effects/kindColor";
 import type { OverlayDoc } from "../overlay/types";
-import { SKIN_OPTIONS, STYLE_OPTIONS } from "../effects/hud/accent";
 import type { SrtLine } from "../overlay/srt";
 import type { StudioTab } from "./TopBar";
 
@@ -29,15 +28,6 @@ interface SidebarProps {
   selCardId: string | null;
   /** 全局底色:一键统一所有卡片亮/暗 */
   onGlobalTheme: (theme: "dark" | "light") => void;
-  /** 皮肤(doc.skin):一键给所有卡换配色令牌组 */
-  skin: string;
-  onSkin: (s: string) => void;
-  /** 风格骨架(doc.style):一键给所有卡换材质骨架(白卡描边等),与皮肤正交 */
-  docStyle: string;
-  onDocStyle: (s: string) => void;
-  /** 侧边色块(doc.sideColor,仅 sketch):卡片左缘漫画感色带,自由选色,空 = 无 */
-  sideColor: string;
-  onSideColor: (c: string) => void;
   /** 全局口播视频(H264):运镜卡导出共用,传一次即可 */
   cam: string;
   onSetCam: (src: string) => void;
@@ -78,12 +68,6 @@ export function Sidebar({
   overlay,
   selCardId,
   onGlobalTheme,
-  skin,
-  onSkin,
-  docStyle,
-  onDocStyle,
-  sideColor,
-  onSideColor,
   cam,
   onSetCam,
   srt,
@@ -380,7 +364,7 @@ export function Sidebar({
             })()}
             {/* 列表末尾的入口:人正在翻卡、正在找"有没有更合适的表达"的时候才遇到。
                 搜索状态下不出现 —— 那时他要的是某一张具体的卡,不是版本对比。
-                地址为空(专业版 / dev)时整块不渲染。 */}
+                地址为空时整块不渲染。 */}
             {PROMO_URL && !fxQuery ? (
               <a className="fx-promo" href={PROMO_URL} target="_blank" rel="noreferrer">
                 <span className="fx-promo-t">没找到想要的表达?</span>
@@ -423,65 +407,6 @@ export function Sidebar({
               </button>
             </div>
           </div>
-        )}
-
-
-        {/* 皮肤:一键给所有卡换配色令牌组(hud.css data-skin),存进编排、导出同步生效 */}
-        {tab === "edit" && overlay && (
-          <label className="ctrl">
-            <div className="ctrl-head">
-              <span>皮肤(所有卡片)</span>
-            </div>
-            <select className="ctrl-input" value={skin} onChange={(e) => onSkin(e.target.value)}>
-              {SKIN_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        {/* 风格骨架:一键给所有卡换材质骨架(hud.css data-style),skin 管颜色、style 管骨架 */}
-        {tab === "edit" && overlay && (
-          <label className="ctrl">
-            <div className="ctrl-head">
-              <span>风格(所有卡片)</span>
-            </div>
-            <select className="ctrl-input" value={docStyle} onChange={(e) => onDocStyle(e.target.value)}>
-              {STYLE_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        {/* 侧边色块(仅手绘白卡):卡片左缘一道漫画感色带,颜色自由选,JumpFromPaper 味 */}
-        {tab === "edit" && overlay && docStyle === "sketch" && (
-          <label className="ctrl">
-            <div className="ctrl-head">
-              <span>侧边色块(漫画感)</span>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="color"
-                value={sideColor || "#f09a3e"}
-                onChange={(e) => onSideColor(e.target.value)}
-                style={{ width: 44, height: 28, padding: 0, border: "none", background: "none", cursor: "pointer" }}
-              />
-              <button
-                className={`seg-btn ${sideColor ? "" : "is-on"}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onSideColor("");
-                }}
-              >
-                无色块
-              </button>
-            </div>
-          </label>
         )}
 
         {/* 导入本地视频垫底,实时预览特效 */}
@@ -536,7 +461,7 @@ export function Sidebar({
                 </button>
               )}
             </div>
-            {/* 全局口播:传一次,所有运镜卡(screen-demo/focus-card/punch-zoom)导出共用,
+            {/* 全局口播:传一次,所有运镜卡(focus-card)导出共用,
                 按时间轴自动对位,不用剪时间段 */}
             {overlay && (
               <div className="ctrl scale-row">

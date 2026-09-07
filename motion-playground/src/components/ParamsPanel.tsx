@@ -6,9 +6,7 @@ import { kindColor } from "../effects/kindColor";
 import type { OverlayCard } from "../overlay/types";
 
 interface ParamsPanelProps {
-  /** 一次改一批:走一次状态更新,只占一步撤销 */
-  onChangeMany?: (patch: Record<string, unknown>) => void;
-  /** 查不到时是 undefined:编排里可能有本档没有的卡(基础版卡少),
+  /** 查不到时是 undefined:编排里可能混进不认识的卡,
       面板要能说清楚,不能崩 —— 见下面的 pp-empty 分支 */
   effect: EffectDef<any> | undefined;
   params: any;
@@ -42,7 +40,7 @@ function fmt(t: number) {
 }
 
 /** 所有卡片通用的大小滑块(画布滚轮同步改这个值)
-    上限 2 → 3:贴边卡(封面叠放、截图墙这类)按自己的固定尺寸画,
+    上限 2 → 3:贴边卡按自己的固定尺寸画,
     想让它在 1920×1080 里占到半屏,2 倍不够用。 */
 const SCALE_CONTROL: Control = {
   key: "scale",
@@ -55,7 +53,6 @@ const SCALE_CONTROL: Control = {
 };
 
 /** 所有卡片通用的速度滑块(只影响这一张卡的动画节奏) */
-
 const SPEED_CONTROL: Control = {
   key: "speed",
   label: "动画速度(此卡)",
@@ -65,7 +62,6 @@ const SPEED_CONTROL: Control = {
   step: 0.05,
   unit: "×",
 };
-
 
 /** 所有卡片通用的音效选择(导出时烤进 MOV 音轨;选中即试听) */
 export const SFX_OPTIONS = [
@@ -114,7 +110,6 @@ function groupOf(c: Control): Group {
   if (c.type === "select" || c.type === "toggle" || c.type === "color") return "style";
   return "content";
 }
-
 
 /** 媒体路径控件:选文件 → 上传进 public/demo/ → 自动填路径(预览和导出都可用) */
 function MediaRow({
@@ -180,76 +175,6 @@ function MediaRow({
         )}
       </div>
       {Boolean(value) && <div className="demo-src">{String(value)}</div>}
-    </div>
-  );
-}
-
-/**
- * 批量上传:一次选多张图,按**文件名顺序**依次填进 img1、img2……
- * 为什么要一次写进去:逐个 onChange 会被 React 的批处理吃掉,只剩最后一个 key 生效,
- * 所以这里攒成一个 patch 交给 onChangeMany(和预设那边同一个坑)。
- */
-function MediaBulkRow({
-  keys,
-  onChangeMany,
-}: {
-  keys: string[];
-  onChangeMany: (patch: Record<string, unknown>) => void;
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState("");
-  const pick = async (files: FileList | null) => {
-    if (!files?.length) return;
-    // 文件选择框给的顺序各系统不一样,统一按文件名排,谁先弹出来是可预期的
-    const list = Array.from(files).sort((a, b) =>
-      a.name.localeCompare(b.name, "zh-Hans-CN", { numeric: true }),
-    );
-    const over = list.length - keys.length;
-    if (over > 0 && !confirm(`选了 ${list.length} 张,这张卡最多 ${keys.length} 张。\n只用前 ${keys.length} 张(按文件名排),继续?`))
-      return;
-    const use = list.slice(0, keys.length);
-    const patch: Record<string, unknown> = {};
-    // 没选到的槽位清空 = 这一批就是全部,不会混着上一批的残图
-    for (const k of keys) patch[k] = "";
-    for (let i = 0; i < use.length; i++) {
-      setBusy(`${i + 1}/${use.length}`);
-      try {
-        const res = await fetch(`/api/upload-demo?name=${encodeURIComponent(use[i].name)}`, {
-          method: "POST",
-          body: use[i],
-        });
-        const data = await res.json();
-        if (data.ok) patch[keys[i]] = data.src;
-        else alert(`❌ ${use[i].name} 上传失败:${data.error}`);
-      } catch (e) {
-        alert(`❌ ${use[i].name} 上传失败:${uploadErrText(e)}`);
-      }
-    }
-    setBusy("");
-    onChangeMany(patch);
-  };
-  return (
-    <div className="ctrl">
-      <div className="ctrl-head">
-        <span>批量上传(一次选多张)</span>
-      </div>
-      <input
-        ref={fileRef}
-        type="file"
-        multiple
-        accept="image/*,video/mp4,video/quicktime,video/webm"
-        style={{ display: "none" }}
-        onChange={(e) => {
-          pick(e.target.files);
-          if (fileRef.current) fileRef.current.value = "";
-        }}
-      />
-      <div className="video-row">
-        <button className="video-btn" disabled={Boolean(busy)} onClick={() => fileRef.current?.click()}>
-          {busy ? `⏳ 上传中 ${busy}…` : `📁 一次选最多 ${keys.length} 张`}
-        </button>
-      </div>
-      <div className="demo-src">按文件名顺序填进下面的槽位,并覆盖原有的图。</div>
     </div>
   );
 }
@@ -410,37 +335,12 @@ function ControlRow({
   );
 }
 
-/** 按 key 选择渲染器:videoSrc = 录屏选择器,img* = 图片选择器,其余走通用控件 */
+/** 按 key 选择渲染器:camSrc = 口播视频上传器,其余走通用控件 */
 function renderControl(
   c: Control,
   params: any,
   onChange: (key: string, value: unknown) => void,
-  imgKeys: string[] = [],
-  onChangeMany?: (patch: Record<string, unknown>) => void,
 ) {
-  // videoSrc / videoSrc2 / videoSrc3… 都走上传器(多段录屏拼接用)
-  if (/^videoSrc\d*$/.test(c.key))
-    return (
-      <MediaRow
-        key={c.key}
-        label={c.key === "videoSrc" ? "录屏视频" : c.label}
-        accept="video/*"
-        noun="录屏文件"
-        value={params[c.key]}
-        onChange={(v) => onChange(c.key, v)}
-      />
-    );
-  if (c.key === "src")
-    return (
-      <MediaRow
-        key={c.key}
-        label={c.label}
-        accept="video/*,image/*"
-        noun="视频/图"
-        value={params[c.key]}
-        onChange={(v) => onChange(c.key, v)}
-      />
-    );
   if (c.key === "camSrc")
     return (
       <MediaRow
@@ -452,25 +352,6 @@ function renderControl(
         onChange={(v) => onChange(c.key, v)}
       />
     );
-  if (/^img\d/.test(c.key)) {
-    const row = (
-      <MediaRow
-        key={c.key}
-        label={c.label}
-        accept="image/*,video/mp4,video/quicktime,video/webm"
-        noun="图/视频"
-        value={params[c.key]}
-        onChange={(v) => onChange(c.key, v)}
-      />
-    );
-    // 多槽位的卡(截图墙、照片环绕…)在第一个槽前面多给一个「一次选多张」
-    if (c.key === imgKeys[0] && imgKeys.length > 1 && onChangeMany)
-      return [
-        <MediaBulkRow key="__imgbulk" keys={imgKeys} onChangeMany={onChangeMany} />,
-        row,
-      ];
-    return row;
-  }
   return (
     <ControlRow
       key={c.key}
@@ -485,7 +366,6 @@ export function ParamsPanel({
   effect,
   params,
   onChange,
-  onChangeMany,
   card,
   editMode,
   onLayer,
@@ -502,7 +382,7 @@ export function ParamsPanel({
   // 加入时间轴之后不再跳回编辑台,所以按钮自己要给一下「加成功了」的回执
   const [justAdded, setJustAdded] = useState(false);
   const addedTimer = useRef<number | null>(null);
-  // 选中的卡这一档没有(基础版卡少,别人用专业版做的编排里就会有)。
+  // 选中的卡是不认识的 kind(手改过的编排里可能出现)。
   // 以前这里是 EFFECTS.find(...)! 直接当它一定在,结果 effect.controls 读了个
   // undefined —— **整页白屏**,连哪张卡出问题都看不到。画布和导出早就写了
   // `if (!def) return null` 跳过,只有这块面板会炸。
@@ -515,12 +395,12 @@ export function ParamsPanel({
         <div className="pp-empty">
           这张卡是 <b>{card.kind}</b>,
           <br />
-          你这个版本里没有。
+          这里没有这种卡。
           <br />
           <br />
           它在画面上不会出现。用上面的
           <br />
-          「更换特效」换一张,或直接删掉。
+          「更换特效」换一张,或直接删除。
         </div>
       </aside>
     );
@@ -551,7 +431,7 @@ export function ParamsPanel({
 
   // 所有控件(含通用大小/速度)按组归类,顺序:内容 → 节奏 → 样式 → 落位
   const own = effect.controls;
-  // 通用控件给卡自带的同名控件让位:比如 warp-title 自带 speed(穿梭速度),
+  // 通用控件给卡自带的同名控件让位:卡自己带了 speed 这类同名控件时,
   // 再叠通用 SPEED_CONTROL 就是两个滑杆写同一个参数 + React 重复 key
   const ownKeys = new Set(own.map((c) => c.key));
   const universal = [
@@ -560,11 +440,6 @@ export function ParamsPanel({
     SFX_CONTROL,
   ].filter((c) => !ownKeys.has(c.key));
   const all: Control[] = [...own, ...universal];
-  // 这张卡有几个图片槽位(img1、img2…):有两个以上才给「一次选多张」
-  const imgKeys = effect.controls
-    .map((c) => c.key)
-    .filter((k) => /^img\d+$/.test(k))
-    .sort((a, b) => Number(a.slice(3)) - Number(b.slice(3)));
   const grouped = new Map<Group, Control[]>();
   for (const c of all) {
     const g = groupOf(c);
@@ -694,7 +569,6 @@ export function ParamsPanel({
           </div>
         )}
 
-
         {/* 四组参数:内容 / 节奏 / 样式 / 落位与大小 */}
         {GROUP_META.map(({ id, label, en }) => {
           const items = grouped.get(id);
@@ -710,8 +584,6 @@ export function ParamsPanel({
                   c,
                   { ...params, scale: params.scale ?? 1, speed: params.speed ?? 1 },
                   onChange,
-                  imgKeys,
-                  onChangeMany,
                 ),
               )}
             </section>
