@@ -13,6 +13,12 @@ import { versusCardDef } from "./hud/VersusCard";
 import { uiCalloutDef } from "./hud/UICallout";
 import { typeShiftDef } from "./hud/TypeShift";
 import { blurTextDef } from "./hud/BlurText";
+import { markerHighlightDef } from "./hud/MarkerHighlight";
+import { stampSlamDef } from "./hud/StampSlam";
+import { particleBurstDef } from "./hud/ParticleBurst";
+import { neonTraceDef } from "./hud/NeonTrace";
+import { constellationDef } from "./hud/Constellation";
+import { flowTimelineDef } from "./hud/FlowTimeline";
 import { odometerDef } from "./hud/Odometer";
 import { focusCardDef } from "./hud/FocusCard";
 import { chapterBarDef } from "./hud/ChapterBar";
@@ -62,7 +68,7 @@ export const EFFECT_GROUPS: EffectGroup[] = [
   },
   {
     title: "文字进场",
-    effects: [blurTextDef, typeShiftDef],
+    effects: [blurTextDef, typeShiftDef, markerHighlightDef, neonTraceDef],
   },
   {
     /* 人物锚定:效果直接"碰"人物 */
@@ -76,6 +82,16 @@ export const EFFECT_GROUPS: EffectGroup[] = [
   {
     title: "场景 · B-roll",
     effects: [terminal3DDef],
+  },
+  {
+    /* 情绪爆点:一句话的能量瞬间(PRO 新增类别,基础版补上) */
+    title: "情绪爆点",
+    effects: [stampSlamDef, particleBurstDef],
+  },
+  {
+    /* 信息结构:关系/系统/生态的可视化(PRO 新增类别,基础版补上) */
+    title: "信息结构",
+    effects: [constellationDef, flowTimelineDef],
   },
 ];
 

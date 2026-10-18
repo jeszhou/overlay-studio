@@ -15,9 +15,17 @@
     "hash": "6092ee834bf2",
     "file": "src/effects/hud/Checklist.tsx"
   },
+  "constellation": {
+    "hash": "13ae5a2f3a50",
+    "file": "src/effects/hud/Constellation.tsx"
+  },
   "entity-chips": {
     "hash": "2bce8c76cd90",
     "file": "src/effects/hud/EntityChips.tsx"
+  },
+  "flow-timeline": {
+    "hash": "d1b4d9368ec4",
+    "file": "src/effects/hud/FlowTimeline.tsx"
   },
   "focus-card": {
     "hash": "e1f7f4ddf78b",
@@ -27,9 +35,21 @@
     "hash": "8b4948ec3561",
     "file": "src/effects/hud/GrowthCurve.tsx"
   },
+  "marker-highlight": {
+    "hash": "adcd47377e7d",
+    "file": "src/effects/hud/MarkerHighlight.tsx"
+  },
+  "neon-trace": {
+    "hash": "e8d6f554fbfe",
+    "file": "src/effects/hud/NeonTrace.tsx"
+  },
   "odometer": {
     "hash": "c32549c9352b",
     "file": "src/effects/hud/Odometer.tsx"
+  },
+  "particle-burst": {
+    "hash": "e944c7dd3443",
+    "file": "src/effects/hud/ParticleBurst.tsx"
   },
   "pin-board": {
     "hash": "a0a83bc8caaf",
@@ -50,6 +70,10 @@
   "ring-metric": {
     "hash": "6f3638292a4f",
     "file": "src/effects/hud/RingMetric.tsx"
+  },
+  "stamp-slam": {
+    "hash": "d13b97921ed1",
+    "file": "src/effects/hud/StampSlam.tsx"
   },
   "stat-proof": {
     "hash": "0578b9ebba86",
