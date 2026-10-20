@@ -185,6 +185,59 @@ function MediaRow({
   );
 }
 
+/** 滑杆;control.precise 时额外给一个数字输入框,可按精确值手填(大范围下拖不到小值) */
+function RangeRow({
+  control,
+  value,
+  onChange,
+}: {
+  control: Extract<Control, { type: "range" }>;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const num = Number(value);
+  const [draft, setDraft] = useState<string | null>(null);
+  const clamp = (v: number) => Math.min(control.max, Math.max(control.min, v));
+  return (
+    <div className="ctrl">
+      <div className="ctrl-head">
+        <span>{control.label}</span>
+        <span className="ctrl-val">
+          {num}
+          {control.unit ?? ""}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={control.min}
+        max={control.max}
+        step={control.step}
+        value={num}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      {control.precise && (
+        <input
+          type="number"
+          className="ctrl-input"
+          style={{ marginTop: 8 }}
+          min={control.min}
+          max={control.max}
+          step={control.step}
+          value={draft ?? String(num)}
+          onChange={(e) => {
+            const raw = e.target.value;
+            setDraft(raw);
+            if (raw.trim() === "") return;
+            const v = Number(raw);
+            if (Number.isFinite(v)) onChange(clamp(v));
+          }}
+          onBlur={() => setDraft(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 function ControlRow({
   control,
   value,
@@ -195,26 +248,7 @@ function ControlRow({
   onChange: (v: unknown) => void;
 }) {
   if (control.type === "range") {
-    const num = Number(value);
-    return (
-      <label className="ctrl">
-        <div className="ctrl-head">
-          <span>{control.label}</span>
-          <span className="ctrl-val">
-            {num}
-            {control.unit ?? ""}
-          </span>
-        </div>
-        <input
-          type="range"
-          min={control.min}
-          max={control.max}
-          step={control.step}
-          value={num}
-          onChange={(e) => onChange(Number(e.target.value))}
-        />
-      </label>
-    );
+    return <RangeRow control={control} value={value} onChange={onChange} />;
   }
 
   if (control.type === "color") {

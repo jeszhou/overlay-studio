@@ -413,7 +413,7 @@ export const odometerDef: EffectDef<OdometerParams> = {
       ],
     },
     { key: "kicker", label: "小标签(可空)", type: "text" },
-    { key: "value", label: "数值(整数)", type: "range", min: 0, max: 99999, step: 1 },
+    { key: "value", label: "数值(整数,可手填)", type: "range", min: 0, max: 99999, step: 1, precise: true },
     { key: "unit", label: "单位", type: "text" },
     { key: "label", label: "说明(可空)", type: "text" },
     { key: "accent", label: "单位颜色", type: "select", options: ACCENT_OPTIONS },
