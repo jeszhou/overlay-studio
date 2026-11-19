@@ -6,7 +6,7 @@
  */
 
 /** 徽章正文 */
-export const VERSION_LABEL = "v1.3.0";
+export const VERSION_LABEL = "v1.3.1";
 
 /** 鼠标悬停时的一行详情 */
 export const VERSION_TITLE = "免费版 · 源码公开";

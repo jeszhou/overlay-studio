@@ -450,7 +450,7 @@ export default function App() {
       const typing =
         el.isContentEditable ||
         tag === "TEXTAREA" ||
-        tag === "SELECT" ||
+        el.closest("select") !== null ||
         (tag === "INPUT" &&
           ["text", "number", "search"].includes((el as HTMLInputElement).type));
       if (typing) return;

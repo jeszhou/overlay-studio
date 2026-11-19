@@ -184,7 +184,7 @@ export function Sidebar({
       // 搜索框是例外:搜完卡光标就留在框里,这时候按 ↑↓ 正是最想换卡的时刻。
       // 其余输入框(参数面板那些数字框)照旧让位 —— 那儿的 ↑↓ 是加减数值。
       const inFxSearch = el.closest(".fx-search") !== null;
-      if (!inFxSearch && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)))
+      if (!inFxSearch && (el.isContentEditable || el.closest("input, textarea, select")))
         return;
       e.preventDefault(); // 否则浏览器会顺手滚一下列表
       const cur = ids.indexOf(curId ?? "");

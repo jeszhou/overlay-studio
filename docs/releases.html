@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="v1.3.0 发布说明">
+  <meta name="description" content="v1.3.1 发布说明">
   <title>Overlay Studio · 版本发布</title>
   <link rel="alternate" hreflang="zh-CN" href="./releases.html">
   <link rel="alternate" hreflang="en" href="./releases.en.html">
@@ -30,24 +30,23 @@
   <main class="wrap" id="content" tabindex="-1">
     <section class="release-intro">
       <p class="edition">版本发布</p>
-      <h1>v1.3.0 发布说明</h1>
+      <h1>v1.3.1 发布说明</h1>
       <div class="actions">
-        <a class="button primary" href="https://github.com/jeszhou/overlay-studio/pull/8">查看改动 PR</a>
-        <a class="button secondary" href="https://github.com/jeszhou/overlay-studio/releases/latest">下载已发布版本</a>
+        <a class="button primary" href="https://github.com/jeszhou/overlay-studio/releases/tag/v1.3.1">下载 v1.3.1</a>
+        <a class="button secondary" href="https://github.com/jeszhou/overlay-studio/releases">查看历史版本</a>
       </div>
     </section>
 
     <section class="section release-section" aria-labelledby="changes-title">
       <h2 id="changes-title">这个版本的改动</h2>
       <ul>
-        <li>项目可以保存、恢复和重开，旧编排可继续编辑。</li>
-        <li>单卡和整条时间轴均可导出透明 MOV 与 WebM，并支持查看进度、取消和重试。</li>
-        <li>发行包从指定 Git 提交独立构建，Windows 启动器按锁文件安装依赖。</li>
+        <li>修复画幅、字体和效果库等下拉菜单文字与底色冲突的问题。</li>
+        <li>提高工程弹窗、输入框占位文字、设置提示、顶栏按钮和导出选项的对比度。</li>
       </ul>
     </section>
 
     <section class="section release-section" aria-labelledby="windows-title">
-      <h2 id="windows-title">Windows 验收</h2>
+      <h2 id="windows-title">v1.3.0 Windows 安装与导出验收</h2>
       <p>Windows 11 ARM64 虚拟机从源码 ZIP 全新安装并启动。使用已校验依赖缓存完成安装，两种导出任务均使用默认渲染模式。四个样片已重新解码核验透明通道和音轨。</p>
       <table>
         <thead><tr><th scope="col">旧示例</th><th scope="col">MOV</th><th scope="col">WebM</th></tr></thead>

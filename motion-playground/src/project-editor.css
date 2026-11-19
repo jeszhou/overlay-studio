@@ -1,7 +1,7 @@
 .project-dialog {
-  color: var(--ink, inherit);
-  background: var(--panel, #202229);
-  border: 1px solid var(--border, #777);
+  color: var(--ink);
+  background: var(--bg-panel);
+  border: 1px solid var(--hairline-strong);
   border-radius: 12px;
   width: min(420px, 90vw);
   padding: 24px;

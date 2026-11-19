@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="v1.3.0 release notes">
+  <meta name="description" content="v1.3.1 release notes">
   <title>Overlay Studio · Releases</title>
   <link rel="alternate" hreflang="zh-CN" href="./releases.html">
   <link rel="alternate" hreflang="en" href="./releases.en.html">
@@ -30,24 +30,23 @@
   <main class="wrap" id="content" tabindex="-1">
     <section class="release-intro">
       <p class="edition">Releases</p>
-      <h1>v1.3.0 release notes</h1>
+      <h1>v1.3.1 release notes</h1>
       <div class="actions">
-        <a class="button primary" href="https://github.com/jeszhou/overlay-studio/pull/8">View changes</a>
-        <a class="button secondary" href="https://github.com/jeszhou/overlay-studio/releases/latest">Download a published release</a>
+        <a class="button primary" href="https://github.com/jeszhou/overlay-studio/releases/tag/v1.3.1">Download v1.3.1</a>
+        <a class="button secondary" href="https://github.com/jeszhou/overlay-studio/releases">Browse past releases</a>
       </div>
     </section>
 
     <section class="section release-section" aria-labelledby="changes-title">
       <h2 id="changes-title">What changed</h2>
       <ul>
-        <li>Save, recover, and reopen projects. Existing arrangements remain editable.</li>
-        <li>Export a single card or the full timeline to transparent MOV and WebM, with progress, cancellation, and retry.</li>
-        <li>Build distribution packages from a specific Git commit. The Windows launcher installs dependencies from the lockfile.</li>
+        <li>Fixed unreadable text in menus such as aspect ratio, font, and the effects library.</li>
+        <li>Improved contrast in the project dialog, input placeholders, settings hints, toolbar buttons, and export options.</li>
       </ul>
     </section>
 
     <section class="section release-section" aria-labelledby="windows-title">
-      <h2 id="windows-title">Windows verification</h2>
+      <h2 id="windows-title">v1.3.0 Windows installation and export verification</h2>
       <p>The source ZIP was installed in a fresh directory in a Windows 11 ARM64 virtual machine. Installation used a verified dependency cache. Both export jobs ran in the default rendering mode. All four files were decoded to verify transparency, and both MOVs were checked for audio.</p>
       <table>
         <thead><tr><th scope="col">Demo</th><th scope="col">MOV</th><th scope="col">WebM</th></tr></thead>
