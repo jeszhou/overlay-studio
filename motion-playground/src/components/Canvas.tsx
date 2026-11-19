@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { EffectDef } from "../effects/types";
 import { EFFECTS } from "../effects/registry";
-import { STAGE } from "../stage";
+import {stageSize} from "../overlay/stage-size.mjs";
 import { focusCamGeomAt } from "../effects/hud/camGeom";
 import { outroFade, type OverlayCard } from "../overlay/types";
 import { useEnter } from "../effects/useAnimation";
@@ -19,6 +19,7 @@ import { FxSpeedScope } from "../effects/FxSpeedScope";
 export type NudgeFn = (cardId: string | null, patch: Record<string, number>) => void;
 
 interface CanvasProps {
+  ratio?: OverlayDocRatio;
   effect: EffectDef<any>;
   params: any;
   playToken: number;
@@ -59,7 +60,9 @@ interface CanvasProps {
  * 拖动 = 改 offsetX/offsetY,滚轮 = 改 scale(CSS 变量透过它继承下去)。
  */
 /** 拖拽时的对齐吸附上下文:舞台元素 + 辅助线上报 */
+type OverlayDocRatio = "h" | "v" | "4:3";
 interface SnapCtx {
+  ratio?: OverlayDocRatio;
   stageEl: () => HTMLDivElement | null;
   setGuides: (g: { v: number[]; h: number[] }) => void;
 }
@@ -94,7 +97,7 @@ function CardShell({
   snapCtx?: SnapCtx;
   children: ReactNode;
 }) {
-  const { w: STAGE_W, h: STAGE_H } = STAGE;
+  const { w: STAGE_W, h: STAGE_H } = stageSize(snapCtx?.ratio);
   const scale = fxScale * (Number(params.scale) || 1);
   // 有效倍速 = 全局「动画速度」×该卡自己的「动画速度(此卡)」
   const speed = animSpeed * (Number(params.speed) || 1);
@@ -105,8 +108,10 @@ function CardShell({
         cursor: onNudge ? "grab" : undefined,
         ["--hud-scale" as string]: scale,
         ["--fx-outro" as string]: outro,
+        ["--project-glass-alpha" as string]: params.glassAlpha,
       }}
       /* 逐卡主题:这张卡自己选的亮/暗覆盖全局(未选则继承) */
+      data-project-glass={params.glass} data-project-shadow={params.shadow}
       data-card-theme={(params.theme as string) || undefined}
       /* 讲过变浅:挂在这个 display:contents 的壳上,靠后代选择器落到卡根元素,
          所以每一张卡都能用,不必逐卡加参数 */
@@ -213,6 +218,7 @@ function CardShell({
 }
 
 export function Canvas({
+  ratio,
   effect,
   params,
   playToken,
@@ -236,14 +242,14 @@ export function Canvas({
   onPickCard,
 }: CanvasProps) {
   // 画布逻辑尺寸:1920×1080
-  const { w: STAGE_W, h: STAGE_H } = STAGE;
+  const { w: STAGE_W, h: STAGE_H } = stageSize(ratio);
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const videoNodeRef = useRef<HTMLVideoElement | null>(null);
   const [scale, setScale] = useState(0.5);
   // 拖拽对齐辅助线(青色虚线,吸附时出现)
   const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
-  const snapCtx: SnapCtx = { stageEl: () => stageRef.current, setGuides };
+  const snapCtx: SnapCtx = { ratio, stageEl: () => stageRef.current, setGuides };
   // 运镜:播放后从满屏缩到左侧
   const camIn = useEnter(playToken);
 

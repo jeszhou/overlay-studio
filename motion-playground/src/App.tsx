@@ -1,4 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {useOverlayFile} from "./hooks/useOverlayFile";
+import {switchRatioLayout} from './overlay/ratioLayout';
+import {swapCardParams} from "./overlay/cardKind";
+import {ProjectFonts} from './components/ProjectFonts';
+import {newProject, projectDocument} from './overlay/project';
+import {saveProjectFile} from './overlay/projectFiles';
+import {AUTOSAVE_KEY, BACKUP_KEY, useProjectAutosave} from './overlay/useProjectAutosave';
+import {useDiskAutosave} from './overlay/useDiskAutosave';
+import {useEditHistory} from './overlay/useEditHistory';
+import {useAutosaveOwner} from './overlay/useAutosaveOwner';
+import './project-editor.css';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { EFFECTS } from "./effects/registry";
 import { Sidebar } from "./components/Sidebar";
 import { Canvas } from "./components/Canvas";
@@ -35,6 +46,9 @@ import "./App.css";
 function addSecFor(kind: string) {
   return kind === "focus-card" ? 15 : 5;
 }
+
+const ProjectDialog = lazy(() => import('./components/ProjectDialog').then(m => ({default: m.ProjectDialog})));
+const ImportProjectDialog = lazy(() => import('./components/ProjectDialog').then(m => ({default: m.ImportProjectDialog})));
 
 export default function App() {
   // 明牌双模式:编辑台(视频+时间轴,像剪映)/ 效果库(挑卡调样式)
@@ -94,7 +108,23 @@ export default function App() {
   const [srt, setSrt] = useState<SrtLine[] | null>(null);
 
   // ---- 自动保存:编排随手存进浏览器,下次打开自动恢复 ----
-  const AUTOSAVE_KEY = "overlayStudioAutosave";
+  const [ready,setReady] = useState(false);
+  const [restoreWarning,setRestoreWarning] = useState('');
+  const [saveOpen,setSaveOpen] = useState(false);
+  const [projectDir,setProjectDir] = useState(() => {
+    try { return localStorage.getItem('overlayStudioProjectDirectory') || ''; } catch {return '';}
+  });
+  useEffect(() => {
+    try {
+      setProjectDir(localStorage.getItem('overlayStudioProjectDirectory:' + overlay?.projectId)
+        || localStorage.getItem('overlayStudioProjectDirectory') || '');
+    } catch { /* Use the current session's folder. */ }
+  }, [overlay?.projectId]);
+  const autosaveOwner = useAutosaveOwner();
+  const projectEpoch = useRef(0);
+  const [pendingImport,setPendingImport] = useState<ReturnType<typeof parseOverlay> | null>(null);
+  const currentProjectId = useRef(overlay?.projectId);
+  currentProjectId.current = overlay?.projectId;
   // 「学一下」是这套工具里唯一一个用户发现不了的能力 —— 不主动说,它就等于不存在。
   // 每次导出都会落一份 review-log(初选 vs 终选),但用户不说那三个字就没人去读。
   // 第 1 次和第 3 次导出各提醒一次:第 1 次让他知道有这回事,第 3 次他已经攒够改动了。
@@ -185,7 +215,7 @@ export default function App() {
     // 第一次写完、第二次看到标记退出,而第一次的定时器又被 cleanup 清掉 —— 谁都弹不出来
     const t = setTimeout(() => {
       try {
-        if (localStorage.getItem(AUTOSAVE_KEY) || localStorage.getItem(WELCOME_KEY)) return;
+        if (currentProjectId.current || localStorage.getItem(AUTOSAVE_KEY) || localStorage.getItem(WELCOME_KEY)) return;
         localStorage.setItem(WELCOME_KEY, "1");
       } catch {
         return; // 隐私模式:不打扰
@@ -229,33 +259,25 @@ export default function App() {
     };
   }, []);
 
+  const restoreStored = (raw: string) => {
+    const saved = JSON.parse(raw);
+    const {doc, error, dropped} = parseOverlay(saved);
+    if (!doc || dropped?.length) throw Error(error || '存档中存在无法识别的卡片');
+    doc.projectId ||= crypto.randomUUID();
+    setOverlay(doc);
+    originRef.current = doc.reviewOrigin ?? saved.origin ?? null;
+    setSrt(doc.srt ?? null);
+    const preview = doc.previewVideo ?? saved.videoUrl;
+    setVideoUrl(typeof preview === 'string' && /^\/(?:_media|_projects|demo)\//.test(preview) ? preview : null);
+    setVideoScale(doc.videoScale ?? 1); setFxScale(doc.fxScale ?? 1); setAnimSpeed(doc.animSpeed ?? 1);
+    setSelCardId(doc.cards[0]?.id ?? null);
+  };
   useEffect(() => {
     try {
       const raw = localStorage.getItem(AUTOSAVE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      if (saved.overlay?.cards?.length) {
-        // 也走一遍 parseOverlay:导入 JSON 会做的补默认值和「认不出的卡跳过」,
-        // 刷新恢复也得做同一套,不然旧草稿会绕过这些处理。
-        const { doc: migrated, dropped } = parseOverlay(saved.overlay);
-        if (dropped?.length)
-          console.warn("恢复上次编排时跳过了认不出的卡:", dropped.map((d) => `${d.kind}×${d.n}`).join(", "));
-        setOverlay(migrated ?? saved.overlay);
-        originRef.current = saved.origin ?? null;
-        if (Array.isArray(saved.srt) && saved.srt.length) setSrt(saved.srt);
-        setSelCardId(saved.overlay.cards[0]?.id ?? null);
-      }
-      // 视频:落盘过的走 /_media/ 真实路径,刷新后直接恢复,不用重新导入。
-      // 先探一下还在不在(用户可能清过 public/_media),不在就当没存过,别留个坏的 <video>。
-      if (typeof saved.videoUrl === "string" && saved.videoUrl.startsWith("/_media/")) {
-        fetch(saved.videoUrl, { method: "HEAD" })
-          .then((r) => r.ok && setVideoUrl(saved.videoUrl))
-          .catch(() => {});
-      }
-    } catch {
-      /* 坏数据直接忽略,不打扰 */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (raw) restoreStored(raw);
+    } catch { setRestoreWarning('当前自动存档无法读取，原存档已保留。'); }
+    setReady(true);
   }, []);
 
   // 落盘过的预览视频自动当全局「口播视频」:运镜卡导出时要烤的,和预览里那条
@@ -268,79 +290,38 @@ export default function App() {
   // 换视频 / 导入新编排 / 载入示例时把记号清掉:那是一次新的开始,该挂还得挂。
   const camClearedRef = useRef(false);
   useEffect(() => {
-    if (!overlay || overlay.cam || !videoUrl?.startsWith("/_media/")) return;
+    if (!overlay || overlay.cam || !videoUrl || !/^\/(?:_media|_projects)\//.test(videoUrl)) return;
     if (camClearedRef.current) return;
     setOverlay((o) => (o && !o.cam ? { ...o, cam: videoUrl } : o));
   }, [overlay, videoUrl]);
 
-  // 任何改动后 800ms 自动落盘;删空卡片则清掉存档
-  useEffect(() => {
-    const id = setTimeout(() => {
-      try {
-        if (!overlay) return;
-        if (overlay.cards.length === 0) {
-          localStorage.removeItem(AUTOSAVE_KEY);
-          return;
-        }
-        localStorage.setItem(
-          AUTOSAVE_KEY,
-          JSON.stringify({
-            overlay,
-            origin: originRef.current,
-            srt,
-            // 只存落盘过的真实路径;blob 地址刷新即失效,存了也是坏的
-            videoUrl: videoUrl?.startsWith("/_media/") ? videoUrl : undefined,
-            savedAt: new Date().toISOString(),
-          }),
-        );
-      } catch {
-        /* 存储异常不打扰编辑 */
-      }
-    }, 800);
-    return () => clearTimeout(id);
-    // videoUrl 也要在依赖里:少了它,「清除视频」之后不会重新落盘,存档里留着旧地址,
-    // 刷新一次视频又回来了 —— 用户看到的就是「清了个寂寞」。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overlay, srt, videoUrl]);
-
-  // ---- 撤销/重做(⌘Z / ⇧⌘Z):存 overlay + 字幕稿 快照 ----
-  // 字幕稿也要进快照:「清空」会把它一起清掉,而弹窗承诺了能 ⌘Z 撤销 ——
-  // 只记 overlay 的话,撤销回来卡片在、字幕稿没了,自动存档还会顺手把最后一份也覆盖掉。
-  type Snap = { overlay: OverlayDoc | null; srt: SrtLine[] | null };
-  const snapRef = useRef<Snap>({ overlay: null, srt: null });
-  snapRef.current = { overlay, srt };
-  const undoRef = useRef<Snap[]>([]);
-  const redoRef = useRef<Snap[]>([]);
-  const lastEditRef = useRef(0);
-
-  /**
-   * 每次改动前调用:把当前 overlay 压进撤销栈。
-   * 400ms 内的连续改动(拖拽/滑块)合并成同一步;force = 独立操作(加卡/导入/换卡)必压。
-   */
-  const pushHistory = (force = false) => {
-    const now = performance.now();
-    const coalesce = !force && now - lastEditRef.current < 400;
-    lastEditRef.current = now;
-    if (coalesce) return;
-    undoRef.current.push(structuredClone(snapRef.current));
-    if (undoRef.current.length > 50) undoRef.current.shift();
-    redoRef.current = [];
-  };
-
-  const applySnap = (s: Snap) => {
-    setOverlay(s.overlay);
-    setSrt(s.srt);
-  };
-  const undo = () => {
-    if (!undoRef.current.length) return;
-    redoRef.current.push(structuredClone(snapRef.current));
-    applySnap(undoRef.current.pop()!);
-  };
-  const redo = () => {
-    if (!redoRef.current.length) return;
-    undoRef.current.push(structuredClone(snapRef.current));
-    applySnap(redoRef.current.pop()!);
-  };
+  const documentToSave = useMemo(() => overlay ? {
+    ...projectDocument(overlay, srt, videoUrl, originRef.current), videoScale, fxScale, animSpeed,
+  } : null, [overlay,srt,videoUrl,videoScale,fxScale,animSpeed]);
+  const snapshot = useMemo(() => documentToSave ? {overlay:documentToSave} : null,[documentToSave]);
+  const canAutosave = ready && autosaveOwner && !restoreWarning;
+  const {status:browserSaveStatus} = useProjectAutosave(snapshot, canAutosave);
+  const diskStatus = useDiskAutosave(documentToSave, projectDir, canAutosave);
+  const handoff = useOverlayFile(documentToSave,srt,raw=>{
+    const result=parseOverlay(raw);
+    if (!result.doc || result.dropped?.length) {alert(result.error || '交接文件含免费版无法识别的卡片，请保留原文件。');return false;}
+    if (result.doc.projectId && overlay && result.doc.projectId!==overlay.projectId &&
+        !confirm('交接文件属于另一个工程，打开它？')) return false;
+    const same = !result.doc.projectId || result.doc.projectId === overlay?.projectId;
+    if (same) {
+      result.doc.projectId ??= overlay?.projectId;
+      result.doc.reviewOrigin ??= originRef.current ?? undefined;
+    }
+    applyImported(result,same);
+    return true;
+  });
+  const saveStatus = autosaveOwner ? (diskStatus || browserSaveStatus) : '此标签页仅手动保存';
+  const {pushHistory,undo,redo} = useEditHistory({overlay,srt,videoUrl,origin:originRef.current,videoScale,fxScale,animSpeed}, snap => {
+    projectEpoch.current++;
+    setOverlay(snap.overlay); setSrt(snap.srt); setVideoUrl(snap.videoUrl); originRef.current = snap.origin;
+    setVideoScale(snap.videoScale); setFxScale(snap.fxScale); setAnimSpeed(snap.animSpeed);
+    setSelCardId(snap.overlay?.cards[0]?.id ?? null); setPlaying(false);
+  });
 
   // 编辑台总时长 = max(视频时长, 最后一张卡结束)
   const duration = useMemo(() => {
@@ -465,6 +446,12 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
+      if (e.isComposing || el.closest("dialog[open]")) return;
+      if ((e.metaKey || e.ctrlKey) && e.code === "KeyS" && currentProjectId.current) {
+        e.preventDefault();
+        setSaveOpen(true);
+        return;
+      }
       const tag = el.tagName;
       const typing =
         el.isContentEditable ||
@@ -507,23 +494,41 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [undo, redo]);
 
   const handleImportJson = async (file: File | null) => {
     if (!file) return;
-    const text = await file.text();
-    const { doc, error, dropped } = parseOverlay(text);
-    if (error || !doc) {
-      alert(`❌ JSON 导入失败:${error}`);
-      return;
-    }
-    // 和「载入示例」一样先问一句。这个入口以前不问:拖错一个 JSON 进窗口,当前编排立刻被换掉,
-    // 800ms 后自动存档也跟着被盖 —— ⌘Z 能救,刷新一次就救不回了。
-    if (overlay?.cards.length && !confirm("导入这份编排会替换当前编排(可撤销),继续吗?")) return;
+    const request = ++projectEpoch.current;
+    try {
+      let raw: unknown;
+      if (/\.overlaypack$/i.test(file.name)) {
+        const response = await fetch('/api/project/unpack', {method:'POST',body:file});
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw Error(data.error || '无法读取工程包');
+        raw = data.doc;
+      } else raw = await file.text();
+      if (request !== projectEpoch.current) return;
+      const result = parseOverlay(raw);
+      if (!result.doc) throw Error(result.error);
+      result.doc.projectName ||= file.name.replace(/(?:\.overlay)?\.json$|\.overlaypack$/i,'');
+      if (overlay || srt?.length || videoUrl) setPendingImport(result);
+      else applyImported(result,false);
+    } catch(e) { alert('打开工程失败：' + String(e)); }
+  };
+  const applyImported = (result: ReturnType<typeof parseOverlay>, keepMedia: boolean) => {
+    const {doc,dropped} = result;
+    if (!doc) return;
+    projectEpoch.current++;
     pushHistory(true);
-    camClearedRef.current = false; // 新编排:口播视频该挂还得挂
+    camClearedRef.current = false;
+    doc.projectId ||= crypto.randomUUID();
+    setSrt(doc.srt ?? (keepMedia ? srt : null));
+    setVideoUrl(doc.previewVideo ?? (keepMedia ? videoUrl : null));
+    if (doc.previewVideo !== videoUrl && !(keepMedia && !doc.previewVideo)) setVideoDur(0);
+    setVideoScale(doc.videoScale ?? 1); setFxScale(doc.fxScale ?? 1); setAnimSpeed(doc.animSpeed ?? 1);
     setOverlay(doc);
-    originRef.current = structuredClone(doc); // AI 初选快照,学习闭环用
+    setPendingImport(null);
+    originRef.current = doc.reviewOrigin ?? structuredClone(doc);
     setSelCardId(doc.cards[0]?.id ?? null);
     setTab("edit");
     seek(0);
@@ -580,11 +585,13 @@ export default function App() {
   /** 载入内置演示编排(public/demo/):示例 SRT + 示例 JSON,不需要自己的视频 */
   const handleLoadDemo = async () => {
     if (overlay?.cards.length && !confirm("载入示例会替换当前编排(可撤销),继续吗?")) return;
+    const request = ++projectEpoch.current;
     try {
       const [jsonText, srtText] = await Promise.all([
         fetch("/demo/demo-overlay.json").then((r) => r.text()),
         fetch("/demo/demo.srt").then((r) => r.text()),
       ]);
+      if (request !== projectEpoch.current) return;
       const { doc, error, dropped } = parseOverlay(jsonText);
       if (error || !doc) {
         alert(`❌ 示例载入失败:${error}`);
@@ -598,7 +605,10 @@ export default function App() {
       pushHistory(true);
       camClearedRef.current = false;
       setSrt(lines.length ? lines : null);
-      setOverlay(doc);
+      projectEpoch.current++;
+      setVideoUrl(null); setVideoDur(0);
+      setVideoScale(1); setFxScale(1); setAnimSpeed(1);
+      setOverlay({...doc,projectId:crypto.randomUUID(),projectName:'内置示例'});
       originRef.current = structuredClone(doc);
       setSelCardId(doc.cards[0]?.id ?? null);
       setTab("edit");
@@ -613,12 +623,16 @@ export default function App() {
 
   const handleImportSrt = async (file: File | null) => {
     if (!file) return;
+    const request = projectEpoch.current;
     const lines = parseSrt(await file.text());
+    if (request !== projectEpoch.current) return;
     if (!lines.length) {
       alert("❌ SRT 解析失败:没读到任何字幕条。");
       return;
     }
+    pushHistory(true);
     setSrt(lines);
+    if (!overlay) setOverlay(newProject());
     // 已有编排且还没有字幕层卡:自动生成一张常驻双语字幕卡(中文先就位,
     // 英文和 *关键词* 由生成器或你在右栏字幕表里补)
     if (overlay && !overlay.cards.some((c) => c.kind === "caption-track")) {
@@ -633,7 +647,6 @@ export default function App() {
               .trim()}`,
         )
         .join("\n");
-      pushHistory(true);
       setOverlay({
         ...overlay,
         cards: [
@@ -653,7 +666,7 @@ export default function App() {
 
   const handleExportJson = () => {
     if (!overlay) return;
-    const blob = new Blob([JSON.stringify(overlay, null, 2)], {
+    const blob = new Blob([JSON.stringify(documentToSave, null, 2)], {
       type: "application/json",
     });
     const a = document.createElement("a");
@@ -681,7 +694,8 @@ export default function App() {
     if (!confirm("清空这条编排?\n\n卡片和字幕稿都会清掉(导入的视频不受影响)。\n可以用 ⌘Z 撤销。"))
       return;
     pushHistory(true);
-    localStorage.removeItem(AUTOSAVE_KEY);
+    projectEpoch.current++;
+    originRef.current = null;
     setOverlay(null);
     setSrt(null);
     setPlaying(false);
@@ -733,7 +747,7 @@ export default function App() {
     patchCardParams({ [key]: value });
   };
 
-  // 更换选中卡片的特效类型(时间/落位保留,参数回到新卡默认值)
+  // 换卡时保留时间和可共用参数，切回原卡时恢复它原先的设置。
   const handleCardKindChange = (kind: string) => {
     if (!overlay || !selCardId) return;
     if (!EFFECTS.some((e) => e.id === kind)) return;
@@ -745,7 +759,8 @@ export default function App() {
           ? {
               ...c,
               kind,
-              params: { ...(EFFECTS.find((e) => e.id === kind)?.defaults ?? {}) },
+              params: structuredClone(c.kindBackups?.[kind]?.params ?? swapCardParams(c.kind,c.params,kind)),
+              kindBackups:{...c.kindBackups,[c.kind]:{params:c.params,seg:c.seg}},
             }
           : c,
       ),
@@ -810,7 +825,7 @@ export default function App() {
     // 往上挪:插到目标后面(删除自己后目标退了一格,插在 j 正好就是它后面)
     // 往下挪:插到目标前面(目标索引比自己小,删除不影响它,插在 j 就是它前面)
     cards.splice(j, 0, me);
-    setOverlay({ ...overlay, cards });
+    setOverlay({ ...overlay, layerOrder:"manual", cards });
   };
 
   // 编辑选中卡片的出现/消失时间(秒)
@@ -866,8 +881,8 @@ export default function App() {
     pushHistory(true);
     setOverlay((o) =>
       o
-        ? { ...o, cards: [...o.cards, card].sort((a, b) => a.start - b.start) }
-        : { version: 1 as const, theme: paramsById[selectedId]?.theme, cards: [card] },
+        ? { ...o, cards: [...o.cards, card], layerOrder:"manual" }
+        : { ...newProject(), theme: paramsById[selectedId]?.theme, cards: [card] },
     );
     setSelCardId(card.id);
     // 以前这里 setTab("edit") 把人甩回编辑台:点一下整个界面就变了,是最容易
@@ -981,6 +996,7 @@ export default function App() {
     // 以前不换 —— 自动挂载只在 cam 为空时生效,换视频后 cam 还指着上一条:预览里运镜卡
     // 圆窗放的是新视频(预览用 videoUrl),导出烤进去的却是旧的(导出用 doc.cam),而且没有任何提示。
     // 只在「cam 等于旧主视频」时换:用户在侧栏手动选过别的口播视频,那是他的选择,不动。
+    const uploadEpoch = projectEpoch.current;
     const prevUrl = videoUrl;
     setVideoUrl((prev) => {
       if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
@@ -1004,7 +1020,9 @@ export default function App() {
       // 非 2xx 也要把响应体读出来:后台写盘失败时会认真回一句原因(500 + JSON),
       // 以前 `r.ok ? … : null` 直接把它扔了,页面一声不吭退回 blob,用户以为导入成功了
       const d = await r.json().catch(() => null);
+      if (uploadEpoch !== projectEpoch.current) return;
       if (d?.ok && d.url) {
+        if (!currentProjectId.current) setOverlay(o => o ?? newProject());
         setVideoUrl(d.url);
         setOverlay((o) => (o && o.cam && o.cam === prevUrl ? { ...o, cam: d.url } : o));
         return;
@@ -1021,7 +1039,7 @@ export default function App() {
     } finally {
       setVideoBusy(false);
     }
-    setVideoUrl(URL.createObjectURL(file));
+    if (uploadEpoch === projectEpoch.current) setVideoUrl(URL.createObjectURL(file));
   };
 
   // 效果库当前效果。selectedId 一直来自 EFFECTS,理论上找得到,
@@ -1068,7 +1086,7 @@ export default function App() {
         }
         if (f.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(f.name)) {
           handleVideo(f);
-        } else if (f.type === "application/json" || /\.json$/i.test(f.name)) {
+        } else if (f.type === "application/json" || /\.(json|overlaypack)$/i.test(f.name)) {
           handleImportJson(f);
         } else if (/\.srt$/i.test(f.name)) {
           handleImportSrt(f);
@@ -1077,6 +1095,30 @@ export default function App() {
         }
       }}
     >
+      <ProjectFonts assets={overlay?.fontAssets}/>
+      <Suspense fallback={null}>
+      {saveOpen && documentToSave && <ProjectDialog directory={projectDir} name={overlay?.projectName || '未命名工程'}
+        onClose={()=>setSaveOpen(false)} onSave={async(kind,name,dir)=>{
+          const id = documentToSave.projectId;
+          await saveProjectFile(kind,dir,{...documentToSave,projectName:name});
+          if (currentProjectId.current !== id) return;
+          setProjectDir(dir);
+          if (autosaveOwner) {
+            try {
+              localStorage.setItem('overlayStudioProjectDirectory:' + id, dir);
+              localStorage.setItem('overlayStudioProjectDirectory', dir);
+            } catch { /* The explicit file is already on disk. */ }
+          }
+          setOverlay(o=>o ? {...o,projectName:name} : o);
+        }}/>}
+      {pendingImport && <ImportProjectDialog onChoose={keep=>applyImported(pendingImport,keep)} onCancel={()=>setPendingImport(null)}/>}
+      </Suspense>
+      {restoreWarning && <div className="project-warning" role="alert">{restoreWarning}
+        <button onClick={()=>{try {const raw=localStorage.getItem(BACKUP_KEY); if(!raw) throw Error('没有上一份备份');
+          restoreStored(raw); setRestoreWarning('');} catch(e){alert(String(e));}}}>恢复上一份备份</button>
+        <button onClick={()=>{const raw=localStorage.getItem(AUTOSAVE_KEY); if(raw){const url=URL.createObjectURL(new Blob([raw]));
+          const a=document.createElement('a');a.href=url;a.download='工程恢复副本.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}}>下载原存档</button>
+        <button onClick={()=>setRestoreWarning('')}>继续编辑</button></div>}
       {!online && (
         <div className="offline-bar">
           ⚠️ 本地服务已停止 —— 这个页面还开着,但导入、上传、导出都不会成功。
@@ -1086,6 +1128,16 @@ export default function App() {
       <TopBar
         tab={tab}
         onTab={setTab}
+        onSaveProject={()=>setSaveOpen(true)}
+        saveStatus={saveStatus}
+        ratio={overlay?.ratio ?? "h"}
+        onRatio={ratio => {
+          pushHistory(true);
+          setOverlay(current => {
+            const doc = current ?? newProject();
+            return {...doc, ratio, cards:switchRatioLayout(doc.cards, doc.ratio ?? 'h', ratio)};
+          });
+        }}
         curT={curT}
         duration={duration}
         playing={playing}
@@ -1188,6 +1240,7 @@ export default function App() {
           if (c) seek(c.start + 0.01);
         }}
         onImportJson={handleImportJson}
+        handoff={handoff}
         onExportJson={handleExportJson}
         onClearOverlay={handleClearOverlay}
         videoBusy={videoBusy}
@@ -1199,6 +1252,7 @@ export default function App() {
       <main className="stage-col">
         <Canvas
           effect={effect}
+          ratio={overlay?.ratio}
           params={params}
           playToken={playToken}
           showGuides={showGuides}

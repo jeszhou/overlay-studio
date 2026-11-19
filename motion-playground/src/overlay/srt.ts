@@ -30,3 +30,19 @@ export function parseSrt(text: string): SrtLine[] {
   }
   return lines.sort((a, b) => a.start - b.start);
 }
+
+function stamp(sec: number): string {
+  const ms = Math.max(0, Math.round(sec * 1000));
+  const h = String(Math.floor(ms / 3600000)).padStart(2, "0");
+  const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, "0");
+  const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, "0");
+  return `${h}:${m}:${s},${String(ms % 1000).padStart(3, "0")}`;
+}
+
+/** 字幕稿 → SRT 文本。交给 AI 助手时用 ——
+ *  字幕是转写出来的,原文件根本不存在;不还原成 SRT,AI 就没有任何东西可读。 */
+export function toSrtText(lines: SrtLine[]): string {
+  return lines
+    .map((l, i) => `${i + 1}\n${stamp(l.start)} --> ${stamp(l.end)}\n${l.text}\n`)
+    .join("\n");
+}

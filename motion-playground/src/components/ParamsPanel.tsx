@@ -3,6 +3,7 @@ import { uploadErrText } from "../uploadErr";
 import type { Control, EffectDef } from "../effects/types";
 import { EFFECT_GROUPS } from "../effects/registry";
 import { kindColor } from "../effects/kindColor";
+import {CardPresets} from "./CardPresets";
 import type { OverlayCard } from "../overlay/types";
 import { BREATH_STILL } from "../effects/breath";
 
@@ -462,6 +463,11 @@ export function ParamsPanel({
     SCALE_CONTROL,
     SPEED_CONTROL,
     SFX_CONTROL,
+    ...("glass" in effect.defaults ? [
+      {key:"glass",label:"玻璃底色",type:"select",options:[{value:"none",label:"关闭"},{value:"dark",label:"深色"},{value:"light",label:"浅色"}]},
+      {key:"glassAlpha",label:"底色透明度",type:"range",min:0,max:1,step:.05},
+    ] as Control[] : []),
+    {key:"shadow",label:"投影",type:"select",options:[{value:"none",label:"无"},{value:"soft",label:"柔和"},{value:"hard",label:"清晰"},{value:"outline",label:"描边"}]} as Control,
     ...(card && editMode && !BREATH_STILL.has(effect.id) ? [BREATH_CONTROL] : []),
   ].filter((c) => !ownKeys.has(c.key));
   const all: Control[] = [...own, ...universal];
@@ -489,7 +495,7 @@ export function ParamsPanel({
         {card && onKindChange && (
           <div className="ctrl">
             <div className="ctrl-head">
-              <span>更换特效(时间/位置保留,文案重置)</span>
+              <span>更换特效（保留时间和可复用的文案）</span>
             </div>
             <input
               className="ctrl-input"
@@ -594,6 +600,7 @@ export function ParamsPanel({
           </div>
         )}
 
+        <CardPresets key={effect.id} kind={effect.id} controls={all.filter(c=>['style','layout'].includes(groupOf(c)) || c.key==='glassAlpha')} params={params} onApply={patch=>Object.entries(patch).forEach(([k,v])=>onChange(k,v))}/>
         {/* 四组参数:内容 / 节奏 / 样式 / 落位与大小 */}
         {GROUP_META.map(({ id, label, en }) => {
           const items = grouped.get(id);

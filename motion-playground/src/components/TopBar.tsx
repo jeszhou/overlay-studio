@@ -73,6 +73,10 @@ interface TopBarProps {
   onToggleMute: () => void;
   onPlayPause: () => void;
   onReset: () => void;
+  onSaveProject: () => void;
+  saveStatus: string;
+  ratio: "h" | "v" | "4:3";
+  onRatio:(ratio:"h" | "v" | "4:3")=>void;
   onImportJson: (file: File | null) => void;
   onLoadDemo: () => void;
   /* 效果库 */
@@ -201,7 +205,7 @@ export function TopBar({
   onToggleMute,
   onPlayPause,
   onReset,
-  onImportJson,
+  onSaveProject, saveStatus, ratio, onRatio, onImportJson,
   onLoadDemo,
   effectName,
   onReplay,
@@ -239,7 +243,8 @@ export function TopBar({
     <div className="topbar">
       <div className="tb-brand">
         OVERLAY<em>/</em>STUDIO
-        <span className="tb-ver" title={VERSION_TITLE}>{VERSION_LABEL}</span>
+        <span className="tb-ver" title={VERSION_TITLE}>{VERSION_LABEL}<br/>免费版 · 源码公开</span>
+        <span className="project-state" title={saveStatus}>{saveStatus}</span>
       </div>
 
       {/* 模式切换:一眼看清自己在哪 */}
@@ -488,7 +493,7 @@ export function TopBar({
               {muted ? "静音" : "声音"}
             </button>
             <button className="tb-btn" onClick={() => jsonRef.current?.click()}>
-              导入 JSON
+              打开工程
             </button>
           </>
         ) : (
@@ -500,6 +505,10 @@ export function TopBar({
         )}
         {/* 示例两个标签页都放:在效果库里点会载入演示并自动切回编辑台。
             只放编辑台的话,人在效果库页会以为这个按钮"没有了" */}
+        <select className="tb-btn" aria-label="画幅" value={ratio} onChange={e=>onRatio(e.target.value as typeof ratio)}>
+          <option value="h">16:9 横版</option><option value="v">9:16 竖版</option><option value="4:3">4:3 横版</option>
+        </select>
+        <button className="tb-btn" disabled={!hasDoc} onClick={onSaveProject}>保存工程</button>
         <button className="tb-btn" onClick={onLoadDemo} title="载入内置演示编排,不需要自己的视频">
           🎬 示例
         </button>
@@ -520,7 +529,7 @@ export function TopBar({
       <input
         ref={jsonRef}
         type="file"
-        accept=".json,application/json"
+        accept=".json,.overlaypack,application/json"
         style={{ display: "none" }}
         onChange={(e) => {
           onImportJson(e.target.files?.[0] ?? null);

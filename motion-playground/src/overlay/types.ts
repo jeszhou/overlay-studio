@@ -1,8 +1,10 @@
+import type {SrtLine} from './srt';
 import { EFFECTS } from "../effects/registry";
 
 /** 时间轴上的一张动效卡 */
 export interface OverlayCard {
   id: string; // 唯一标识,如 "card-1"
+  kindBackups?: Record<string, {params: Record<string, unknown>; seg?: string}>;
   kind: string; // 卡片类型 = 特效 id(registry 里的一种)
   start: number; // 出现时间(秒,来自 SRT)
   end: number; // 消失时间(秒)
@@ -38,6 +40,17 @@ export function outroFade(t: number, card: { start: number; end: number }): numb
 
 /** Overlay 工程文件(Skill 生成 / Studio 导入导出) */
 export interface OverlayDoc {
+  projectId?: string;
+  projectName?: string;
+  srt?: SrtLine[];
+  previewVideo?: string;
+  reviewOrigin?: OverlayDoc;
+  layerOrder?: "manual";
+  fontAssets?: {family: string; url: string; weight?: string}[];
+  ratio?: "h" | "v" | "4:3";
+  videoScale?: number;
+  fxScale?: number;
+  animSpeed?: number;
   version: 1;
   theme?: "dark" | "light"; // 全局主题,卡片 params.theme 可覆盖
   /** 文字可读性光晕(默认关;true 才开)——开了字会发虚,按画面自己定 */
@@ -71,20 +84,30 @@ export function parseOverlay(raw: unknown): {
   dropped?: { kind: string; n: number }[];
 } {
   try {
-    const o = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const o = Array.isArray(parsed?.overlay?.cards)
+      ? {...parsed.overlay, srt: parsed.overlay.srt ?? parsed.srt ?? undefined,
+         previewVideo: parsed.overlay.previewVideo ?? parsed.videoUrl,
+         reviewOrigin: parsed.overlay.reviewOrigin ?? parsed.origin}
+      : parsed;
     if (!o || !Array.isArray(o.cards)) return { error: "缺少 cards 数组" };
+    if (o.cards.length > 10_000) return {error: '工程超过 10,000 张卡，请拆分后打开'};
+    if (o.srt != null && (!Array.isArray(o.srt) || o.srt.length > 10_000 || o.srt.some((line: SrtLine) =>
+      !line || typeof line.text !== 'string' || !Number.isFinite(line.start) || !Number.isFinite(line.end)
+      || line.start < 0 || line.end < line.start))) return {error: '工程中的字幕文字或时间无效'};
     const ids = new Set<string>();
     const cards: OverlayCard[] = [];
     const dropCount = new Map<string, number>();
     for (let i = 0; i < o.cards.length; i++) {
       const c = o.cards[i];
+      if (!c || typeof c !== 'object' || Array.isArray(c)) return {error: `第 ${i + 1} 张卡片数据无效`};
       const def = EFFECTS.find((e) => e.id === c.kind);
       if (!def) {
         const k = String(c?.kind ?? "(没写 kind)");
         dropCount.set(k, (dropCount.get(k) ?? 0) + 1);
         continue;
       }
-      if (typeof c.start !== "number" || typeof c.end !== "number" || c.end <= c.start)
+      if (!Number.isFinite(c.start) || !Number.isFinite(c.end) || c.end <= c.start)
         return { error: `第 ${i + 1} 张卡片时间非法: start=${c.start} end=${c.end}` };
       const id = String(c.id ?? `card-${i + 1}`);
       if (ids.has(id)) return { error: `卡片 id 重复: "${id}"` };
@@ -98,9 +121,9 @@ export function parseOverlay(raw: unknown): {
           : Array.isArray(c.lintOff) && c.lintOff.every((r: unknown) => typeof r === "string")
             ? (c.lintOff as string[])
             : undefined;
-      cards.push({ id, kind: c.kind, start: c.start, end: c.end, seg, lintOff, params });
+      cards.push({ id, kind: c.kind, start: c.start, end: c.end, seg, lintOff, params, kindBackups: c.kindBackups && typeof c.kindBackups === "object" ? c.kindBackups : undefined });
     }
-    cards.sort((a, b) => a.start - b.start);
+    if (o.layerOrder !== "manual") cards.sort((a, b) => a.start - b.start);
     // 一张都不认识:多半不是「少几张卡」,而是拿错了文件或者版本对不上。
     // 这种情况给整份错误比给一份空编排有用 —— 空编排会让人以为文件是空的。
     if (!cards.length && dropCount.size)
@@ -115,6 +138,17 @@ export function parseOverlay(raw: unknown): {
       dropped: dropped.length ? dropped : undefined,
       doc: {
         version: 1,
+        projectId: typeof o.projectId === 'string' && o.projectId ? o.projectId : undefined,
+        projectName: typeof o.projectName === 'string' ? o.projectName : undefined,
+        srt: o.srt ?? undefined,
+        previewVideo: typeof o.previewVideo === 'string' && /^\/(?:_media|_projects|demo)\//.test(o.previewVideo) ? o.previewVideo : undefined,
+        reviewOrigin: Array.isArray(o.reviewOrigin?.cards) ? {...o.reviewOrigin, reviewOrigin: undefined} : undefined,
+        fontAssets: Array.isArray(o.fontAssets) ? o.fontAssets.filter((f: {url:string;family:string}) => f && typeof f.family === 'string' && typeof f.url === 'string' && /^\/_projects\//.test(f.url)) : undefined,
+        ratio: o.ratio === '4:3' || o.ratio === 'v' ? o.ratio : undefined,
+        layerOrder: o.layerOrder === 'manual' ? 'manual' : undefined,
+        videoScale: Number.isFinite(o.videoScale) ? o.videoScale : undefined,
+        fxScale: Number.isFinite(o.fxScale) ? o.fxScale : undefined,
+        animSpeed: Number.isFinite(o.animSpeed) ? o.animSpeed : undefined,
         theme,
         glow: o.glow === true,
         breath: o.breath === true ? true : undefined,

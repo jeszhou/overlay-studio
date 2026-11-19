@@ -5,7 +5,9 @@ import "./fonts"; // 自定义字体注册:导出端也要有 @font-face,成片�
 import { EFFECTS } from "./effects/registry";
 import { FxSpeedScope } from "./effects/FxSpeedScope";
 import { outroFade, parseOverlay, type OverlayDoc } from "./overlay/types";
-import { STAGE } from "./stage";
+import {stageSize} from "./overlay/stage-size.mjs";
+import {ProjectFonts} from "./components/ProjectFonts";
+import "./project-editor.css";
 import "./effects/hud/hud.css";
 import "./App.css";
 
@@ -56,9 +58,11 @@ function renderCard(
       style={{
         display: "contents",
         ["--hud-scale" as string]: scale,
+        ["--project-glass-alpha" as string]: Number(params.glassAlpha ?? .6),
         ["--fx-outro" as string]: outro < 1 ? outro : undefined,
       }}
       /* 逐卡主题:与 Studio 预览一致 */
+      data-project-glass={String(params.glass ?? "")} data-project-shadow={String(params.shadow ?? "")}
       data-card-theme={(card.params.theme as string) || undefined}
       data-past={past ? "1" : undefined}
       data-outro={outro < 1 ? "1" : undefined}
@@ -77,8 +81,8 @@ function renderCard(
   );
 }
 
-const stageStyle = (scale: number) => {
-  const { w, h } = STAGE;
+const stageStyle = (scale: number, ratio?: string) => {
+  const { w, h } = stageSize(ratio);
   return {
     position: "fixed",
     left: 0,
@@ -150,11 +154,12 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
   }
   return (
     <BreathContext.Provider value={doc.breath === true}>
+      <ProjectFonts assets={doc.fontAssets}/>
       <div
         className={`stage is-hud is-export${doc.glow ? "" : " no-glow"}`}
         data-theme={doc.theme ?? "dark"}
         style={{
-          ...stageStyle(scale),
+          ...stageStyle(scale, doc.ratio),
           ...(doc.font ? { ["--hud-font" as string]: `"${doc.font}"` } : {}),
           ...inkVars(doc.inkColor),
         }}

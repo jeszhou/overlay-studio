@@ -1,3 +1,8 @@
+import {overlayFile} from './vite-plugins/overlay-file.js'
+import {randomUUID} from 'node:crypto'
+import {projectBundlePlugin} from './scripts/project-bundle.mjs'
+import {projectSavePlugin} from './scripts/project-save.mjs'
+import {projectFolderPlugin} from './project-folder.js'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { spawn } from 'node:child_process'
@@ -144,7 +149,7 @@ function overlayExport(): Plugin {
         if (req.method !== 'POST') { res.statusCode = 405; res.end('{"ok":false}'); return }
         const raw = String(req.headers['x-filename'] ?? 'video')
         // 文件名只留安全字符,防止 ../ 之类写到目录外
-        const safe = decodeURIComponent(raw).replace(/[^\w.\-\u4e00-\u9fff]/g, '_').slice(-80)
+        const safe = randomUUID() + '-' + decodeURIComponent(raw).replace(/[^\w.\-\u4e00-\u9fff]/g, '_').slice(-80)
         const dir = path.join(server.config.root, 'public', '_media')
         fs.mkdirSync(dir, { recursive: true })
         // 以前这儿有一条「同名 + 大小一样就当同一个文件,直接复用旧的」的近路。
@@ -268,7 +273,7 @@ function demoUpload(): Plugin {
           const q = new URL(req.url ?? '', 'http://x').searchParams
           // 只留文件名本体,防路径穿越;空格等字符统一成下划线
           const raw = decodeURIComponent(q.get('name') || 'demo.mp4')
-          const name = path.basename(raw).replace(/[^\w.一-龥()-]/g, '_')
+          const name = randomUUID() + '-' + path.basename(raw).replace(/[^\w.一-龥()-]/g, '_')
           const dir = path.join(server.config.root, 'public', 'demo')
           fs.mkdirSync(dir, { recursive: true })
           // 先写临时文件再改名:用户在文件选择器里选中 public/demo 里的同名文件时,
@@ -318,7 +323,7 @@ function reviewLog(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), sfxFallback(), overlayExport(), demoUpload(), reviewLog()],
+  plugins: [projectFolderPlugin(), overlayFile(), projectBundlePlugin(), projectSavePlugin(), react(), sfxFallback(), overlayExport(), demoUpload(), reviewLog()],
   server: {
     port: 5177, // Overlay Studio 固定端口,避免和其他项目的 5173/5174 混淆
     // 端口被占时**报错退出**,不许自己顺延到 5178。

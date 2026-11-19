@@ -1,3 +1,4 @@
+import type {OverlayFileState} from '../hooks/useOverlayFile';
 import { useEffect, useMemo, useRef, useState } from "react";
 import { uploadErrText } from "../uploadErr";
 import type { EffectDef, VisualTag } from "../effects/types";
@@ -47,6 +48,7 @@ interface SidebarProps {
   onImportSrt: (file: File | null) => void;
   onSelectCard: (id: string) => void;
   onImportJson: (file: File | null) => void;
+  handoff: OverlayFileState;
   onExportJson: () => void;
   onClearOverlay: () => void;
   onVideo: (file: File | null) => void;
@@ -85,7 +87,7 @@ export function Sidebar({
   onImportSrt,
   onSelectCard,
   onImportJson,
-  onExportJson,
+  handoff, onExportJson,
   onClearOverlay,
   onVideo,
   onFxScale,
@@ -513,13 +515,25 @@ export function Sidebar({
           )}
         </div>
 
+        {tab === "edit" && <details className="pp-sec"><summary>AI 文件交接</summary>
+          <p role="status">{handoff.aiReady ? '交接文件有更新，可以取回' :
+            handoff.synced === false ? '有改动待同步' : handoff.synced ? '已同步' : '尚未同步'}</p>
+          <button className="video-btn" disabled={(!overlay && !srt?.length) || handoff.busy} onClick={()=>void handoff.sync()}>同步给 AI</button>
+          <button className="video-btn" disabled={handoff.busy} onClick={()=>void handoff.pull()}>取回编排</button>
+          <button className="video-btn" disabled={!overlay || handoff.busy} onClick={async()=>{
+            if (!confirm("完成本期并归档当前交接文件？")) return;
+            const result=await handoff.archive(overlay?.projectName || '本期');
+            if(result) alert('已归档到 '+result.dest);
+          }}>完成本期</button>
+          {handoff.note && <p role="status">{handoff.note}</p>}
+        </details>}
         {/* Overlay JSON:导入(Skill 生成的时间轴)/ 导出(改完的)—— 只在编辑台出现 */}
         {tab === "edit" && (
           <>
             <input
               ref={jsonRef}
               type="file"
-              accept=".json,application/json"
+              accept=".json,.overlaypack,application/json"
               style={{ display: "none" }}
               onChange={(e) => {
                 onImportJson(e.target.files?.[0] ?? null);
@@ -528,7 +542,7 @@ export function Sidebar({
             />
             <div className="video-row">
               <button className="video-btn" onClick={() => jsonRef.current?.click()}>
-                📥 导入 JSON
+                📥 打开工程
               </button>
               {overlay && (
                 <button className="video-btn video-btn--clear" onClick={onExportJson}>
