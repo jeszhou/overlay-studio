@@ -440,10 +440,11 @@ export function Sidebar({
                 搜索状态下不出现 —— 那时他要的是某一张具体的卡,不是版本对比。
                 地址为空时整块不渲染。 */}
             {PROMO_URL && !fxQuery ? (
-              <a className="fx-promo" href={PROMO_URL} target="_blank" rel="noreferrer">
-                <span className="fx-promo-t">没找到想要的表达?</span>
+              <a className="fx-promo" href={PROMO_URL} target="_blank" rel="noreferrer"
+                aria-label="升级 Pro（在新标签页打开官网购买页）">
+                <span className="fx-promo-t">升级 Pro ↗</span>
                 <span className="fx-promo-d">
-                  这一份是基础版。专业版有更多动效卡、更懂内容的 AI 编排,也可以直接找作者聊 —— 去官网看 ↗
+                  前往官网购买专业版卡库和编排 Skill
                 </span>
               </a>
             ) : null}

@@ -252,18 +252,16 @@ export function TopBar({
       >
         效果库
       </button>
-      {/* 版本指南入口。放在两个模式切换的紧右边 —— 眼睛本来就扫这一片,
-          又不混进右边那排干活的按钮(那儿每次导出都会看到,容易烦)。
-          地址为空时整个不渲染。 */}
       {PROMO_URL ? (
         <a
           className="tb-pro"
           href={PROMO_URL}
           target="_blank"
           rel="noreferrer"
-          title="去官网看基础版和专业版差在哪,以及怎么联系作者"
+          aria-label="升级 Pro（在新标签页打开官网购买页）"
+          title="在新标签页打开 Overlay Studio Pro 官网购买页"
         >
-          官网 ↗
+          升级 Pro ↗
         </a>
       ) : null}
 
