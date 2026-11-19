@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="v1.3.0-rc.1 发布候选">
+  <title>Overlay Studio · 版本发布</title>
+  <link rel="alternate" hreflang="zh-CN" href="./releases.html">
+  <link rel="alternate" hreflang="en" href="./releases.en.html">
+  <link rel="stylesheet" href="./site.css">
+  <script src="./site.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#content">跳到正文</a>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="./index.html"><span class="mark" aria-hidden="true"></span>Overlay Studio</a>
+      <nav class="primary-nav" aria-label="主导航">
+        <a href="./index.html#install">快速开始</a>
+        <a href="./releases.html" aria-current="page">版本发布</a>
+        <a href="https://github.com/jeszhou/overlay-studio">GitHub</a>
+      </nav>
+      <nav class="languages" aria-label="语言">
+        <a lang="zh-CN" hreflang="zh-CN" href="./releases.html" aria-current="page">简体中文</a>
+        <a lang="en" hreflang="en" href="./releases.en.html">English</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap" id="content" tabindex="-1">
+    <section class="release-intro">
+      <p class="edition">版本发布</p>
+      <h1>v1.3.0-rc.1 发布候选</h1>
+      <div class="actions">
+        <a class="button primary" href="https://github.com/jeszhou/overlay-studio/pull/8">查看候选 PR</a>
+        <a class="button secondary" href="https://github.com/jeszhou/overlay-studio/releases/latest">下载已发布版本</a>
+      </div>
+    </section>
+
+    <section class="section release-section" aria-labelledby="changes-title">
+      <h2 id="changes-title">这个版本的改动</h2>
+      <ul>
+        <li>项目可以保存、恢复和重开，旧编排可继续编辑。</li>
+        <li>单卡和整条时间轴均可导出透明 MOV 与 WebM，并支持查看进度、取消和重试。</li>
+        <li>发行包从指定 Git 提交独立构建，Windows 启动器按锁文件安装依赖。</li>
+      </ul>
+    </section>
+
+    <section class="section release-section" aria-labelledby="windows-title">
+      <h2 id="windows-title">Windows 验收</h2>
+      <p>Windows 11 ARM64 虚拟机从源码 ZIP 全新安装并启动。使用已校验依赖缓存完成安装，两种导出任务均使用默认渲染模式。四个样片已重新解码核验透明通道和音轨。</p>
+      <table>
+        <thead><tr><th scope="col">旧示例</th><th scope="col">MOV</th><th scope="col">WebM</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">单卡</th><td>78帧<br>1 处音效</td><td>78帧</td></tr>
+          <tr><th scope="row">整条时间轴</th><td>854帧<br>16 处音效</td><td>854帧</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section release-section" aria-labelledby="download-title">
+      <h2 id="download-title">选择正确的下载包</h2>
+      <p>源码 ZIP 用于本地安装、编辑和导出。dist ZIP 用于静态预览。使用已发布版本时，从 GitHub Releases 选择对应的源码包。</p>
+      <div class="actions"><a class="button secondary" href="./index.html#install">去看安装步骤</a></div>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <span>Overlay Studio · 一页枝鸥</span>
+      <nav aria-label="项目链接">
+        <a href="./versions.html">版本比较</a>
+        <a href="https://www.overlaystudio.cn/purchase/#checkout">购买 Pro</a>
+        <a href="https://github.com/jeszhou/overlay-studio/blob/main/LICENSE">许可</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

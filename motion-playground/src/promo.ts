@@ -1,8 +1,2 @@
-/**
- * 版本指南页的地址。
- *
- * 空字符串 = 界面上不出现任何相关入口,两处入口(顶栏徽章、效果库末尾)都不渲染。
- * 填了就显示入口,留空就不显示 —— 所以这不是"要不要显示"的
- * 开关判断,而是"有没有地址"这一件事,少一个要另外维护的状态。
- */
-export const PROMO_URL = "https://www.overlaystudio.cn/";
+/** 顶栏和效果库共用的 Pro 官网购买入口。 */
+export const PROMO_URL = "https://www.overlaystudio.cn/purchase/#checkout";

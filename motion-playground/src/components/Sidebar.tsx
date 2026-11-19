@@ -1,3 +1,4 @@
+import type {OverlayFileState} from '../hooks/useOverlayFile';
 import { useEffect, useMemo, useRef, useState } from "react";
 import { uploadErrText } from "../uploadErr";
 import type { EffectDef, VisualTag } from "../effects/types";
@@ -47,6 +48,7 @@ interface SidebarProps {
   onImportSrt: (file: File | null) => void;
   onSelectCard: (id: string) => void;
   onImportJson: (file: File | null) => void;
+  handoff: OverlayFileState;
   onExportJson: () => void;
   onClearOverlay: () => void;
   onVideo: (file: File | null) => void;
@@ -85,7 +87,7 @@ export function Sidebar({
   onImportSrt,
   onSelectCard,
   onImportJson,
-  onExportJson,
+  handoff, onExportJson,
   onClearOverlay,
   onVideo,
   onFxScale,
@@ -440,10 +442,11 @@ export function Sidebar({
                 搜索状态下不出现 —— 那时他要的是某一张具体的卡,不是版本对比。
                 地址为空时整块不渲染。 */}
             {PROMO_URL && !fxQuery ? (
-              <a className="fx-promo" href={PROMO_URL} target="_blank" rel="noreferrer">
-                <span className="fx-promo-t">没找到想要的表达?</span>
+              <a className="fx-promo" href={PROMO_URL} target="_blank" rel="noreferrer"
+                aria-label="升级 Pro（在新标签页打开官网购买页）">
+                <span className="fx-promo-t">升级 Pro ↗</span>
                 <span className="fx-promo-d">
-                  这一份是基础版。专业版有更多动效卡、更懂内容的 AI 编排,也可以直接找作者聊 —— 去官网看 ↗
+                  前往官网购买专业版卡库和编排 Skill
                 </span>
               </a>
             ) : null}
@@ -512,13 +515,25 @@ export function Sidebar({
           )}
         </div>
 
+        {tab === "edit" && <details className="pp-sec"><summary>AI 文件交接</summary>
+          <p role="status">{handoff.aiReady ? '交接文件有更新，可以取回' :
+            handoff.synced === false ? '有改动待同步' : handoff.synced ? '已同步' : '尚未同步'}</p>
+          <button className="video-btn" disabled={(!overlay && !srt?.length) || handoff.busy} onClick={()=>void handoff.sync()}>同步给 AI</button>
+          <button className="video-btn" disabled={handoff.busy} onClick={()=>void handoff.pull()}>取回编排</button>
+          <button className="video-btn" disabled={!overlay || handoff.busy} onClick={async()=>{
+            if (!confirm("完成本期并归档当前交接文件？")) return;
+            const result=await handoff.archive(overlay?.projectName || '本期');
+            if(result) alert('已归档到 '+result.dest);
+          }}>完成本期</button>
+          {handoff.note && <p role="status">{handoff.note}</p>}
+        </details>}
         {/* Overlay JSON:导入(Skill 生成的时间轴)/ 导出(改完的)—— 只在编辑台出现 */}
         {tab === "edit" && (
           <>
             <input
               ref={jsonRef}
               type="file"
-              accept=".json,application/json"
+              accept=".json,.overlaypack,application/json"
               style={{ display: "none" }}
               onChange={(e) => {
                 onImportJson(e.target.files?.[0] ?? null);
@@ -527,7 +542,7 @@ export function Sidebar({
             />
             <div className="video-row">
               <button className="video-btn" onClick={() => jsonRef.current?.click()}>
-                📥 导入 JSON
+                📥 打开工程
               </button>
               {overlay && (
                 <button className="video-btn video-btn--clear" onClick={onExportJson}>
@@ -573,10 +588,10 @@ export function Sidebar({
         )}
 
         {/* 导出透明动效层 */}
-        {tab === "edit" && (
+        {(
         <div className="export-row">
           <button className="export-btn" onClick={onExport} disabled={exporting}>
-            {exporting ? "⏳ 导出中…请稍候" : "⬇ 导出整条时间轴(透明)"}
+            {exporting ? "⏳ 导出中…请稍候" : tab === "edit" ? "⬇ 导出整条时间轴(透明)" : "⬇ 导出单卡(透明)"}
           </button>
         </div>
         )}

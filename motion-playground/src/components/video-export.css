@@ -1,0 +1,43 @@
+.export-options {
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.export-options legend { padding: 0; margin-bottom: 10px; font-size: 13px; font-weight: 600; }
+.export-options-base { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 4px; }
+.export-options-base span { color: var(--ink-muted); font-size: 11px; }
+.export-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 0;
+  border-top: 1px solid var(--hairline);
+  cursor: pointer;
+}
+.export-option input { flex: 0 0 auto; width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--accent); }
+.export-option-content { flex: 1; min-width: 0; }
+.export-option-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.export-option-heading strong { font-size: 13px; font-weight: 600; }
+.export-option-state { margin-left: auto; color: var(--ink-muted); font-size: 10px; white-space: nowrap; }
+.export-option-tag { padding: 0 4px; border: 1px solid var(--hairline-strong); color: var(--ink-muted); font-size: 10px; }
+.export-option input:checked + .export-option-content .export-option-state { color: var(--accent); }
+.export-option-description { display: block; margin-top: 5px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.export-option-cost { display: block; margin-top: 3px; }
+.export-option:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.export-options:disabled { opacity: 0.6; }
+.export-options:disabled .export-option { cursor: default; }
+
+.video-export-dialog {width:min(460px,90vw);max-height:88vh;overflow:auto;background:var(--bg-panel);color:var(--ink);border:1px solid var(--hairline-strong);border-radius:10px;padding:20px}
+.video-export-dialog::backdrop {background:#0008}
+.video-export-dialog form,.video-export-dialog form > label {display:grid;gap:8px}
+.video-export-dialog form {gap:14px}
+.video-export-dialog h2 {margin:0;font-size:18px}
+.video-export-dialog input:not([type=checkbox]),.video-export-dialog select {font:inherit;padding:6px}
+.video-export-dialog footer {display:flex;justify-content:flex-end;gap:8px}
+.export-prog progress {width:100%;accent-color:var(--accent)}
+.export-result {position:fixed;bottom:16px;right:16px;z-index:900;background:var(--bg-panel);color:var(--ink);border:1px solid var(--hairline-strong);border-radius:10px;padding:16px;max-width:min(440px,90vw);display:flex;gap:8px;flex-wrap:wrap;box-shadow:0 8px 30px #0006}
+.export-result span {width:100%;white-space:pre-wrap;overflow-wrap:anywhere;max-height:40vh;overflow:auto}

@@ -1,3 +1,11 @@
+import {overlayFile} from './vite-plugins/overlay-file.js'
+import {randomUUID} from 'node:crypto'
+import {projectBundlePlugin} from './scripts/project-bundle.mjs'
+import {projectSavePlugin} from './scripts/project-save.mjs'
+import { lineReader, progressConsumer, progressWatchdog } from './scripts/export-progress.mjs'
+import { stopProcessTree } from './scripts/process-tree.mjs'
+import {resolveExportFolder} from './scripts/export-folder.mjs'
+import {chooseExportFolder,projectFolderPlugin} from './project-folder.js'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { spawn } from 'node:child_process'
@@ -121,8 +129,42 @@ function sfxFallback(): Plugin {
   }
 }
 
+function localApiGuard(): Plugin {
+  return {
+    name: 'local-api-guard',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!/^\/api(?:\/|\?|$)/.test(req.url ?? '')) return next()
+        const origin = req.headers.origin
+        let allowed = req.headers['sec-fetch-site'] !== 'cross-site'
+        if (origin) {
+          try {
+            const protocol = server.config.server.https ? 'https:' : 'http:'
+            allowed = allowed && new URL(origin).origin === `${protocol}//${req.headers.host}`
+          } catch { allowed = false }
+        }
+        // 没有 Origin 的本机 CLI/启动器请求继续可用。
+        if (allowed) return next()
+        res.statusCode = 403
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ ok: false, error: '只允许从本地编辑台访问此接口' }))
+      })
+    },
+  }
+}
+
+function sameOrigin(req: IncomingMessage): boolean {
+  if (!req.headers.origin) return true
+  try { return new URL(req.headers.origin).host === req.headers.host }
+  catch { return false }
+}
+
 function overlayExport(): Plugin {
   let busy = false
+  let folderPickerBusy = false
+  let activePid: number | undefined
+  let cancelled = false
+  let lastResult: Record<string, unknown> | undefined
   // 导出进度(GET /api/export-status 轮询用):从脚本 stdout 解析
   let prog: {
     running: boolean
@@ -130,7 +172,15 @@ function overlayExport(): Plugin {
     frame: number
     total: number
     startedAt: number
+    requestId?: string
     framesAt: number // 逐帧渲染开跑的时刻(0 = 还没开始),「预计还需」从这里起算
+    perFrame?: { render: number; anim: number; shot: number } // 每帧三步平均毫秒(脚本 progress 行带出)
+    operation?: string
+    stageStartedAt?: number
+    encodedFrame?: number
+    outTimeSec?: number
+    durationSec?: number
+    totalSize?: number
     ok?: boolean
   } = { running: false, stage: 'done', frame: 0, total: 0, startedAt: 0, framesAt: 0 }
   return {
@@ -141,10 +191,22 @@ function overlayExport(): Plugin {
       // 所以它同时可以当运镜卡的「口播视频」用。
       server.middlewares.use('/api/media', (req, res) => {
         res.setHeader('Content-Type', 'application/json')
-        if (req.method !== 'POST') { res.statusCode = 405; res.end('{"ok":false}'); return }
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end('{"ok":false}')
+          return
+        }
         const raw = String(req.headers['x-filename'] ?? 'video')
         // 文件名只留安全字符,防止 ../ 之类写到目录外
-        const safe = decodeURIComponent(raw).replace(/[^\w.\-\u4e00-\u9fff]/g, '_').slice(-80)
+        let decoded: string
+        try {
+          decoded = decodeURIComponent(raw)
+        } catch {
+          res.statusCode = 400
+          res.end(JSON.stringify({ ok: false, error: '文件名编码无效' }))
+          return
+        }
+        const safe = randomUUID() + '-' + decoded.replace(/[^\w.\-\u4e00-\u9fff]/g, '_').slice(-80)
         const dir = path.join(server.config.root, 'public', '_media')
         fs.mkdirSync(dir, { recursive: true })
         // 以前这儿有一条「同名 + 大小一样就当同一个文件,直接复用旧的」的近路。
@@ -155,12 +217,127 @@ function overlayExport(): Plugin {
 
       server.middlewares.use('/api/export-status', (_req, res) => {
         res.setHeader('Content-Type', 'application/json')
-        res.end(JSON.stringify(prog))
+        res.end(JSON.stringify({ ...prog, result: lastResult }))
+      })
+      server.middlewares.use('/api/export-folder', (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        if (!sameOrigin(req)) {
+          res.statusCode = 403
+          res.end(JSON.stringify({ ok: false, error: '只允许从本地编辑台选择文件夹' }))
+          return
+        }
+        const fallback = path.join(server.config.root, 'exports', 'output')
+        if (req.method === 'GET') {
+          res.end(JSON.stringify({ ok: true, dir: fallback }))
+          return
+        }
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end(JSON.stringify({ ok: false, error: 'GET or POST only' }))
+          return
+        }
+        let body = ''
+        req.on('data', (chunk) => {
+          body += chunk
+        })
+        req.on('end', () => {
+          void (async () => {
+            try {
+              const { initialDir, dir } = JSON.parse(body || '{}')
+              if (typeof dir === 'string') {
+                if (dir === fallback) fs.mkdirSync(fallback, { recursive: true })
+                res.end(JSON.stringify({ ok: true, dir: resolveExportFolder(server.config.root, dir) }))
+                return
+              }
+              if (folderPickerBusy) throw new Error('已有文件夹选择窗口，请先完成或取消')
+              let initial = fallback
+              try {
+                initial = resolveExportFolder(server.config.root, initialDir)
+              } catch {
+                /* Stale preference: open at the default folder. */
+              }
+              if (!fs.existsSync(initial)) initial = server.config.root
+              folderPickerBusy = true
+              let chosen: string | null
+              try {
+                chosen = await chooseExportFolder(initial)
+              } finally {
+                folderPickerBusy = false
+              }
+              if (!chosen) {
+                res.end(JSON.stringify({ ok: false, cancelled: true }))
+                return
+              }
+              res.end(JSON.stringify({ ok: true, dir: resolveExportFolder(server.config.root, chosen) }))
+            } catch (error) {
+              res.statusCode = 400
+              res.end(JSON.stringify({ ok: false, error: String(error) }))
+            }
+          })()
+        })
+      })
+      server.middlewares.use('/api/export-cancel', (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        if (req.method !== 'POST' || !sameOrigin(req)) {
+          res.statusCode = 403
+          res.end(JSON.stringify({ ok: false, error: '无效请求' }))
+          return
+        }
+        const expected = new URL(req.url || '/', 'http://localhost').searchParams.get('startedAt')
+        if (expected !== null && Number(expected) !== prog.startedAt) {
+          res.statusCode = 409
+          res.end(JSON.stringify({ ok: false, error: '导出任务已切换' }))
+          return
+        }
+        if (!busy || !activePid) {
+          res.end(JSON.stringify({ ok: false, error: '没有正在导出的任务' }))
+          return
+        }
+        cancelled = true
+        void stopProcessTree(activePid)
+          .then(() => res.end(JSON.stringify({ ok: true })))
+          .catch((e: Error) => {
+            res.statusCode = 500
+            res.end(JSON.stringify({ ok: false, error: e.message }))
+          })
+      })
+      server.middlewares.use('/api/export-open', (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        if (req.method !== 'POST' || !sameOrigin(req)) {
+          res.statusCode = 403
+          res.end(JSON.stringify({ ok: false }))
+          return
+        }
+        const file = lastResult?.mov
+        if (typeof file !== 'string' || !fs.existsSync(file)) {
+          res.statusCode = 404
+          res.end(JSON.stringify({ ok: false, error: '成品文件不存在' }))
+          return
+        }
+        const command =
+          process.platform === 'win32' ? 'explorer.exe' : process.platform === 'darwin' ? 'open' : 'xdg-open'
+        const args =
+          process.platform === 'win32'
+            ? ['/select,', file]
+            : process.platform === 'darwin'
+              ? ['-R', file]
+              : [path.dirname(file)]
+        const child = spawn(command, args, { windowsHide: true, stdio: 'ignore' })
+        child.once('error', () => {})
+        child.unref()
+        res.end(JSON.stringify({ ok: true }))
       })
       server.middlewares.use('/api/export', (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
         if (req.method !== 'POST') {
           res.statusCode = 405
           res.end('POST only')
+          return
+        }
+        if (!sameOrigin(req)) {
+          res.statusCode = 403
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ ok: false, error: '只允许从本地编辑台导出' }))
           return
         }
         if (busy) {
@@ -168,80 +345,145 @@ function overlayExport(): Plugin {
           res.end(JSON.stringify({ ok: false, error: '已有导出任务在进行中' }))
           return
         }
+        busy = true
+        cancelled = false
+        lastResult = undefined
         let body = ''
-        req.on('data', (c) => (body += c))
+        let rejected = false
+        req.on('close', () => {
+          if (!req.complete && !rejected) busy = false
+        })
+        req.on('data', (c) => {
+          if (rejected) return
+          body += c
+          if (body.length > 32 * 1024 * 1024 && !rejected) {
+            rejected = true
+            busy = false
+            res.statusCode = 413
+            res.end(JSON.stringify({ ok: false, error: '工程数据超过 32 MB' }))
+          }
+        })
         req.on('end', () => {
-          busy = true
+          if (rejected) return
           try {
             const job = JSON.parse(body || '{}')
-            job.base = `http://localhost:${server.config.server.port ?? 5177}`
-            const jobFile = path.join(os.tmpdir(), `overlay-export-${Date.now()}.json`)
+            if (!Number.isFinite(job.duration) || job.duration <= 0 || job.duration > 86400)
+              throw new Error('导出时长必须在 0 到 86400 秒之间')
+            if (job.outputDir) job.outputDir = resolveExportFolder(server.config.root, job.outputDir)
+            job.mode ??= job.doc ? 'timeline' : 'single'
+            if (
+              job.mode !== 'timeline' &&
+              (job.mode !== 'single' || !/^[a-z0-9][a-z0-9-]*$/.test(job.effectId ?? ''))
+            )
+              throw Error('无效的卡片或模式')
+            job.runId = randomUUID()
+            const address = server.httpServer?.address()
+            job.base = `http://localhost:${typeof address === 'object' && address ? address.port : (server.config.server.port ?? 5177)}`
+            const jobFile = path.join(os.tmpdir(), `overlay-export-${job.runId}.json`)
             fs.writeFileSync(jobFile, JSON.stringify(job))
 
-            const child = spawn('node', ['scripts/export-frames.mjs', jobFile], {
+            const child = spawn(process.execPath, ['scripts/export-frames.mjs', jobFile], {
               cwd: server.config.root,
               stdio: ['ignore', 'pipe', 'pipe'],
+              windowsHide: true,
             })
-            prog = { running: true, stage: 'prep', frame: 0, total: 0, startedAt: Date.now(), framesAt: 0 }
-            let out = ''
+            activePid = child.pid
+            const requestId =
+              typeof job.requestId === 'string' && /^[a-zA-Z0-9-]{1,64}$/.test(job.requestId)
+                ? job.requestId
+                : undefined
+            prog = {
+              running: true,
+              stage: 'prep',
+              frame: 0,
+              total: 0,
+              startedAt: Date.now(),
+              requestId,
+              framesAt: 0,
+            }
             let err = ''
-            // 看门狗:子进程 15 分钟没有任何输出就当它假死,强制停掉。不设的话 busy 永远是 true,
-            // 之后每次点导出都是「已有导出任务在进行中」,只能重启服务。15 分钟留给最慢的静默
-            // 阶段(长视频抽帧、ProRes 合成都不打进度);脚本内部另有 30 秒的单帧超时兜常见情况。
-            const IDLE_MS = 15 * 60_000
-            const giveUp = () => {
-              err +=
-                '\n【导出失败原因】导出 15 分钟没有任何进展,已强制停止。多半是渲染器假死了:' +
-                '重新导出一次;还不行就重启 npm run dev。'
-              child.kill('SIGKILL')
-            }
-            let idle = setTimeout(giveUp, IDLE_MS)
-            const kick = () => {
-              clearTimeout(idle)
-              idle = setTimeout(giveUp, IDLE_MS)
-            }
+            let failureReason = ''
+            let result: Record<string, unknown> | undefined
+            let finished = false
+            const consume = progressConsumer(prog)
+            // 真实帧数/输出时间/已写字节增加才延长等待,重复日志不能掩盖冻结。
+            const watchdog = progressWatchdog(() => {
+              failureReason = '导出 15 分钟没有实际进展,已停止本次任务。请检查素材或重新导出。'
+              void stopProcessTree(child.pid).catch((error: Error) => {
+                failureReason += ` 停止子进程失败:${error.message}`
+                child.kill('SIGKILL')
+              })
+            })
+            const lines = lineReader((line: string) => {
+              try {
+                const event = JSON.parse(line)
+                if (event?.event === 'progress') {
+                  if (consume(event)) watchdog.advance()
+                  return // Machine progress updates status, not terminal scrollback.
+                } else if (typeof event?.ok === 'boolean') result = event
+              } catch {
+                /* Human-readable logs are not progress events. */
+              }
+              process.stdout.write(`[export] ${line}\n`)
+            })
+            child.stdout.setEncoding('utf8')
+            child.stderr.setEncoding('utf8')
             child.stdout.on('data', (d) => {
-              kick()
-              out += d
-              process.stdout.write(`[export] ${d}`)
-              // 从累计输出的尾部解析进度(行可能被分块截断,所以每次都从全文找最后一条)
-              const m = [...out.matchAll(/progress (\d+)\/(\d+)/g)].pop()
-              if (m) {
-                prog.frame = Number(m[1])
-                prog.total = Number(m[2])
-                prog.stage = 'frames'
-              }
-              // 视频抽帧(长录屏要几分钟):单独一个阶段,别一直显示「启动渲染器」
-              if (prog.stage === 'prep' && out.includes('extracting video frames'))
-                prog.stage = 'extract'
-              // 逐帧渲染开跑:记下时刻,「预计还需」只按这之后的耗时算
-              if (!prog.framesAt && out.includes('rendering frames:')) {
-                prog.framesAt = Date.now()
-                prog.stage = 'frames'
-              }
-              if (out.includes('composing MOV')) prog.stage = 'mov'
-              if (out.includes('composing WebM')) prog.stage = 'webm'
-              if (out.includes('baking')) prog.stage = 'sfx'
+              lines.write(d)
             })
             child.stderr.on('data', (d) => {
-              kick()
-              err += d
+              err = (err + d).slice(-16_384)
             })
-            child.on('close', (code) => {
-              clearTimeout(idle)
+            const finish = (code: number | null, signal?: NodeJS.Signals | null) => {
+              if (finished) return
+              finished = true
+              lines.end()
+              watchdog.stop()
               busy = false
-              prog = { ...prog, running: false, stage: 'done', ok: code === 0 }
-              fs.rmSync(jobFile, { force: true })
-              res.setHeader('Content-Type', 'application/json')
-              if (code === 0) {
-                // 取脚本最后一行 JSON 作为结果
-                const lines = out.trim().split('\n')
-                res.end(lines[lines.length - 1])
-              } else {
-                res.statusCode = 500
-                res.end(JSON.stringify({ ok: false, error: err.slice(-800) }))
+              activePid = undefined
+              if (cancelled) {
+                const stem = (job.mode === 'timeline' ? 'timeline' : job.effectId) + '-' + job.runId
+                const final = job.outputDir || path.join(server.config.root, 'exports', 'output')
+                try {
+                  for (const suffix of ['.mov', '.webm', '-音效清单.txt', '-音效轨.m4a', '-合成说明.txt'])
+                    fs.rmSync(path.join(final, stem + suffix), { force: true })
+                  fs.rmSync(path.join(server.config.root, 'exports', stem), { force: true, recursive: true })
+                } catch (error) {
+                  console.error('清理已取消导出的临时文件失败', error)
+                }
               }
+              const ok = !cancelled && code === 0 && !signal && !failureReason && result?.ok === true
+              const finalError = cancelled
+                ? '用户已取消导出'
+                : failureReason || String(result?.error || err.slice(-800) || '导出未完成')
+              lastResult = { ...result, ok, cancelled, ...(!ok ? { error: finalError } : {}) }
+              prog = { ...prog, running: false, stage: 'done', ok }
+              try {
+                fs.rmSync(jobFile, { force: true })
+              } catch (error) {
+                console.error('[export] 临时任务文件清理失败:', error)
+              }
+              try {
+                res.setHeader('Content-Type', 'application/json')
+                if (ok || cancelled) res.end(JSON.stringify(lastResult))
+                else {
+                  res.statusCode = 500
+                  const fallback = signal
+                    ? `导出进程被 ${signal} 停止`
+                    : `导出进程退出码 ${code},未返回有效成品`
+                  const error = failureReason || String(result?.error || err.slice(-800) || fallback)
+                  // Structured diagnostics and retained paths must survive a non-zero exit.
+                  res.end(JSON.stringify({ ...result, ok: false, error }))
+                }
+              } catch (error) {
+                console.error('[export] 回应失败:', error)
+              }
+            }
+            child.once('error', (error) => {
+              failureReason = `无法启动导出进程:${error.message}`
+              finish(1)
             })
+            child.once('close', finish)
           } catch (e) {
             busy = false
             res.statusCode = 400
@@ -268,7 +510,7 @@ function demoUpload(): Plugin {
           const q = new URL(req.url ?? '', 'http://x').searchParams
           // 只留文件名本体,防路径穿越;空格等字符统一成下划线
           const raw = decodeURIComponent(q.get('name') || 'demo.mp4')
-          const name = path.basename(raw).replace(/[^\w.一-龥()-]/g, '_')
+          const name = randomUUID() + '-' + path.basename(raw).replace(/[^\w.一-龥()-]/g, '_')
           const dir = path.join(server.config.root, 'public', 'demo')
           fs.mkdirSync(dir, { recursive: true })
           // 先写临时文件再改名:用户在文件选择器里选中 public/demo 里的同名文件时,
@@ -318,7 +560,7 @@ function reviewLog(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), sfxFallback(), overlayExport(), demoUpload(), reviewLog()],
+  plugins: [localApiGuard(),projectFolderPlugin(), overlayFile(), projectBundlePlugin(), projectSavePlugin(), react(), sfxFallback(), overlayExport(), demoUpload(), reviewLog()],
   server: {
     port: 5177, // Overlay Studio 固定端口,避免和其他项目的 5173/5174 混淆
     // 端口被占时**报错退出**,不许自己顺延到 5178。

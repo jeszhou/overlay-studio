@@ -1,14 +1,14 @@
 {
   "name": "motion-playground",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.3.0-rc.1",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/clean-build.mjs",
     "lint": "oxlint",
     "lint:overlay": "tsx --tsconfig tsconfig.app.json scripts/lint-overlay.ts",
     "sync:cards": "node scripts/sync-skill-cards.mjs && node scripts/sync-agent-skills.mjs",
@@ -17,9 +17,11 @@
     "check:motion": "node scripts/check-motion.mjs",
     "sync:agent-skills": "node scripts/sync-agent-skills.mjs",
     "check:agent-skills": "node scripts/sync-agent-skills.mjs --check",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:manifest": "node scripts/update-build-inputs.mjs"
   },
   "dependencies": {
+    "modern-tar": "0.7.6",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

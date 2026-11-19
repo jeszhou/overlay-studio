@@ -73,6 +73,10 @@ interface TopBarProps {
   onToggleMute: () => void;
   onPlayPause: () => void;
   onReset: () => void;
+  onSaveProject: () => void;
+  saveStatus: string;
+  ratio: "h" | "v" | "4:3";
+  onRatio:(ratio:"h" | "v" | "4:3")=>void;
   onImportJson: (file: File | null) => void;
   onLoadDemo: () => void;
   /* 效果库 */
@@ -201,7 +205,7 @@ export function TopBar({
   onToggleMute,
   onPlayPause,
   onReset,
-  onImportJson,
+  onSaveProject, saveStatus, ratio, onRatio, onImportJson,
   onLoadDemo,
   effectName,
   onReplay,
@@ -239,7 +243,8 @@ export function TopBar({
     <div className="topbar">
       <div className="tb-brand">
         OVERLAY<em>/</em>STUDIO
-        <span className="tb-ver" title={VERSION_TITLE}>{VERSION_LABEL}</span>
+        <span className="tb-ver" title={VERSION_TITLE}>{VERSION_LABEL}<br/>免费版 · 源码公开</span>
+        <span className="project-state" title={saveStatus}>{saveStatus}</span>
       </div>
 
       {/* 模式切换:一眼看清自己在哪 */}
@@ -252,18 +257,16 @@ export function TopBar({
       >
         效果库
       </button>
-      {/* 版本指南入口。放在两个模式切换的紧右边 —— 眼睛本来就扫这一片,
-          又不混进右边那排干活的按钮(那儿每次导出都会看到,容易烦)。
-          地址为空时整个不渲染。 */}
       {PROMO_URL ? (
         <a
           className="tb-pro"
           href={PROMO_URL}
           target="_blank"
           rel="noreferrer"
-          title="去官网看基础版和专业版差在哪,以及怎么联系作者"
+          aria-label="升级 Pro（在新标签页打开官网购买页）"
+          title="在新标签页打开 Overlay Studio Pro 官网购买页"
         >
-          官网 ↗
+          升级 Pro ↗
         </a>
       ) : null}
 
@@ -490,7 +493,7 @@ export function TopBar({
               {muted ? "静音" : "声音"}
             </button>
             <button className="tb-btn" onClick={() => jsonRef.current?.click()}>
-              导入 JSON
+              打开工程
             </button>
           </>
         ) : (
@@ -502,6 +505,10 @@ export function TopBar({
         )}
         {/* 示例两个标签页都放:在效果库里点会载入演示并自动切回编辑台。
             只放编辑台的话,人在效果库页会以为这个按钮"没有了" */}
+        <select className="tb-btn" aria-label="画幅" value={ratio} onChange={e=>onRatio(e.target.value as typeof ratio)}>
+          <option value="h">16:9 横版</option><option value="v">9:16 竖版</option><option value="4:3">4:3 横版</option>
+        </select>
+        <button className="tb-btn" disabled={!hasDoc} onClick={onSaveProject}>保存工程</button>
         <button className="tb-btn" onClick={onLoadDemo} title="载入内置演示编排,不需要自己的视频">
           🎬 示例
         </button>
@@ -512,17 +519,15 @@ export function TopBar({
         >
           {videoBusy ? "⏳ 上传中…" : hasVideo ? "换视频" : "导入视频"}
         </button>
-        {tab === "edit" && (
-          <button className="tb-btn tb-btn--primary" onClick={onExport} disabled={exporting}>
-            {exporting ? "导出中…" : "⬇ 导出透明 MOV"}
-          </button>
-        )}
+        <button className="tb-btn tb-btn--primary" onClick={onExport} disabled={exporting}>
+          {exporting ? "导出中…" : tab === "edit" ? "导出透明 MOV" : "导出单卡"}
+        </button>
       </div>
 
       <input
         ref={jsonRef}
         type="file"
-        accept=".json,application/json"
+        accept=".json,.overlaypack,application/json"
         style={{ display: "none" }}
         onChange={(e) => {
           onImportJson(e.target.files?.[0] ?? null);

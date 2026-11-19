@@ -1,25 +1,28 @@
 @echo off
-REM ============================================================
-REM Overlay Studio 启动器(Windows)
-REM 双击即可:启动本地服务器并自动打开浏览器
-REM 关闭方法:关掉这个命令行窗口即停止服务器
-REM ============================================================
+setlocal
 chcp 65001 >nul
-cd /d "%~dp0"
-
-echo 🎬 Overlay Studio 启动中...
-
-where npm >nul 2>nul
+cd /d "%~dp0" || exit /b 1
+where npm.cmd >nul 2>nul
 if errorlevel 1 (
-  echo ❌ 找不到 Node.js/npm。请先安装 Node.js: https://nodejs.org
+  echo Please install Node.js 22.12 or later, then restart this launcher.
   pause
   exit /b 1
 )
-
-if not exist "node_modules" (
-  echo 📦 首次运行,安装依赖...
-  call npm install
+node -e "const [a,b]=process.versions.node.split('.').map(Number); process.exit(a>22 || (a===22 && b>=12) ? 0 : 1)"
+if errorlevel 1 (
+  echo Node.js 22.12 or later is required.
+  pause
+  exit /b 1
 )
-
-echo 🚀 启动本地服务器: http://localhost:5177/
-call npm run dev
+if not exist "node_modules\vite\bin\vite.js" (
+  echo Installing locked Overlay Studio dependencies...
+  call npm.cmd ci --no-audit --no-fund
+  if errorlevel 1 (
+    echo Installation failed. Check the message above and retry.
+    pause
+    exit /b 1
+  )
+)
+echo Starting Overlay Studio at http://localhost:5177/
+call npm.cmd run dev
+exit /b %errorlevel%

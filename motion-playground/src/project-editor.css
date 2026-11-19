@@ -1,0 +1,64 @@
+.project-dialog {
+  color: var(--ink, inherit);
+  background: var(--panel, #202229);
+  border: 1px solid var(--border, #777);
+  border-radius: 12px;
+  width: min(420px, 90vw);
+  padding: 24px;
+}
+.project-dialog::backdrop {
+  background: #0008;
+}
+.project-dialog form,
+.project-dialog label {
+  display: grid;
+  gap: 8px;
+}
+.project-dialog form {
+  gap: 14px;
+}
+.project-dialog h2,
+.project-dialog p {
+  margin: 0;
+}
+.project-dialog input,
+.project-dialog select {
+  font: inherit;
+  padding: 7px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.project-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.project-warning {
+  padding: 6px 12px;
+  background: #fff2cf;
+  color: #36280b;
+}
+.project-state {
+  font-size: 11px;
+  max-width: 20em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-project-glass="dark"] .hud-anchor {
+  background-color: rgb(18 22 30 / var(--project-glass-alpha, 0.6));
+  border-radius: 12px;
+}
+[data-project-glass="light"] .hud-anchor {
+  background-color: rgb(255 255 255 / var(--project-glass-alpha, 0.6));
+  border-radius: 12px;
+}
+[data-project-shadow="soft"] .hud {
+  filter: drop-shadow(0 6px 12px #0007);
+}
+[data-project-shadow="hard"] .hud {
+  filter: drop-shadow(2px 4px 2px #000b);
+}
+[data-project-shadow="outline"] .hud {
+  filter: drop-shadow(1px 1px 1px #000) drop-shadow(-1px -1px 1px #000);
+}
