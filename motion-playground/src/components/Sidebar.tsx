@@ -588,10 +588,10 @@ export function Sidebar({
         )}
 
         {/* 导出透明动效层 */}
-        {tab === "edit" && (
+        {(
         <div className="export-row">
           <button className="export-btn" onClick={onExport} disabled={exporting}>
-            {exporting ? "⏳ 导出中…请稍候" : "⬇ 导出整条时间轴(透明)"}
+            {exporting ? "⏳ 导出中…请稍候" : tab === "edit" ? "⬇ 导出整条时间轴(透明)" : "⬇ 导出单卡(透明)"}
           </button>
         </div>
         )}

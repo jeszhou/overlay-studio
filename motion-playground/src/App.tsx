@@ -47,6 +47,7 @@ function addSecFor(kind: string) {
   return kind === "focus-card" ? 15 : 5;
 }
 
+const VideoExport = lazy(() => import("./components/VideoExport").then((m) => ({ default: m.VideoExport })));
 const ProjectDialog = lazy(() => import('./components/ProjectDialog').then(m => ({default: m.ProjectDialog})));
 const ImportProjectDialog = lazy(() => import('./components/ProjectDialog').then(m => ({default: m.ImportProjectDialog})));
 
@@ -81,14 +82,7 @@ export default function App() {
   const [fxScale, setFxScale] = useState(1);
   // 导出透明动效层
   const [exporting, setExporting] = useState(false);
-  // 导出进度(每秒轮询 /api/export-status)
-  const [exportProg, setExportProg] = useState<{
-    stage: string;
-    frame: number;
-    total: number;
-    startedAt: number;
-    framesAt: number;
-  } | null>(null);
+  const [exportDialog, setExportDialog] = useState(false);
 
   // ---- 编辑台:时间轴 ----
   const [overlay, setOverlay] = useState<OverlayDoc | null>(null);
@@ -632,10 +626,10 @@ export default function App() {
     }
     pushHistory(true);
     setSrt(lines);
-    if (!overlay) setOverlay(newProject());
-    // 已有编排且还没有字幕层卡:自动生成一张常驻双语字幕卡(中文先就位,
+    const project = overlay ?? newProject();
+    // 编排里还没有字幕层卡:自动生成一张常驻双语字幕卡(中文先就位,
     // 英文和 *关键词* 由生成器或你在右栏字幕表里补)
-    if (overlay && !overlay.cards.some((c) => c.kind === "caption-track")) {
+    if (!project.cards.some((c) => c.kind === "caption-track")) {
       const def = EFFECTS.find((e) => e.id === "caption-track");
       const end = Math.ceil(Math.max(...lines.map((l) => l.end)));
       const linesText = lines
@@ -648,11 +642,11 @@ export default function App() {
         )
         .join("\n");
       setOverlay({
-        ...overlay,
+        ...project,
         cards: [
-          ...overlay.cards,
+          ...project.cards,
           {
-            id: `caption-track-${overlay.cards.length + 1}`,
+            id: `caption-track-${project.cards.length + 1}`,
             kind: "caption-track",
             start: 0,
             end,
@@ -890,103 +884,18 @@ export default function App() {
     // 新卡在轨道上直接看得见,不用换页确认。
   };
 
-  const handleExport = async () => {
+  const handleExport = () => {
     if (exporting) return;
-    if (!overlay || overlay.cards.length === 0) {
-      alert("时间轴上还没有卡片:先 📥 导入 JSON,或去 ✨ 效果库 ➕ 加入卡片。");
+    if (tab === "edit" && !overlay?.cards.length) {
+      alert("请先打开编排或添加卡片");
       return;
     }
-    setExporting(true);
-    // 完成时发系统通知(切去别的应用也能收到);先申请权限
-    if ("Notification" in window && Notification.permission === "default")
-      Notification.requestPermission().catch(() => {});
-    // 每秒轮询导出进度,驱动右下角进度浮窗
-    const poll = window.setInterval(async () => {
-      try {
-        const r = await fetch("/api/export-status");
-        const p = await r.json();
-        if (p.running) setExportProg(p);
-      } catch {
-        /* 服务器重启等瞬时失败,忽略 */
-      }
-    }, 1000);
-    // 学习闭环:定稿导出时也落一份「初选 vs 终选」日志
-    fetch("/api/review-log", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        savedAt: new Date().toISOString(),
-        origin: originRef.current,
-        final: overlay,
-      }),
-    }).catch(() => {});
+    setExportDialog(true);
+  };
+  const recordTimelineExport = () => {
+    void fetch("/api/review-log",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({savedAt:new Date().toISOString(),origin:originRef.current,final:overlay})}).catch(()=>{});
     maybeShowLearnTip();
-    try {
-      // 导出帧率:相机/手机拍的素材是 NTSC 29.97fps(30000/1001),动效层按 30 导会
-      // 越走越快 —— 166s 累计漂移约 5 帧,片尾能看出动效和口型对不上
-      const EXPORT_FPS = 29.97;
-      // 导出整条 overlay(时长 = 最后一张卡结束 + 0.5s 尾巴)
-      // 尾巴是留给末尾音效收干净的,别用 ceil 取整 —— 28.0s 的片子会被抬到 29s,
-      // 白白多出整整一秒空帧(卡片走到 end 就卸掉了,尾巴里什么都没有)。
-      const body = {
-        doc: overlay,
-        scale: fxScale,
-        speed: animSpeed,
-        fps: EXPORT_FPS,
-        duration: Math.max(...overlay.cards.map((c) => c.end)) + 0.5,
-      };
-      const res = await fetch("/api/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      // 线上试玩版没有导出后端(逐帧渲染要本地无头 Chrome + ffmpeg):给友好提示,不甩报错。
-      // 判断依据只能是「返回的不是 JSON」—— 静态托管会回 HTML(404 或 SPA 回退)。
-      // 不能用 !res.ok:本地导出失败时服务端返回的是 500 + JSON,里面带着真正的
-      // 失败原因,当成"线上版"会把这条信息直接丢掉,用户和你都不知道到底为什么失败。
-      if (!(res.headers.get("content-type") ?? "").includes("json")) {
-        alert(
-          "🌐 当前是线上试玩版,不支持导出。\n\n导出透明 MOV 需要在本地运行:\n  git clone 仓库 → npm install → npm run dev\n\n完整步骤见 README「快速开始」。",
-        );
-        return;
-      }
-      const data = await res.json();
-      if (data.ok) {
-        if ("Notification" in window && Notification.permission === "granted")
-          new Notification("✅ 动效层导出完成", {
-            body: data.mov ? `MOV 已就绪:${String(data.mov).split("/").pop()}` : "PNG 序列已就绪",
-          });
-        if (!data.mov) {
-          alert(
-            "⚠️ 只导出了 PNG 序列,没有生成 MOV。\n\n" +
-              "原因:本机没有装 ffmpeg(合成透明视频要用它)。\n\n" +
-              "装好之后重新导出即可:\n" +
-              "  macOS:   brew install ffmpeg\n" +
-              "  Windows: winget install --id Gyan.FFmpeg -e\n\n" +
-              `PNG 序列已经在这儿了:\n${data.dir}`,
-          );
-          return;
-        }
-        const files = [
-          data.mov ? `🎞 透明 MOV(剪映直接拖):\n${data.mov}` : null,
-          data.webm ? `🌐 透明 WebM(小体积):\n${data.webm}` : null,
-          `🖼 PNG 序列 ${data.frames} 帧 @ ${data.fps}fps`,
-        ]
-          .filter(Boolean)
-          .join("\n\n");
-        alert(`✅ 导出完成!\n\n${files}\n\n文件夹:\n${data.dir}`);
-      } else {
-        const raw = String(data.error ?? "未知错误");
-        const i = raw.lastIndexOf("【导出失败原因】");
-        alert(`❌ 导出失败\n\n${i === -1 ? raw : raw.slice(i)}`);
-      }
-    } catch (e) {
-      alert(`❌ 导出失败:${e}`);
-    } finally {
-      window.clearInterval(poll);
-      setExporting(false);
-      setExportProg(null);
-    }
   };
 
   const handleVideo = async (file: File | null) => {
@@ -1306,7 +1215,25 @@ export default function App() {
       </div>
 
       {/* 导出进度浮窗(右下角):渲染帧数 + 预计剩余 + 合成阶段 */}
-      {exporting && <ExportProgress prog={exportProg} />}
+      <Suspense fallback={null}>
+        <VideoExport
+          open={exportDialog}
+          close={() => setExportDialog(false)}
+          library={tab === "library"}
+          document={overlay}
+          projectDir={projectDir}
+          title={effect.name}
+          effectId={selectedId}
+          params={paramsById[selectedId]}
+          scale={fxScale}
+          speed={animSpeed}
+          videoScale={videoScale}
+          onBusy={setExporting}
+          onTimelineExport={recordTimelineExport}
+          onConfigure={handleExport}
+          onFps={(rate) => setOverlay((o) => o && (o.exportFps ?? 29.97) !== rate ? { ...o, exportFps: rate } : o)}
+        />
+      </Suspense>
 
       {/* 检查器浮窗(左下角):导入 JSON 自动体检的结果,只提醒不阻断 */}
       {lintIssues.length > 0 && (
@@ -1383,55 +1310,6 @@ function LintPanel({
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function ExportProgress({
-  prog,
-}: {
-  prog: { stage: string; frame: number; total: number; startedAt: number; framesAt: number } | null;
-}) {
-  let pct = 2;
-  let text = "准备中(启动渲染器)…";
-  if (prog) {
-    if (prog.stage === "extract") {
-      text = "预处理素材:把卡片里的视频抽成帧(长录屏要几分钟)…";
-    } else if (prog.stage === "frames" && prog.total > 0) {
-      // 渲染帧占进度的前 80%,后面是合成/混音
-      pct = Math.max(2, Math.round((prog.frame / prog.total) * 80));
-      // ⚠️ 只按「逐帧渲染开跑之后」的耗时算(framesAt,不是 startedAt)。
-      // 用任务启动时刻的话,前面抽帧/启浏览器那几分钟会被摊进每帧耗时,
-      // 第一次报数(第 30 帧)能报出几十分钟,然后一路往下掉 —— 纯属吓人。
-      const elapsed = (Date.now() - (prog.framesAt || prog.startedAt)) / 1000;
-      const eta =
-        prog.frame > 0
-          ? Math.round((elapsed / prog.frame) * (prog.total - prog.frame))
-          : 0;
-      const fmt =
-        eta >= 60 ? `${Math.floor(eta / 60)} 分 ${eta % 60} 秒` : `${eta} 秒`;
-      text = `渲染帧 ${prog.frame}/${prog.total} · 预计还需 ${fmt}`;
-    } else if (prog.stage === "mov") {
-      pct = 84;
-      text = "合成透明 MOV(长视频这步要几分钟)…";
-    } else if (prog.stage === "webm") {
-      pct = 93;
-      text = "合成 WebM 小体积版…";
-    } else if (prog.stage === "sfx") {
-      pct = 98;
-      text = "把音效混进 MOV…";
-    }
-  }
-  return (
-    <div className="export-prog">
-      <div className="export-prog-head">
-        <span>🎞 导出中</span>
-        <b>{pct}%</b>
-      </div>
-      <div className="export-prog-bar">
-        <i style={{ width: `${pct}%` }} />
-      </div>
-      <div className="export-prog-sub">{text}</div>
     </div>
   );
 }

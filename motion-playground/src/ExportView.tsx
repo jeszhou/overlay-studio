@@ -1,3 +1,5 @@
+import {flushSync} from 'react-dom';
+import {storedVideoFrame} from './storedVideoFrame';
 import { inkVars } from "./effects/hud/accent";
 import { BreathContext } from "./effects/breath";
 import { useEffect, useState } from "react";
@@ -122,7 +124,8 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
     (window as unknown as { __setExportT?: (sec: number) => void }).__setExportT = (sec) => {
       // 卡内计时钩子的权威时钟(见 useAnimation.clockNow)
       (window as unknown as { __fxExportMs?: number }).__fxExportMs = sec * 1000;
-      setT(sec);
+      if ((window as Window & {__DIRECT_FRAME?:boolean}).__DIRECT_FRAME) flushSync(() => setT(sec));
+      else setT(sec);
     };
   }, []);
 
@@ -157,6 +160,8 @@ function TimelineExport({ doc, scale, speed }: { doc: OverlayDoc; scale: number;
       <ProjectFonts assets={doc.fontAssets}/>
       <div
         className={`stage is-hud is-export${doc.glow ? "" : " no-glow"}`}
+        data-export-empty={!active.length}
+        data-export-time={t}
         data-theme={doc.theme ?? "dark"}
         style={{
           ...stageStyle(scale, doc.ratio),
@@ -181,7 +186,7 @@ export function ExportView() {
     (window as any).__seekVideos = (t: number) => {
       const man = ((window as any).__VID_FRAMES ?? {}) as Record<
         string,
-        { dir: string; fps: number; count: number; dur: number }
+        { dir: string; fps: number; count: number; dur: number; ranges?: {start:number;end:number;offset:number}[] }
       >;
       document.querySelectorAll<HTMLImageElement>("img[data-fx-vidimg]").forEach((im) => {
         const m = man[im.getAttribute("data-fx-src") ?? ""];
@@ -193,7 +198,7 @@ export function ExportView() {
         // 循环短素材(证据小窗):按素材时长取模,播完从头再来
         if (im.dataset.fxLoop && m.dur > 0) target = target % m.dur;
         const idx = Math.min(m.count - 1, Math.floor(target * m.fps));
-        const want = `${m.dir}/f_${String(idx + 1).padStart(5, "0")}.jpg`;
+        const want = `${m.dir}/f_${String(storedVideoFrame(idx, m.ranges) + 1).padStart(5, "0")}.jpg`;
         if (im.getAttribute("src") !== want) im.setAttribute("src", want);
       });
     };
@@ -208,7 +213,11 @@ export function ExportView() {
   // 编排优先读导出脚本注入的 __EXPORT_DOC(整份编排走 URL 会超长 → HTTP 431);
   // URL 的 ?doc= 仅作短编排/手工调试的兜底
   const injected = (window as unknown as { __EXPORT_DOC?: string }).__EXPORT_DOC;
-  const { doc, error } = parseOverlay(injected ?? q.get("doc") ?? "{}");
+  const direct = q.get("effect");
+  const input = direct ? {version:1,ratio:q.get("ratio"),cards:[{
+    id:"single",kind:direct,start:0,end:Number(q.get("duration")) || 6,params:JSON.parse(q.get("p") || "{}"),
+  }]} : injected ?? q.get("doc") ?? "{}";
+  const { doc, error } = parseOverlay(input);
   if (error || !doc) return <div style={{ color: "red" }}>{error}</div>;
   // 烤入人物的卡:这几段导出后在剪映里要盖掉原始口播轨,否则会看到两层人。
   // 判断依据是卡有没有 camSrc 控件(不写死卡名,以后新加的卡自动算进来)。

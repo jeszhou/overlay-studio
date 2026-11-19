@@ -48,6 +48,7 @@ export interface OverlayDoc {
   layerOrder?: "manual";
   fontAssets?: {family: string; url: string; weight?: string}[];
   ratio?: "h" | "v" | "4:3";
+  exportFps?: number;
   videoScale?: number;
   fxScale?: number;
   animSpeed?: number;
@@ -146,6 +147,7 @@ export function parseOverlay(raw: unknown): {
         fontAssets: Array.isArray(o.fontAssets) ? o.fontAssets.filter((f: {url:string;family:string}) => f && typeof f.family === 'string' && typeof f.url === 'string' && /^\/_projects\//.test(f.url)) : undefined,
         ratio: o.ratio === '4:3' || o.ratio === 'v' ? o.ratio : undefined,
         layerOrder: o.layerOrder === 'manual' ? 'manual' : undefined,
+        exportFps: [29.97,30,50,60].includes(o.exportFps) ? o.exportFps : undefined,
         videoScale: Number.isFinite(o.videoScale) ? o.videoScale : undefined,
         fxScale: Number.isFinite(o.fxScale) ? o.fxScale : undefined,
         animSpeed: Number.isFinite(o.animSpeed) ? o.animSpeed : undefined,

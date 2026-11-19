@@ -6,7 +6,7 @@ import { isFolderPickerCancellation, resolveExportFolder } from "./scripts/expor
 
 /** Use the visible Windows common Save dialog to pick its containing folder. The explicit owner matters:
  * a dialog without one can stay hidden while the HTTP request waits forever. */
-function chooseExportFolder(initial: string): Promise<string | null> {
+export function chooseExportFolder(initial: string): Promise<string | null> {
   let command: string;
   let args: string[];
   if (process.platform === "win32") {
