@@ -30,3 +30,6 @@ lint-rules.local.json
 *.sw?
 
 public/_media
+
+.dist-stage-*/
+.dist-publish-lock/

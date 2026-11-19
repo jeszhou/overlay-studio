@@ -40,7 +40,7 @@ winget install --id Gyan.FFmpeg -e       # Windows(PowerShell)
 ```bash
 git clone https://github.com/jeszhou/overlay-studio.git
 cd overlay-studio/motion-playground
-npm install
+npm ci
 npm run dev
 ```
 
@@ -50,6 +50,20 @@ npm run dev
 
 > 装不动、或者想要一步步照着抄的版本(含 ffmpeg 装 PATH、国内镜像、字体怎么放),
 > 见 **[安装指南](安装指南.md)** —— Windows 和 macOS 都覆盖。
+
+Windows 用户解压源码 ZIP 后可以双击 `motion-playground/start-overlay-studio.bat`。首次启动会按锁文件安装依赖。保持命令窗口打开，在浏览器访问 `http://localhost:5177`。
+
+## 从干净源码构建发行包
+
+维护者在仓库根目录运行以下命令，输出目录须为新目录。命令按指定 Git 提交生成源码 ZIP，从这份 ZIP 独立构建前端，并写出两个包的 SHA-256。
+
+```bash
+python3 scripts/package-release.py --ref HEAD --output ../overlay-free-release
+```
+
+下载源码 ZIP 的用户也可以在 `motion-playground` 运行 `npm run build`。构建会在临时目录读取已登记且校验通过的文件，并按锁文件安装构建依赖。本地导入的视频、音效、项目草稿都留在工作目录。源码包包含编辑器与本地导出服务，dist 包供静态预览使用。
+
+修改构建输入后，先暂存准备发行的文件，再到 `motion-playground` 运行 `npm run build:manifest`。核对 `scripts/build-inputs.json` 中新增、删除及内容变化的路径，将清单与源码一起提交后再打包。
 
 ## 用你自己的视频(完整工作流)
 
