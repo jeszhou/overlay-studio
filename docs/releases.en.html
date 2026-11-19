@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="v1.3.0-rc.1 release candidate">
+  <title>Overlay Studio · Releases</title>
+  <link rel="alternate" hreflang="zh-CN" href="./releases.html">
+  <link rel="alternate" hreflang="en" href="./releases.en.html">
+  <link rel="stylesheet" href="./site.css">
+  <script src="./site.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="./en.html"><span class="mark" aria-hidden="true"></span>Overlay Studio</a>
+      <nav class="primary-nav" aria-label="Main navigation">
+        <a href="./en.html#install">Quick start</a>
+        <a href="./releases.en.html" aria-current="page">Releases</a>
+        <a href="https://github.com/jeszhou/overlay-studio">GitHub</a>
+      </nav>
+      <nav class="languages" aria-label="Language">
+        <a lang="zh-CN" hreflang="zh-CN" href="./releases.html">简体中文</a>
+        <a lang="en" hreflang="en" href="./releases.en.html" aria-current="page">English</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap" id="content" tabindex="-1">
+    <section class="release-intro">
+      <p class="edition">Releases</p>
+      <h1>v1.3.0-rc.1 release candidate</h1>
+      <div class="actions">
+        <a class="button primary" href="https://github.com/jeszhou/overlay-studio/pull/8">View candidate PR</a>
+        <a class="button secondary" href="https://github.com/jeszhou/overlay-studio/releases/latest">Download a published release</a>
+      </div>
+    </section>
+
+    <section class="section release-section" aria-labelledby="changes-title">
+      <h2 id="changes-title">What changed</h2>
+      <ul>
+        <li>Save, recover, and reopen projects. Existing arrangements remain editable.</li>
+        <li>Export a single card or the full timeline to transparent MOV and WebM, with progress, cancellation, and retry.</li>
+        <li>Build distribution packages from a specific Git commit. The Windows launcher installs dependencies from the lockfile.</li>
+      </ul>
+    </section>
+
+    <section class="section release-section" aria-labelledby="windows-title">
+      <h2 id="windows-title">Windows verification</h2>
+      <p>The source ZIP was installed on a fresh setup in a Windows 11 ARM64 virtual machine. Installation used a verified dependency cache. Both export jobs ran in the default rendering mode. All four output files were decoded to verify transparency and audio.</p>
+      <table>
+        <thead><tr><th scope="col">Demo</th><th scope="col">MOV</th><th scope="col">WebM</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Single card</th><td>78 frames<br>1 sound effects</td><td>78 frames</td></tr>
+          <tr><th scope="row">Full timeline</th><td>854 frames<br>16 sound effects</td><td>854 frames</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section release-section" aria-labelledby="download-title">
+      <h2 id="download-title">Choose a download</h2>
+      <p>Use the source ZIP for local installation, editing, and export. Use the dist ZIP for a static preview. For published builds, choose the source package from GitHub Releases.</p>
+      <div class="actions"><a class="button secondary" href="./en.html#install">View installation steps</a></div>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <span>Overlay Studio · 一页枝鸥</span>
+      <nav aria-label="Project links">
+        <a href="./versions.html">Compare editions (Chinese)</a>
+        <a href="https://www.overlaystudio.cn/purchase/#checkout">Get Pro</a>
+        <a href="https://github.com/jeszhou/overlay-studio/blob/main/LICENSE-EN">License</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

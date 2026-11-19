@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Give AI a timestamped transcript to arrange 20 free motion cards. Refine them in the local editor and export a transparent MOV or WebM to layer over your footage.">
+  <title>Overlay Studio · Free motion graphics editor</title>
+  <link rel="alternate" hreflang="zh-CN" href="./index.html">
+  <link rel="alternate" hreflang="en" href="./en.html">
+  <link rel="stylesheet" href="./site.css">
+  <script src="./site.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="./en.html"><span class="mark" aria-hidden="true"></span>Overlay Studio</a>
+      <nav class="primary-nav" aria-label="Main navigation">
+        <a href="./en.html#install">Quick start</a>
+        <a href="./releases.en.html">Releases</a>
+        <a href="https://github.com/jeszhou/overlay-studio">GitHub</a>
+      </nav>
+      <nav class="languages" aria-label="Language">
+        <a lang="zh-CN" hreflang="zh-CN" href="./index.html">简体中文</a>
+        <a lang="en" hreflang="en" href="./en.html" aria-current="page">English</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap" id="content" tabindex="-1">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="edition">Free edition · Source available</p>
+        <h1 id="hero-title">Motion graphics<br>for your videos.</h1>
+        <p class="lede">Give AI a timestamped transcript to arrange 20 free motion cards. Refine them in the local editor and export a transparent MOV or WebM to layer over your footage.</p>
+        <div class="actions">
+          <a class="button primary" href="#install">Install Overlay Studio</a>
+          <a class="button secondary" href="./releases.en.html">Releases & downloads</a>
+        </div>
+      </div>
+      <img class="hero-art" src="./hero.webp" width="1672" height="941" fetchpriority="high" alt="Layered motion graphics with an alpha checkerboard, charts, and subtitle bars above a timeline">
+    </section>
+
+    <section class="section" id="install" aria-labelledby="install-title">
+      <h2 id="install-title">Quick start</h2>
+      <p class="intro">Ask an AI tool to check your setup and launch the editor, or follow the steps for your system.</p>
+      <div class="install-grid">
+        <article class="panel ai-panel">
+          <h3>Ask AI to install it</h3>
+          <p>Open the full repository in an AI tool that can run your local terminal. If you have not downloaded it yet, open the parent folder where you want to install it, then share this prompt.</p>
+          <pre id="install-prompt"><code>Install and launch the free edition of Overlay Studio on this computer. Prefer the source already in the current folder.
+If the source is missing, get it from https://github.com/jeszhou/overlay-studio and place it in a new folder.
+Check Node.js (22.12 or later), npm, FFmpeg, and ffprobe. Use official installation methods for missing tools.
+In motion-playground, run npm ci using package-lock.json, then run npm run dev.
+Verify that http://localhost:5177 opens and keep the server running. Tell me the install path, how to restart it, and how to open the demo and export a transparent MOV.</code></pre>
+          <div class="copy-row">
+            <button type="button" data-copy="install-prompt" data-copied="Copied" data-failed="Select and copy the prompt manually." hidden>Copy install prompt</button>
+            <span class="copy-status" role="status"></span>
+          </div>
+        </article>
+        <article class="panel">
+          <h3>Install manually</h3>
+          <p>In GitHub Releases, choose Source code (zip) under Assets and extract it, or clone with Git. Install Node.js 22.12 or later. Export also requires FFmpeg and ffprobe.</p>
+          <p class="text-links"><a href="https://github.com/jeszhou/overlay-studio/releases/latest">Download source ZIP</a><a href="https://nodejs.org/">Download Node.js</a></p>
+          <details>
+            <summary>Windows</summary>
+            <p>Install FFmpeg in PowerShell and reopen the terminal. Open motion-playground and double-click start-overlay-studio.bat to install and launch.</p>
+            <pre><code>winget install --id Gyan.FFmpeg -e</code></pre>
+          </details>
+          <details>
+            <summary>macOS</summary>
+            <p>Install FFmpeg with Homebrew, then open motion-playground in the source folder.</p>
+            <pre><code>brew install ffmpeg
+npm ci
+npm run dev</code></pre>
+          </details>
+          <p class="text-links"><a href="https://github.com/jeszhou/overlay-studio/blob/main/安装指南.md">Full install guide (Chinese)</a></p>
+        </article>
+      </div>
+      <div class="run-callout">
+        <div><h3>Open the editor</h3><p>Keep the terminal running. Open localhost:5177, select 示例 (Demo), play the sample, and choose 导出透明 MOV (Export transparent MOV).</p></div>
+        <a class="button secondary" href="http://localhost:5177/">localhost:5177</a>
+      </div>
+    </section>
+
+    <section class="section workflow" aria-labelledby="workflow-title">
+      <h2 id="workflow-title">Create overlays from your subtitles</h2>
+      <ol class="steps">
+        <li><h3>Export SRT</h3><p>Export your timestamped subtitles from your video editor.</p></li>
+        <li><h3>Arrange with AI</h3><p>Give your AI tool the full repo and SRT. The bundled overlay-fx-generator Skill produces an overlay JSON.</p></li>
+        <li><h3>Edit and export</h3><p>Import the JSON and footage, refine the cards, and layer the transparent MOV or WebM over your video.</p></li>
+      </ol>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <span>Overlay Studio · 一页枝鸥</span>
+      <nav aria-label="Project links">
+        <a href="./versions.html">Compare editions (Chinese)</a>
+        <a href="https://www.overlaystudio.cn/purchase/#checkout">Get Pro</a>
+        <a href="https://github.com/jeszhou/overlay-studio/blob/main/LICENSE-EN">License</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>
