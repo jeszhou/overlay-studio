@@ -91,6 +91,9 @@ const stageStyle = (scale: number, ratio?: string) => {
     top: 0,
     width: w,
     height: h,
+    // 与预览画布一致:满屏元素按画幅铺,竖版导出不沿用横版尺寸
+    ["--stage-w" as string]: `${w}px`,
+    ["--stage-h" as string]: `${h}px`,
     ["--hud-scale" as string]: scale,
   } as React.CSSProperties;
 };
