@@ -307,6 +307,9 @@ export function Canvas({
         style={{
           width: STAGE_W,
           height: STAGE_H,
+          // 口播视频框、章节条等按这两个变量铺满画布;不跟着画幅写,竖版会沿用横版的 1920×1080
+          ["--stage-w" as string]: `${STAGE_W}px`,
+          ["--stage-h" as string]: `${STAGE_H}px`,
           transform: `translate(-50%, -50%) scale(${scale})`,
           ["--hud-scale" as string]: fxScale,
           ...(font ? { ["--hud-font" as string]: `"${font}"` } : {}),
