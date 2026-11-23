@@ -1,0 +1,21 @@
+/* ── donut-split 环形占比 ── */
+.nv-dn-plate { width: 580px; padding: 24px 28px 24px; }
+.nv-dn-title { font-size: 30px; font-weight: 800; white-space: nowrap; margin-bottom: 8px; }
+.nv-dn-row { display: flex; align-items: center; gap: 26px; }
+.nv-dn-ring { position: relative; width: 260px; height: 260px; flex: none; }
+.nv-dn-ring svg { display: block; overflow: visible; }
+.nv-dn-tick { stroke: var(--nv-faint); stroke-width: 1.4; stroke-linecap: round; }
+.nv-dn-track { fill: none; stroke: color-mix(in srgb, var(--nv-ink) 8%, transparent); }
+.nv-dn-dot { fill: var(--nv-ink); }
+.nv-dn-center {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+}
+.nv-dn-center span { display: block; font-size: 16px; color: var(--nv-muted); margin-bottom: 2px; white-space: nowrap; }
+.nv-dn-center b { font-size: 44px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.nv-dn-center small { font-size: 20px; margin-left: 2px; }
+.nv-dn-legend { display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 0; }
+.nv-dn-item { display: flex; align-items: center; gap: 12px; font-size: 21px; white-space: nowrap; }
+.nv-dn-item i { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+.nv-dn-item span { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.nv-dn-item b { font-size: 19px; color: var(--nv-muted); }
+.nv-dn-item.is-on b { color: var(--hud-acc); }

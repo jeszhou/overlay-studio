@@ -1,0 +1,35 @@
+/* ── waterfall-bridge 瀑布图 ── */
+.nv-wf-plate { padding: 24px 28px 18px; }
+.nv-wf-title { font-size: 30px; font-weight: 800; white-space: nowrap; margin-bottom: 44px; }
+.nv-wf-chart { position: relative; }
+.nv-wf-svg { display: block; overflow: visible; }
+.nv-wf-grid { stroke: var(--nv-line); stroke-width: 1; stroke-dasharray: 2 6; }
+.nv-wf-axis { stroke: var(--nv-faint); stroke-width: 2; }
+.nv-wf-link { stroke: var(--nv-faint); stroke-width: 1.6; stroke-dasharray: 4 4; }
+.nv-wf-base { fill: color-mix(in srgb, var(--nv-ink) 46%, var(--nv-plate-solid)); }
+.nv-wf-up { fill: var(--nv-ok); }
+.nv-wf-down { fill: var(--nv-bad); }
+.nv-wf-end { fill: var(--hud-acc); }
+.nv-wf-val {
+  position: absolute; transform: translateX(-50%); transform-origin: 50% 100%;
+  font-family: var(--nv-mono); font-size: 17px; font-weight: 700; white-space: nowrap;
+}
+.nv-wf-val.is-up { color: var(--nv-ok); }
+.nv-wf-val.is-down { color: var(--nv-bad); }
+.nv-wf-val.is-end { font-size: 26px; font-weight: 800; color: var(--hud-acc); }
+.nv-wf-name {
+  position: absolute; transform: translateX(-50%); text-align: center;
+  font-size: 15px; color: var(--nv-muted); line-height: 1.2;
+}
+.nv-wf-name.is-end { color: var(--nv-ink); font-weight: 700; }
+.nv-wf-badge {
+  position: absolute; transform-origin: 100% 100%;
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 7px 12px; border-radius: 12px;
+  background: color-mix(in srgb, var(--nv-ok) 16%, var(--nv-plate-solid));
+  border: 1px solid color-mix(in srgb, var(--nv-ok) 45%, transparent);
+}
+.nv-wf-badge b { font-size: 18px; color: var(--nv-ok); white-space: nowrap; }
+.nv-wf-badge small { font-size: 13px; color: var(--nv-muted); }
+.nv-wf-badge.is-down { background: color-mix(in srgb, var(--nv-bad) 16%, var(--nv-plate-solid)); border-color: color-mix(in srgb, var(--nv-bad) 45%, transparent); }
+.nv-wf-badge.is-down b { color: var(--nv-bad); }

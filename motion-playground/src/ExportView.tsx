@@ -11,6 +11,7 @@ import {stageSize} from "./overlay/stage-size.mjs";
 import {ProjectFonts} from "./components/ProjectFonts";
 import "./project-editor.css";
 import "./effects/hud/hud.css";
+import "./effects/hud/narrative/index.css";
 import "./App.css";
 
 /**

@@ -106,7 +106,7 @@ description: 特效生成——当用户提供 SRT 字幕文件(或带时间戳�
 动效是**视觉伴奏**,不是把字幕再打一遍。按这个优先级选卡:
 
 1. **证据优先(最高)**:观点要用数字和真素材背书,不要用文字复述——里程碑/成绩用 `stat-proof`(滚动计数);比例/达成度用 `ring-metric`;整数规模用 `odometer`;取舍、二选一用 `versus-card`;要演示的界面让用户「导入视频」把录屏铺成底,再用 `ui-callout` 圈出要讲的那块。
-2. **数字可视化**:一出现数字就用 `odometer`/`ring-metric`/`stat-proof`——大数字 + 一行小注,不写整句。
+2. **数字可视化**:单个数字用 `odometer`/`ring-metric`/`stat-proof`——大数字 + 一行小注,不写整句;排名/趋势用 `rank-bars`/`growth-curve`;前后涨幅用 `growth-bars`,占比拆解用 `donut-split`/`waffle-fill`,增减算账用 `waterfall-bridge`,多维对比用 `radar-profile`。
 3. **图标/图形结构**:并列列举 → `pin-board`(要点逐条钉住,讲过不撤);流程/步骤 → `step-timeline`(章节大纲)或 `checklist`(逐项打勾);二选一 → `versus-card`;文件/代码/和 AI 的拉扯对话 → `terminal-3d`。
 4. **实物图/截图/录屏**:引用他人的话 → `quote-lockup`(逐行揭示 + 署名);演示界面/网页/代码 → 没有专门的录屏运镜卡,让用户在 Studio 里「导入视频」把录屏铺成底,再用 `ui-callout` 圈出要讲的区域;讲界面某个区域 → `ui-callout` 圈出来。聊天记录、群消息这类长文字,让用户录屏或截图铺底,绝不要打成文字卡。
 5. **纯文字卡是最后的选择**:只给钩子/反转/金句时刻(`punch-pill`/`blur-text`/`type-shift`/`quote-lockup`),占比上限见【偏好·文字量】。
@@ -124,7 +124,7 @@ description: 特效生成——当用户提供 SRT 字幕文件(或带时间戳�
 
 - `dimAt`(秒,时间轴绝对时间):**讲过变浅+缩小**。到点后整卡压暗并缩小(幅度见【偏好·让位与压暗】,偏好表没给就用组件默认值),同 seg 顺排的卡缩放时(zoom 参与布局,下方内容自动上移补位,不会被挤出屏幕),但不退场;整个话题结束才用 `end` 退场。`dimMode` 可选让位方式:`both`(默认,变浅+缩小)/`fade`(只变浅)/`shrink`(只缩小),一般不用填。编排时给每张证据/论点卡都填:值 = 下一个话题开始的秒数。这是"组合感"的关键——旧信息在场但让位,观众随时能回看已讲过的论据。
 
-## 卡片库(20 种,只能用这些 kind)
+## 卡片库(25 种,只能用这些 kind)
 
 <!-- CARDS:AUTO-BEGIN 由 `npm run sync:cards` 从 registry.ts 生成。
      新增卡片后跑一次,表里会自动多一行;「触发条件」列写着「⬜ 待补」的需要人工补一句。
@@ -149,6 +149,11 @@ description: 特效生成——当用户提供 SRT 字幕文件(或带时间戳�
 | `odometer` | 翻牌计数器 | 单个整数的里程表滚轮 | `kicker`、`value`(整数)、`unit`、`label`、`position` |
 | `rank-bars` | 数据排名条 | 多项数据对比排名:"A 42%、B 21%" | `title`、`rows`(`名称,数值`用`\|`分隔)、`suffix`、`position`(left/right) |
 | `growth-curve` | 增长曲线:平滑曲线动画画出+渐变面积,峰值滚动计数 | "越攒越多/一路上涨"的复利叙事(粉丝数、资产库存、收入) | `kicker`/`kickerZh`、`points`(「标签 数值」`\|`分隔)、`unit`、`drawMs`(画完时长,卡点)、`caption`(数据口径)、`position` |
+| `growth-bars` | 前后两柱 + 涨幅 · 灰柱「之前」对强调色柱「之后」+ 涨幅贴纸 + 可选要点列 | 「从 10% 涨到了 22%,翻了一倍多」;两柱前后对比 + 涨幅贴纸,可带一列要点讲多出来的花在哪 | `title`(标题(*词*强调))、`note`、`aLabel`/`aValue`、`bLabel`/`bValue`、`unit`、`sticker`(涨幅贴纸)、`pointsTitle`/`points`(要点`\|`分隔,最多 5 条)、`times`(前柱\|后柱\|贴纸)、`pointTimes`、`position` |
+| `donut-split` | 环形占比 · 各段顺时针长出成环,念到哪项那段外弹发光、圆心切换占比 | 「整体由这几块组成」「最大的一块占了四成」;2–6 项占比构成,支持逐项聚焦 | `kickerEn`/`kickerZh`、`title`、`items`(一行一项`名称:数值`,2–6 项)、`unit`、`centerLabel`、`times`(开始画环秒)、`focusTimes`(每项念到秒`\|`分隔)、`position` |
+| `waterfall-bridge` | 瀑布图 · 起点柱升起,增项砸下、减项抽走,终点柱发光弹出总变化 | 「从 100 到 120,中间发生了什么」「增加了这些,又被这些吃掉了」;拆解增减过程,最多 6 步 | `kickerEn`/`kickerZh`、`title`、`start`(`名称:数值`)、`steps`(一行一步`名称:+数值/-数值`,最多 6 步)、`endLabel`、`unit`、`times`(起点柱\|终点柱)、`stepTimes`、`position` |
+| `radar-profile` | 雷达画像 · 网格展开,主对象多边形长出、可叠对比对象并标出差距最大轴 | 「强在哪、差在哪,一张图看清」「跟对手比这一项差了 30 分」;3–10 个维度对比 | `kickerEn`/`kickerZh`、`title`、`axes`(维度名`\|`分隔,3–10 个)、`nameA`/`valuesA`、`nameB`/`valuesB`(可空)、`max`、`times`(主对象\|对比\|差距轴)、`position` |
+| `waffle-fill` | 百格华夫 · 10×10 方格按类别灌满,图例数字滚动,灌完可聚焦一类 | 「每 100 个人里有 38 个是这样」「超过三分之一属于这一类」;2–8 类占比直观呈现 | `kickerEn`/`kickerZh`、`title`、`items`(一行一类`名称:数值`,2–8 类)、`unit`、`focus`(聚焦第几类,0=不聚焦)、`times`(开始灌\|聚焦)、`position` |
 
 ### 对比取舍(两个东西对撞/否定一个立一个)
 | kind | 用途 | 触发条件 | 关键 params |

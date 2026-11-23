@@ -1,0 +1,119 @@
+/* ═════════ 叙事卡底座(nv-)· 2026-10 新动效批次共用 ═════════
+   和精修版同一套语言:深色玻璃底板、白色粗体中文、mono 英文眉题、强调色点睛。
+   每张卡自己的样式写在各自前缀下(nv-xxx-),这里只放公共部分。 */
+
+.nv {
+  --nv-plate: linear-gradient(165deg, rgba(34, 35, 44, 0.95), rgba(17, 18, 24, 0.95));
+  --nv-plate-solid: #1b1c23;
+  --nv-line: rgba(255, 255, 255, 0.09);
+  --nv-ink: #ffffff;
+  --nv-muted: rgba(255, 255, 255, 0.62);
+  --nv-faint: rgba(255, 255, 255, 0.34);
+  --nv-sub: rgba(255, 255, 255, 0.06);
+  --nv-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --nv-ok: #5fd08a;
+  --nv-bad: #ff5a4e;
+  --nv-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --nv-sans: var(--hud-font, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif);
+  font-family: var(--nv-sans);
+  color: var(--nv-ink);
+  line-height: 1.25;
+  /* 整卡可点:画布上按住就能拖(拖动改 offsetX/Y)。别改回 none,改了 67 张叙事卡全拖不动 */
+  pointer-events: auto;
+}
+.nv[data-nv-theme="light"] {
+  --nv-plate: linear-gradient(165deg, rgba(255, 255, 255, 0.97), rgba(244, 242, 238, 0.97));
+  --nv-plate-solid: #f6f4f0;
+  --nv-line: rgba(20, 17, 14, 0.1);
+  --nv-ink: #14110e;
+  --nv-muted: rgba(20, 17, 14, 0.62);
+  --nv-faint: rgba(20, 17, 14, 0.36);
+  --nv-sub: rgba(20, 17, 14, 0.05);
+  --nv-shadow: 0 20px 50px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+  --nv-ok: #1f9d55;
+}
+
+.nv-plate {
+  position: relative;
+  background: var(--nv-plate);
+  border: 1px solid var(--nv-line);
+  border-radius: 22px;
+  box-shadow: var(--nv-shadow);
+  padding: 26px 30px;
+}
+.nv-plate.is-bare {
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 16px rgba(0, 0, 0, 0.45));
+  /* 没了深色底板,次要字和涨跌小标直接压在画面上:灰字提亮、红绿换更亮的一档 */
+  --nv-muted: rgba(255, 255, 255, 0.86);
+  --nv-faint: rgba(255, 255, 255, 0.62);
+  --nv-line: rgba(255, 255, 255, 0.24);
+  --nv-sub: rgba(0, 0, 0, 0.28);
+  --nv-ok: #8dffb6;
+  --nv-bad: #ff8d84;
+}
+/* 浅色 + 无底板:字是深色的,深色投影托不住 —— 换成贴字的白色光晕(描边感)+ 外圈柔光 */
+.nv[data-nv-theme="light"] .nv-plate.is-bare {
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.9))
+    drop-shadow(0 0 8px rgba(255, 255, 255, 0.35));
+  --nv-muted: rgba(20, 17, 14, 0.86);
+  --nv-faint: rgba(20, 17, 14, 0.62);
+  --nv-line: rgba(20, 17, 14, 0.24);
+  --nv-sub: rgba(255, 255, 255, 0.2);
+  --nv-ok: #137a3f;
+  --nv-bad: #d4271c;
+}
+
+.nv-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  color: var(--nv-muted);
+  margin-bottom: 14px;
+  white-space: nowrap;
+}
+.nv-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hud-acc);
+  box-shadow: 0 0 10px var(--hud-acc);
+  flex: none;
+}
+.nv-kicker-en { font-family: var(--nv-mono); text-transform: uppercase; color: var(--hud-acc); }
+.nv-kicker-zh { letter-spacing: 0.06em; }
+
+.nv-hi { font-style: normal; color: var(--hud-acc); }
+
+.nv-title { font-size: 44px; font-weight: 800; letter-spacing: 0.01em; line-height: 1.18; }
+.nv-sub { font-size: 20px; color: var(--nv-muted); }
+.nv-mono { font-family: var(--nv-mono); }
+
+.nv-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: none;
+  background: color-mix(in srgb, var(--hud-acc) 30%, var(--nv-plate-solid));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hud-acc) 60%, transparent);
+}
+.nv-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.nv-avatar b { color: var(--nv-ink); font-weight: 800; }
+
+/* 占位框:素材位空着时画一个带说明的虚线框,不是坏画面 */
+.nv-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--nv-faint);
+  border-radius: 14px;
+  color: var(--nv-faint);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+}
