@@ -38,6 +38,7 @@ const LINT_CFG = mergeLintConfig(
   Object.values(lintLocalModules)[0]?.default,
 );
 import "./effects/hud/hud.css";
+import "./effects/hud/narrative/index.css";
 import "./App.css";
 
 /** 新卡默认多长:整段演示类的卡要 15 秒才够看完一轮,其余 5 秒。

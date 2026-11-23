@@ -1,0 +1,26 @@
+/* ── radar-profile 雷达画像 ── */
+.nv-rd-plate { width: 576px; padding: 24px 28px 14px; }
+.nv-rd-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.nv-rd-head .nv-kicker { margin-bottom: 8px; }
+.nv-rd-title { font-size: 30px; font-weight: 800; white-space: nowrap; }
+.nv-rd-legend { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; padding-bottom: 4px; }
+.nv-rd-legend span { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--nv-muted); white-space: nowrap; }
+.nv-rd-legend i { width: 18px; height: 0; border-top: 3px solid; border-radius: 2px; }
+.nv-rd-legend i.is-a { border-color: var(--hud-acc); }
+.nv-rd-legend i.is-b { border-top: 2px dashed var(--nv-ink); opacity: 0.7; }
+.nv-rd-svg { display: block; overflow: visible; margin-top: -6px; }
+.nv-rd-ring { fill: none; stroke: var(--nv-line); stroke-width: 1.2; }
+.nv-rd-ring.is-outer { stroke: var(--nv-faint); stroke-width: 1.4; }
+.nv-rd-spoke { stroke: var(--nv-line); stroke-width: 1.2; }
+.nv-rd-a { fill: color-mix(in srgb, var(--hud-acc) 24%, transparent); stroke: var(--hud-acc); stroke-width: 2.8; stroke-linejoin: round; }
+.nv-rd-a-dot { fill: var(--hud-acc); stroke: var(--nv-plate-solid); stroke-width: 2; }
+.nv-rd-b { fill: color-mix(in srgb, var(--nv-ink) 7%, transparent); stroke: color-mix(in srgb, var(--nv-ink) 70%, transparent); stroke-width: 2; stroke-dasharray: 6 5; stroke-linejoin: round; }
+.nv-rd-b-dot { fill: var(--nv-plate-solid); stroke: color-mix(in srgb, var(--nv-ink) 75%, transparent); stroke-width: 1.8; }
+.nv-rd-gap-axis { stroke: var(--hud-acc); stroke-width: 2; stroke-dasharray: 3 4; }
+.nv-rd-gap { stroke: var(--nv-ink); stroke-width: 4; stroke-linecap: round; }
+.nv-rd-gap-glow { stroke: var(--hud-acc); stroke-width: 16; stroke-linecap: round; filter: blur(4px); }
+.nv-rd-label { fill: var(--nv-ink); font-size: 16px; font-weight: 700; }
+.nv-rd-label.is-on { fill: var(--hud-acc); font-weight: 800; }
+.nv-rd-val { fill: var(--nv-muted); font-family: var(--nv-mono); font-size: 13px; }
+.nv-rd-delta { fill: var(--nv-ok); font-family: var(--nv-mono); font-size: 18px; font-weight: 800; }
+.nv-rd-delta.is-down { fill: var(--nv-bad); }

@@ -15,6 +15,10 @@
     "hash": "6092ee834bf2",
     "file": "src/effects/hud/Checklist.tsx"
   },
+  "donut-split": {
+    "hash": "79cf8b85f79e",
+    "file": "src/effects/hud/narrative/DonutSplit.tsx"
+  },
   "entity-chips": {
     "hash": "2bce8c76cd90",
     "file": "src/effects/hud/EntityChips.tsx"
@@ -22,6 +26,10 @@
   "focus-card": {
     "hash": "e1f7f4ddf78b",
     "file": "src/effects/hud/FocusCard.tsx"
+  },
+  "growth-bars": {
+    "hash": "a2536060ede9",
+    "file": "src/effects/hud/narrative/GrowthBars.tsx"
   },
   "growth-curve": {
     "hash": "8b4948ec3561",
@@ -42,6 +50,10 @@
   "quote-lockup": {
     "hash": "f052c9f61b03",
     "file": "src/effects/QuoteLockup.tsx"
+  },
+  "radar-profile": {
+    "hash": "c80594b67134",
+    "file": "src/effects/hud/narrative/RadarProfile.tsx"
   },
   "rank-bars": {
     "hash": "1e986f5e195e",
@@ -78,5 +90,13 @@
   "versus-card": {
     "hash": "312ac4854fa6",
     "file": "src/effects/hud/VersusCard.tsx"
+  },
+  "waffle-fill": {
+    "hash": "6e1890be842f",
+    "file": "src/effects/hud/narrative/WaffleFill.tsx"
+  },
+  "waterfall-bridge": {
+    "hash": "2d3913abfa0f",
+    "file": "src/effects/hud/narrative/WaterfallBridge.tsx"
   }
 }

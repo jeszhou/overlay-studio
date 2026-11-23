@@ -21,6 +21,11 @@ import { statProofDef } from "./hud/StatProof";
 import { growthCurveDef } from "./hud/GrowthCurve";
 import { entityChipsDef } from "./hud/EntityChips";
 import { pinBoardDef } from "./hud/PinBoard";
+import { growthBarsDef } from "./hud/narrative/GrowthBars";
+import { donutSplitDef } from "./hud/narrative/DonutSplit";
+import { waterfallBridgeDef } from "./hud/narrative/WaterfallBridge";
+import { radarProfileDef } from "./hud/narrative/RadarProfile";
+import { waffleFillDef } from "./hud/narrative/WaffleFill";
 import { withBreath } from "./breath";
 
 /** 按用途分组:同组内是"同一类需求的可选项",挑一张用即可 */
@@ -42,7 +47,7 @@ export const EFFECT_GROUPS: EffectGroup[] = [
   },
   {
     title: "数据指标",
-    effects: [ringMetricDef, odometerDef, rankBarsDef, growthCurveDef],
+    effects: [ringMetricDef, odometerDef, rankBarsDef, growthCurveDef, growthBarsDef, donutSplitDef, waterfallBridgeDef, radarProfileDef, waffleFillDef],
   },
   {
     title: "对比取舍",

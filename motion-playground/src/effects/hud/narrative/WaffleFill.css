@@ -1,0 +1,20 @@
+/* ── waffle-fill 百格华夫 ── */
+.nv-wff-plate { width: 560px; padding: 24px 28px 26px; }
+.nv-wff-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.nv-wff-head .nv-kicker { margin-bottom: 8px; }
+.nv-wff-title { font-size: 30px; font-weight: 800; white-space: nowrap; }
+.nv-wff-big { text-align: right; white-space: nowrap; }
+.nv-wff-big span { display: block; font-size: 15px; color: var(--nv-muted); }
+.nv-wff-big b { font-size: 40px; font-weight: 800; line-height: 1; color: var(--hud-acc); font-variant-numeric: tabular-nums; }
+.nv-wff-big small { font-size: 20px; margin-left: 2px; }
+.nv-wff-row { display: flex; align-items: flex-end; gap: 20px; margin-top: -18px; }
+.nv-wff-grid { display: block; overflow: visible; flex: none; }
+.nv-wff-empty { fill: color-mix(in srgb, var(--nv-ink) 8%, transparent); }
+.nv-wff-stream { stroke-width: 3; stroke-linecap: round; stroke-dasharray: none; opacity: 0.85; }
+.nv-wff-splash { opacity: 0.5; }
+.nv-wff-legend { display: flex; flex-direction: column; gap: 12px; flex: 1; min-width: 0; padding-bottom: 4px; }
+.nv-wff-item { display: flex; align-items: center; gap: 12px; font-size: 20px; white-space: nowrap; }
+.nv-wff-item i { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+.nv-wff-item span { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.nv-wff-item b { font-size: 18px; color: var(--nv-muted); font-variant-numeric: tabular-nums; }
+.nv-wff-item.is-live b, .nv-wff-item.is-on b { color: var(--hud-acc); }
