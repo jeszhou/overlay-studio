@@ -14,6 +14,11 @@
 
 ---
 
+## v1.4.0
+
+- 新增 5 张常用数据动态图：`growth-bars`（前后两柱 + 涨幅）、`donut-split`（环形占比）、`waterfall-bridge`（瀑布图）、`radar-profile`（雷达画像）、`waffle-fill`（百格华夫），效果库扩至 25 张。
+- 同步更新 `.claude` / `.agents` / `.codebuddy` / `.workbuddy` 下的 `SKILL.md` 卡片库与选卡指引。
+
 ## v1.3.2
 
 - 修复 9:16 竖版下口播视频只显示在画布上方一块正方形、没有铺满画面的问题。竖版的章节条和人物聚焦运镜画面同样按竖版尺寸铺满，预览和导出一致。
