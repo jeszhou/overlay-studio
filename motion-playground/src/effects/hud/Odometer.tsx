@@ -1,6 +1,6 @@
 import type { EffectDef, EffectProps } from "../types";
 import { useId, type CSSProperties } from "react";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_VAR,
@@ -115,6 +115,8 @@ function Odometer({ params, playToken }: EffectProps<OdometerParams>) {
   const end = (params as { __end?: number }).__end;
   const dur = typeof end === "number" ? end - (params.__start ?? 0) : null;
   const t = dur != null ? Math.min(t0, dur) : t0;
+  const spd = usePlateSpeed(); // 动画速度:无卡点,动作用卡内时间 ts,退场仍按真实结束时刻
+  const ts = t * spd;
   const acc = ACCENT_VAR[accent] ?? ACCENT_VAR.orange;
   const accHi = odMix(acc, 62, "#ffffff"); // 参考作品的 orange-hi
   const font = 'var(--hud-font, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif)';
@@ -190,40 +192,40 @@ function Odometer({ params, playToken }: EffectProps<OdometerParams>) {
 
   // ── 时间 ──
   const LAND = OD_SPIN + (n - 1) * OD_STAGGER; // 最后一位(最高位)落下 = 重音那拍
-  const exitU = dur != null ? odProg(t, dur - OD_EXIT, OD_EXIT) : 0;
+  const exitU = dur != null ? odProg(t, dur - OD_EXIT / spd, OD_EXIT / spd) : 0;
   const exitE = odInCubic(exitU);
 
   // 卡片入场:从左向右展开;落位时整卡微震
-  const inU = odOutCubic(odProg(t, 0, 0.45));
-  const landK = t > LAND ? Math.exp(-9 * (t - LAND)) : 0;
-  const thud = landK * Math.sin((t - LAND) * 38) * 4;
+  const inU = odOutCubic(odProg(ts, 0, 0.45));
+  const landK = ts > LAND ? Math.exp(-9 * (ts - LAND)) : 0;
+  const thud = landK * Math.sin((ts - LAND) * 38) * 4;
   const clipR = odClamp((1 - inU) * 100 + exitE * 100, 0, 100);
   const cardOp = Math.min(1, inU * 1.4) * (1 - exitE * 0.6);
   const cardTx = (1 - inU) * -28 - exitE * 30;
-  const stripe = odOutCubic(odProg(t, 0.1, 0.5));
+  const stripe = odOutCubic(odProg(ts, 0.1, 0.5));
 
-  const breathe = t > LAND + 0.6 ? 0.5 + 0.5 * Math.sin(((t - LAND - 0.6) * Math.PI * 2) / 3.4 - Math.PI / 2) : 0;
+  const breathe = ts > LAND + 0.6 ? 0.5 + 0.5 * Math.sin(((ts - LAND - 0.6) * Math.PI * 2) / 3.4 - Math.PI / 2) : 0;
   const glow = (10 + 18 * landK + 14 * breathe) * u;
   const glowA = 0.35 + 0.25 * breathe + 0.4 * landK;
 
   // 落位闪光 + 扩散方框
-  const flashOp = landK * 0.95 + (t > LAND ? 0.18 * breathe : 0);
-  const ringU = odProg(t, LAND, 0.7);
+  const flashOp = landK * 0.95 + (ts > LAND ? 0.18 * breathe : 0);
+  const ringU = odProg(ts, LAND, 0.7);
   const ringOp = ringU > 0 && ringU < 1 ? (1 - ringU) * 0.8 : 0;
   const ringS = 1 + odOutCubic(ringU) * 0.22;
 
   // 高光扫过:落位一次,之后每 4.2 秒缓慢掠过
   let sx: number;
   const sweep = HW + 44 * u + 120 * u;
-  if (t < LAND + 1.5) sx = -120 * u + odOutCubic(odProg(t, LAND - 0.05, 0.9)) * sweep;
-  else { const ph = ((t - LAND - 1.5) % 4.2) / 4.2; sx = ph < 0.32 ? -120 * u + (ph / 0.32) * sweep : HW + 44 * u; }
+  if (ts < LAND + 1.5) sx = -120 * u + odOutCubic(odProg(ts, LAND - 0.05, 0.9)) * sweep;
+  else { const ph = ((ts - LAND - 1.5) % 4.2) / 4.2; sx = ph < 0.32 ? -120 * u + (ph / 0.32) * sweep : HW + 44 * u; }
 
   // 单位弹出
-  const uu = odProg(t, LAND - 0.12, 0.5);
+  const uu = odProg(ts, LAND - 0.12, 0.5);
   const us = uu > 0 ? odOutBack(uu) : 0;
   // 分隔线 + 光点(每 5s 走一趟)
-  const ru = odOutQuint(odProg(t, LAND - 0.05, 0.8));
-  const sp = t < LAND + 0.8 ? -1 : ((t - LAND - 0.8) % 5.0) / 5.0;
+  const ru = odOutQuint(odProg(ts, LAND - 0.05, 0.8));
+  const sp = ts < LAND + 0.8 ? -1 : ((ts - LAND - 0.8) % 5.0) / 5.0;
   const sparkOn = sp >= 0 && sp < 0.45;
   // 圆点呼吸
   const ds = 1 + 0.22 * breathe;
@@ -239,8 +241,8 @@ function Odometer({ params, playToken }: EffectProps<OdometerParams>) {
     const turns = 1 + Math.min(2, i);
     const steps = d + 10 * turns;
     const land = OD_SPIN + place * OD_STAGGER;
-    const pos = odReelPos(t, steps, land) + exitE * 0.9;
-    const v = (odReelPos(t + 0.008, steps, land) - odReelPos(Math.max(0, t - 0.008), steps, land)) / 0.016;
+    const pos = odReelPos(ts, steps, land) + exitE * 0.9;
+    const v = (odReelPos(ts + 0.008, steps, land) - odReelPos(Math.max(0, ts - 0.008), steps, land)) / 0.016;
     const blur = odClamp(Math.abs(v) * 0.55, 0, 9) * u;
     const cells: { k: number; y: number; c: number; op: number; front: boolean }[] = [];
     for (let k = Math.max(0, Math.floor(pos - 2)); k <= Math.ceil(pos + 2); k++) {
@@ -293,7 +295,7 @@ function Odometer({ params, playToken }: EffectProps<OdometerParams>) {
                 <div key={li} style={{ whiteSpace: "nowrap" }}>
                   {ln.map((ch) => {
                     const i = eyeIdx++;
-                    const e = odOutCubic(odProg(t, 0.12 + i * eyeStep, 0.4));
+                    const e = odOutCubic(odProg(ts, 0.12 + i * eyeStep, 0.4));
                     return charSpan(ch, i, e, (1 - e) * 14);
                   })}
                 </div>
@@ -370,7 +372,7 @@ function Odometer({ params, playToken }: EffectProps<OdometerParams>) {
               <div key={li} style={{ whiteSpace: "nowrap" }}>
                 {ln.map((ch) => {
                   const j = labIdx++;
-                  const e = odOutCubic(odProg(t, LAND + 0.1 + j * labStep, 0.45));
+                  const e = odOutCubic(odProg(ts, LAND + 0.1 + j * labStep, 0.45));
                   return charSpan(ch, j, e, (1 - e) * 12, { filter: e < 1 ? `blur(${((1 - e) * 6).toFixed(2)}px)` : "none" });
                 })}
               </div>

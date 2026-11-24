@@ -1,6 +1,6 @@
 import { useId } from "react";
 import type { EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import { ACCENT_SWATCH, ACCENT_VAR, offsetVars } from "./accent";
 import type { PinBoardParams } from "./PinBoard";
 
@@ -130,10 +130,13 @@ const L = {
 function PinBoardPlate({ params, playToken }: EffectProps<PinBoardParams>) {
   const { position, title, subtitle, items, stepMs, accent } = params;
   const t0 = useCardElapsed(params, playToken);
+  const spd = usePlateSpeed(); // 卡点秒数不动,只缩放动作时长
   const extra = params as PinBoardParams & { scale?: number; __scale?: number; __end?: number;  };
   const DUR = typeof extra.__end === "number" ? Math.max(0, extra.__end - (extra.__start ?? 0)) : Infinity;
   const t = Math.max(0, Math.min(DUR, t0));
   const fin = Number.isFinite(DUR);
+  const P = (a: number, o: number, d: number) => prog(t, a + o / spd, d / spd); // 卡点 a 之后 o 秒开始、d 秒做完(按 1 倍速写)
+  const D = (a: number, o = 0) => (t - a) * spd - o; // 卡点之后按 1 倍速计的流逝秒数
   const right = position === "top-right";
 
   const acc = accRgb(accent);
@@ -202,23 +205,23 @@ function PinBoardPlate({ params, playToken }: EffectProps<PinBoardParams>) {
   const side = right ? { right: 0 } : { left: 0 };
 
   // ── 退场(原作是常驻层,没有退场;有结束时间时最后一小段整块上飘淡出) ──
-  const oc = fin ? inCubic(prog(t, DUR - OUTLEN, DUR)) : 0;
+  const oc = fin ? inCubic(prog(t, DUR - OUTLEN / spd, DUR)) : 0;
 
   // ── 进场:短强调线 → 计数 → 空心标题擦出 → 强调条 → 副题字 ──
-  const k = outExpo(prog(t, 0.0, 0.45));
-  const c = outCubic(prog(t, 0.2, 0.6));
-  const tw = outQuart(prog(t, 0.15, 0.85));
-  const tY = (1 - outCubic(prog(t, 0.15, 0.7))) * 8;
-  const b = outExpo(prog(t, 0.45, 0.95));
-  const st = outCubic(prog(t, 0.65, 1.1));
+  const k = outExpo(P(0, 0.0, 0.45));
+  const c = outCubic(P(0, 0.2, 0.4));
+  const tw = outQuart(P(0, 0.15, 0.7));
+  const tY = (1 - outCubic(P(0, 0.15, 0.55))) * 8;
+  const b = outExpo(P(0, 0.45, 0.5));
+  const st = outCubic(P(0, 0.65, 0.45));
 
   // ── 计数器:已钉数量,落钉那一下跳一跳 ──
   let n = 0;
   dropT.forEach((d) => {
-    if (t >= d + FALL) n++;
+    if (t >= d + FALL / spd) n++;
   });
-  const lastLand = n > 0 ? Math.max(...dropT.filter((d) => t >= d + FALL)) + FALL : -10;
-  const pop = prog(t, lastLand, lastLand + 0.35);
+  const lastLand = n > 0 ? Math.max(...dropT.filter((d) => t >= d + FALL / spd)) + FALL / spd : -10;
+  const pop = prog(t, lastLand, lastLand + 0.35 / spd);
   const ps = n > 0 && pop < 1 ? 1 + 0.35 * Math.sin(pop * Math.PI) * (1 - pop) : 1;
   const textShadow = light ? "0 1px 2px rgba(255,255,255,.75), 0 0 10px rgba(255,255,255,.5)" : "0 1px 3px rgba(0,0,0,.65), 0 0 10px rgba(0,0,0,.35)";
 
@@ -315,7 +318,8 @@ function PinBoardPlate({ params, playToken }: EffectProps<PinBoardParams>) {
           {/* 钉牌 */}
           {lay.plates.map((pl, i) => {
             const d = dropT[i];
-            const u = t - d;
+            const u = D(d); // 落钉后按 1 倍速计的秒数
+            if (t < d) return null;
             const rest = RESTS[i % RESTS.length];
             const rotK = Math.min(1, 300 / Math.max(1, pl.w)); // 长牌歪角按比例收,远端不会扫过上面的副题太久
             if (u < 0) return null;
@@ -361,17 +365,17 @@ function PinBoardPlate({ params, playToken }: EffectProps<PinBoardParams>) {
             const pinS = pv < 0 ? 1.8 : 1.8 - 0.8 * outBack(pk, 2.2);
             const pinY = pv < 0 ? -8 : -8 * (1 - outCubic(pk));
             // 落钉涟漪
-            const rv = prog(t, d + FALL, d + FALL + 0.6);
+            const rv = P(d, FALL, 0.6);
             const r = 6 + 40 * outCubic(rv);
             const ringOp = rv > 0 && rv < 1 ? 0.7 * (1 - rv) : 0;
             // 当前项 vs 已讲过:旧的稍微退后,不位移
             const nd = dropT[i + 1];
-            const fade = nd !== undefined ? outCubic(prog(t, nd + FALL, nd + FALL + 0.5)) : 0;
+            const fade = nd !== undefined ? outCubic(P(nd, FALL, 0.5)) : 0;
             const txtOp = 1 - (0.32) * fade;
             const numOp = 1 - (0.45) * fade;
             // 当前小圆点:落定后出现,极慢呼吸(待机唯一的动)
-            const curIn = outCubic(prog(t, d + FALL + 0.2, d + FALL + 0.6));
-            const breathe = 0.75 + 0.25 * Math.cos((t - d) * Math.PI * 2 / 3.2);
+            const curIn = outCubic(P(d, FALL + 0.2, 0.4));
+            const breathe = 0.75 + 0.25 * Math.cos(D(d) * Math.PI * 2 / 3.2);
             const curOp = curIn * (1 - fade) * breathe;
             return (
               <div

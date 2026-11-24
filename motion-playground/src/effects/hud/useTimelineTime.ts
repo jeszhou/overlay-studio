@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { FxSpeedContext } from "../useAnimation";
 
 /**
  * 时间轴时间(秒,绝对时间):
@@ -35,4 +36,14 @@ export function useCardElapsed(
 ): number {
   const t = useTimelineTime(params, playToken);
   return Math.max(0, t - (params.__start ?? 0));
+}
+
+/**
+ * 精修卡的「动画速度」倍数(全局速度 × 此卡速度)。
+ * 用法:卡点秒数(times / strikeTimes / bAt / vetoAt 等)不动,
+ * 卡点之后的每个动作的时长、动作内的先后间隔都除以它 —— 动作变快,踩台词的时刻不变。
+ */
+export function usePlateSpeed(): number {
+  const s = useContext(FxSpeedContext);
+  return s > 0 ? s : 1;
 }

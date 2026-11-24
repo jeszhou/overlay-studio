@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { ACCENT_OPTIONS, ACCENT_VAR, OFFSET_CONTROLS, OFFSET_DEFAULTS, offsetVars, THEME_OPTIONS } from "../accent";
-import { useCardElapsed } from "../useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "../useTimelineTime";
 export function secList(v?: string): number[] {
   return (v ?? "")
     .split("|")
@@ -58,7 +58,7 @@ export function nvControls(own: Control[], positions: NvPosition[] = ["left", "c
  */
 export function useNvTime(params: NvBaseParams, playToken: number) {
   const t = useCardElapsed(params, playToken);
-  const sp = 1;
+  const sp = usePlateSpeed();
   /** 从 at 秒开始、持续 dur 秒(按速度缩放)的 0→1 进度 */
   const act = (at: number, dur: number) => clamp01(((t - at) * sp) / Math.max(0.001, dur));
   return { t, sp, act };

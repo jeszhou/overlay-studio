@@ -1,12 +1,11 @@
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_SWATCH,
   OFFSET_CONTROLS,
   OFFSET_DEFAULTS,
   offsetVars,
-  THEME_OPTIONS,
 } from "./accent";
 
 export interface ChecklistParams {
@@ -162,6 +161,8 @@ function Checklist({ params, playToken }: EffectProps<ChecklistParams>) {
   const { position, title, items, accent } = params;
   const tp = params as ChecklistParams & { __t?: number; __start?: number; __end?: number };
   const t = useCardElapsed(tp, playToken);
+  const spd = usePlateSpeed(); // 卡点秒数不动,只缩放动作时长
+  const P = (a: number, o: number, d: number) => ckProg(t, a + o / spd, d / spd);
   const end = tp.__end;
   const dur = typeof end === "number" ? Math.max(0, end - (tp.__start ?? 0)) : null;
   const pal = ckPalette(accent);
@@ -202,11 +203,11 @@ function Checklist({ params, playToken }: EffectProps<ChecklistParams>) {
   rowH.reduce((y, h) => (centers.push(y + h / 2), y + h), 0);
 
   // ── 整卡进/出 ──
-  const pin = ckOutExpo(ckProg(t, 0, 0.6));
-  const pout = dur == null ? 0 : ckInCubic(ckProg(t, dur - CK_OUT, CK_OUT));
+  const pin = ckOutExpo(P(0, 0, 0.6));
+  const pout = dur == null ? 0 : ckInCubic(ckProg(t, dur - CK_OUT / spd, CK_OUT / spd));
   const px = (-50 * (1 - pin) - 70 * pout) * (right ? -1 : 1);
-  const edge = ckOutCubic(ckProg(t, 0.05, 0.5));
-  const kick = ckProg(t, 0.15, 0.4);
+  const edge = ckOutCubic(P(0, 0.05, 0.5));
+  const kick = P(0, 0.15, 0.4);
 
   // ── 各条 ──
   const appear = (i: number) => CK_FIRST + gap * i;
@@ -215,18 +216,18 @@ function Checklist({ params, playToken }: EffectProps<ChecklistParams>) {
   const rs = rows.map((r, i) => {
     const t0 = appear(i);
     const canCheck = i < doneN;
-    const tc = t0 + CK_CHECK;
-    const a = ckOutCubic(ckProg(t, t0, 0.5));
-    const ringP = ckOutCubic(ckProg(t, t0 + 0.05, 0.4));
-    const cp = canCheck ? ckProg(t, tc, 0.35) : 0;
-    const fillS = canCheck ? ckOutBack(ckProg(t, tc, 0.32)) : 0;
-    const tickP = canCheck ? ckOutCubic(ckProg(t, tc + 0.1, 0.28)) : 0;
+    const tc = t0 + CK_CHECK / spd;
+    const a = ckOutCubic(P(t0, 0, 0.5));
+    const ringP = ckOutCubic(P(t0, 0.05, 0.4));
+    const cp = canCheck ? ckProg(t, tc, 0.35 / spd) : 0;
+    const fillS = canCheck ? ckOutBack(ckProg(t, tc, 0.32 / spd)) : 0;
+    const tickP = canCheck ? ckOutCubic(ckProg(t, tc + 0.1 / spd, 0.28 / spd)) : 0;
     if (t >= t0) activeIdx = i;
     done += ckOutCubic(cp);
     // 打勾那一下光晕爆开;勾完且还是最新一条时轻轻呼吸
-    const burst = cp > 0 ? Math.sin(Math.PI * ckProg(t, tc, 0.6)) : 0;
-    const breath = cp >= 1 ? 0.18 + 0.12 * Math.sin((t - tc) * 4.2) : 0;
-    const nextA = i + 1 < n ? ckProg(t, appear(i + 1), 0.4) : 0;
+    const burst = cp > 0 ? Math.sin(Math.PI * ckProg(t, tc, 0.6 / spd)) : 0;
+    const breath = cp >= 1 ? 0.18 + 0.12 * Math.sin((t - tc) * spd * 4.2) : 0;
+    const nextA = i + 1 < n ? P(appear(i + 1), 0, 0.4) : 0;
     const g = Math.max(burst, breath * (1 - nextA));
     // 旧条目退到 68%;没讲到的(未勾)再灰一档,上锁的更灰
     const dim = (1 - 0.32 * nextA) * (r.locked ? 0.45 : canCheck ? 1 : 0.6);
@@ -236,22 +237,22 @@ function Checklist({ params, playToken }: EffectProps<ChecklistParams>) {
   let listH = 0;
   let railH = 0;
   rows.forEach((_, i) => {
-    const grow = ckOutCubic(ckProg(t, appear(i) - 0.05, 0.45));
+    const grow = ckOutCubic(P(appear(i), -0.05, 0.45));
     listH += rowH[i] * grow;
     if (i > 0) railH += (centers[i] - centers[i - 1]) * grow;
   });
   let shown = 0;
-  rows.forEach((_, i) => (shown += ckOutCubic(ckProg(t, appear(i) - 0.05, 0.45))));
+  rows.forEach((_, i) => (shown += ckOutCubic(P(appear(i), -0.05, 0.45))));
   const railP = shown > 1 ? ckClamp((done - 1) / (shown - 1), 0, 1) : 0;
   const whole = Math.floor(done + 1e-6);
   let pulse = 0;
   for (let m = 0; m < doneN; m++) {
-    const q = ckProg(t, appear(m) + CK_CHECK + 0.2, 0.4);
+    const q = P(appear(m), CK_CHECK + 0.2, 0.4);
     if (q > 0 && q < 1) pulse = Math.max(pulse, Math.sin(Math.PI * q));
   }
   // 全部勾完:一道光扫过卡片
-  const allDone = n > 0 && doneN === n ? appear(n - 1) + CK_CHECK + 0.25 : Infinity;
-  const sw = ckProg(t, allDone, 0.55);
+  const allDone = n > 0 && doneN === n ? appear(n - 1) + (CK_CHECK + 0.25) / spd : Infinity;
+  const sw = ckProg(t, allDone, 0.55 / spd);
   const panelH = CK_PAD_T + headH + listH + CK_PAD_B;
   let ci = 0;
 
@@ -291,7 +292,7 @@ function Checklist({ params, playToken }: EffectProps<ChecklistParams>) {
                 <span
                   style={{
                     fontVariantNumeric: "tabular-nums", letterSpacing: "0.08em", fontSize: 20, color: pal.count, whiteSpace: "nowrap",
-                    opacity: +ckProg(t, 0.2, 0.4).toFixed(3), transform: `scale(${(1 + 0.18 * pulse).toFixed(3)})`,
+                    opacity: +P(0, 0.2, 0.4).toFixed(3), transform: `scale(${(1 + 0.18 * pulse).toFixed(3)})`,
                   }}
                 >
                   <b style={{ color: pal.hi, fontSize: 26 }}>{whole}</b> / {n}
@@ -301,7 +302,7 @@ function Checklist({ params, playToken }: EffectProps<ChecklistParams>) {
                 {tFit.lines.map((ln, li) => (
                   <div key={li}>
                     {Array.from(ln).map((ch) => {
-                      const e = ckOutCubic(ckProg(t, 0.08 + ci * 0.035, 0.45));
+                      const e = ckOutCubic(P(0, 0.08 + ci * 0.035, 0.45));
                       ci++;
                       return (
                         <span key={ci} style={{ display: "inline-block", whiteSpace: "pre", opacity: +e.toFixed(3), transform: `translateY(${(18 * (1 - e)).toFixed(2)}px)`, filter: `blur(${(6 * (1 - e)).toFixed(2)}px)` }}>
@@ -407,7 +408,6 @@ export const checklistDef: EffectDef<ChecklistParams> = {
   },
   controls: [
     { key: "stepMs", label: "每条间隔(卡点用)", type: "range", min: 100, max: 8000, step: 100, unit: "ms" },
-    { key: "theme", label: "底色(此卡独立生效)", type: "select", options: THEME_OPTIONS },
     {
       key: "position",
       label: "落位",

@@ -1,5 +1,5 @@
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_VAR,
@@ -150,9 +150,12 @@ function EntityChips({ params, playToken }: EffectProps<EntityChipsParams>) {
     const ratio = "h";
   // 有 __end 才退场:卡片时长 = __end − __start,最后 0.5s 收走;没有就一直停着
   const dur = typeof tm.__end === "number" ? Math.max(0, tm.__end - (tm.__start ?? 0)) : Infinity;
+  const spd = usePlateSpeed(); // 动画速度:卡点(stepMs 排程)秒数不动,每个动作本身按它加快
   const t = Math.min(tRaw, dur);
-  const OUT = dur - 0.5;
-  const exitP = (delay: number) => (Number.isFinite(dur) ? eInCubic(ePrg(t, OUT + delay, 0.32)) : 0);
+  const OUT = dur - 0.5 / spd;
+  const P = (a: number, o: number, d: number) => ePrg(t, a + o / spd, d / spd);
+  const D = (a: number, o = 0) => (t - a) * spd - o;
+  const exitP = (delay: number) => (Number.isFinite(dur) ? eInCubic(P(OUT, delay, 0.32)) : 0);
 
   const list = parseChips(chips);
   const n = list.length;
@@ -247,20 +250,20 @@ function EntityChips({ params, playToken }: EffectProps<EntityChipsParams>) {
 
           if (isA(c)) {
             /* ---- 机器方:横向擦出 + 逐字打出 ---- */
-            const aIn = eOutExpo(ePrg(t, s, 0.55));
+            const aIn = eOutExpo(P(s, 0, 0.55));
             const clip = ((1 - aIn) * 100).toFixed(2);
             const txt = Array.from(c.sub);
             const typeDur = 0.5 * Math.max(1, txt.length / 12); // 参考 12 个字母 0.5s 打完,更长按同速
-            let left = Math.floor(ec((t - s - 0.2) / typeDur) * txt.length);
+            let left = Math.floor(ec(D(s, 0.2) / typeDur) * txt.length);
             const typed = r.lab.lines.map((l) => {
               const ch = Array.from(l);
               const k = Math.min(ch.length, left);
               left -= k;
               return ch.slice(0, k).join("");
             });
-            const cursorOn = t < s + 0.2 + typeDur + 0.2 || Math.floor((t - s) * 2.2) % 2 === 0; // 方块光标闪烁
-            const an = eOutCubic(ePrg(t, s + 0.25, 0.45));
-            const cyc = (((t - s - 1.2) % 2.6) + 2.6) % 2.6; // 周期扫描光
+            const cursorOn = D(s, 0.2 + typeDur + 0.2) < 0 || Math.floor((t - s) * spd * 2.2) % 2 === 0; // 方块光标闪烁
+            const an = eOutCubic(P(s, 0.25, 0.45));
+            const cyc = ((D(s, 1.2) % 2.6) + 2.6) % 2.6; // 周期扫描光
             const scanX = -140 + (cyc / 0.9) * (PW + 260);
             let lastTyped = 0;
             typed.forEach((l, li) => (l || li === 0 ? (lastTyped = li) : 0));
@@ -289,7 +292,7 @@ function EntityChips({ params, playToken }: EffectProps<EntityChipsParams>) {
                   style={{
                     position: "absolute", top: 0, bottom: 0, left: 0, width: 120,
                     background: "linear-gradient(90deg,transparent,rgba(160,195,255,0.16),transparent)",
-                    opacity: t > s + 1.2 ? 1 : 0, transform: `translateX(${scanX.toFixed(1)}px)`,
+                    opacity: D(s, 1.2) > 0 ? 1 : 0, transform: `translateX(${scanX.toFixed(1)}px)`,
                   }}
                 />
                 <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 8, background: "#7FA8FF" }} />
@@ -311,11 +314,11 @@ function EntityChips({ params, playToken }: EffectProps<EntityChipsParams>) {
           }
 
           /* ---- 主角方:带弹性的落位 + 手写下划线 ---- */
-          const bp = ePrg(t, s, 0.7);
+          const bp = P(s, 0, 0.7);
           const bs = eSpring(bp);
-          const bn = eOutCubic(ePrg(t, s + 0.15, 0.45));
-          const ul = eOutCubic(ePrg(t, s + 0.45, 0.5));
-          const breathe = t > s + 0.5 ? 0.5 + 0.5 * Math.sin((t - s - 0.5) * 2.4) : 0; // 暖色呼吸点
+          const bn = eOutCubic(P(s, 0.15, 0.45));
+          const ul = eOutCubic(P(s, 0.45, 0.5));
+          const breathe = D(s, 0.5) > 0 ? 0.5 + 0.5 * Math.sin(D(s, 0.5) * 2.4) : 0; // 暖色呼吸点
           const ulW = Math.max(60, Math.min(PW - 60, r.lastW + 6));
           const sx = ulW / 270;
           const ulD = `M${2 * sx} 8 C ${50 * sx} 3, ${95 * sx} 12, ${140 * sx} 7 S ${225 * sx} 3, ${266 * sx} 8`;
@@ -378,8 +381,8 @@ function EntityChips({ params, playToken }: EffectProps<EntityChipsParams>) {
         {/* ---- VS 徽章:只压在牌面不同的两块之间 ---- */}
         {list.map((c, i) => {
           if (!vsText || i >= n - 1 || isA(c) === isA(list[i + 1])) return null;
-          const vStart = startOf(i + 1) + 0.5;
-          const vp = ePrg(t, vStart, 0.55);
+          const vStart = startOf(i + 1) + 0.5 / spd;
+          const vp = P(vStart, 0, 0.55);
           const vsS = eSpring(vp);
           const vOut = exitP(vsDelay(i));
           const upA = isA(c);
@@ -398,7 +401,7 @@ function EntityChips({ params, playToken }: EffectProps<EntityChipsParams>) {
                 boxShadow: "0 6px 16px rgba(0,0,0,0.3), 0 0 0 3px rgba(255,255,255,0.9)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 opacity: ec(vp * 5) * (1 - vOut),
-                transform: `scale(${(vsS * (1 - vOut * 0.6)).toFixed(3)}) rotate(${((1 - vsS) * -90 * dir + Math.sin(Math.max(0, t - vStart - 0.6) * 0.9) * 3).toFixed(2)}deg)`,
+                transform: `scale(${(vsS * (1 - vOut * 0.6)).toFixed(3)}) rotate(${((1 - vsS) * -90 * dir + Math.sin(Math.max(0, D(vStart, 0.6)) * 0.9) * 3).toFixed(2)}deg)`,
               }}
             >
               <span
@@ -418,7 +421,7 @@ function EntityChips({ params, playToken }: EffectProps<EntityChipsParams>) {
         {/* ---- 侧注:竖向引线 + 每行一块深色小底依次滑入 ---- */}
         {noteRows.length > 0 && (() => {
           const nOut = exitP(0);
-          const lp = eOutCubic(ePrg(t, noteT0, 0.4));
+          const lp = eOutCubic(P(noteT0, 0, 0.4));
           const leadX = dir > 0 ? 16 : TW - 18;
           return (
             <>
@@ -429,7 +432,7 @@ function EntityChips({ params, playToken }: EffectProps<EntityChipsParams>) {
                 }}
               />
               {noteRows.map((r, i) => {
-                const k = eOutCubic(ePrg(t, noteT0 + 0.15 + i * 0.17, 0.45));
+                const k = eOutCubic(P(noteT0, 0.15 + i * 0.17, 0.45));
                 return (
                   <div
                     key={i}

@@ -3,7 +3,7 @@ import { FxVideo } from "./MediaImg";
 import { STAGE } from "../../stage";
 import { useId } from "react";
 import { fcBez, focusCamBox, focusCamGeomAt, focusCardTimes } from "./camGeom";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_VAR,
@@ -112,6 +112,7 @@ function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
   const { w: SW, h: SH } = STAGE;
   const uid = useId().replace(/:/g, "");
   const t = useCardElapsed(p, playToken);
+  const spd = usePlateSpeed(); // 动画速度:要点卡点(stepMs)和口播缩放/回满屏的几何时刻不动,只加快动作本身
   const D = typeof p.__end === "number" ? Math.max(0, p.__end - (p.__start ?? 0)) : Infinity;
   const g = focusCamGeomAt(p, t, D);
   const B = focusCamBox(p);
@@ -121,6 +122,10 @@ function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
   const items = (p.items ?? "").split("|").map((s) => s.trim()).filter(Boolean);
   const n = items.length;
   const eyebrow = (p.eyebrow ?? "").trim();
+  // 以卡点 a 为起点的动作:o 秒后开始、d 秒做完(按 1 倍速写,自动除以速度)
+  const P = (a: number, o: number, d: number) => fcSeg(t, a + o / spd, a + (o + d) / spd);
+  // 卡点 a 之后、按 1 倍速计的流逝秒数
+  const Dt = (a: number, o = 0) => (t - a) * spd - o;
   const step = Math.max(0.2, (Number(p.stepMs) || 600) / 1000);
   const STARTS = items.map((_, i) => 0.5 + i * step);
 
@@ -152,15 +157,15 @@ function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
   const blockTop = Math.max(regTop, Math.min(regBot - lay.blockH, cy - lay.blockH / 2));
 
   // 背景:随镜头一起「打开」,收尾时一起淡出(被满屏画面盖住)
-  const open = fcEaseOut(fcSeg(t, 0.1, 1.0)) * (1 - fcSeg(t, end - 0.5, end));
+  const open = fcEaseOut(P(0, 0.1, 0.9)) * (1 - fcSeg(t, end - 0.5 / spd, end));
   // 框线:落位后沿框描一圈,随后一颗光点慢绕;回满屏前先撤
-  const frameOut = 1 - fcSeg(t, back0 - 0.15, back0 + 0.15);
-  const draw = fcEaseOut(fcSeg(t, 0.85, 1.75));
-  const cometOn = fcSeg(t, 1.6, 2.2) * frameOut;
+  const frameOut = 1 - P(back0, -0.15, 0.3);
+  const draw = fcEaseOut(P(1.05, -0.2, 0.9));
+  const cometOn = P(1.05, 0.55, 0.6) * frameOut;
   const fr = (pad: number) => ({ x: g.x - pad, y: g.y - pad, width: Math.max(0, g.w + pad * 2), height: Math.max(0, g.h + pad * 2), rx: g.r ? g.r + pad : 0 });
   // 收尾:要点统一收走(由下往上)
-  const exitK = fcEaseIn(fcSeg(t, back0 - 0.1, back0 + 0.35));
-  const e = fcEaseOut(fcSeg(t, 0.3, 0.9));
+  const exitK = fcEaseIn(P(back0, -0.1, 0.45));
+  const e = fcEaseOut(P(0, 0.3, 0.6));
   const st = n > 1 ? Math.min(0.07, 0.35 / (n - 1)) : 0;
 
   // 滚动模式:列表跟着新出现的那条往上推,保证正在讲的那条在可视区里
@@ -170,7 +175,7 @@ function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
     let prev = 0;
     items.forEach((_, i) => {
       const need = Math.max(prev, lay.tops[i] + lay.hs[i] - visH);
-      scroll += (need - prev) * fcEaseOut(fcSeg(t, STARTS[i] - 0.1, STARTS[i] + 0.5));
+      scroll += (need - prev) * fcEaseOut(P(STARTS[i], -0.1, 0.6));
       prev = need;
     });
   }
@@ -179,7 +184,7 @@ function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
   for (let j = 1; j < n; j++) {
     const a0 = lay.tops[j - 1] + m + 6 - scroll;
     const a1 = lay.tops[j] - 6 - scroll;
-    const g = fcEaseOut(fcSeg(t, STARTS[j] - 0.15, STARTS[j] + 0.35));
+    const g = fcEaseOut(P(STARTS[j], -0.15, 0.5));
     const top = Math.max(0, a0);
     const h = (a1 - a0) * g - (top - a0);
     if (h > 0) railSegs.push({ top, h });
@@ -212,9 +217,9 @@ function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
       <div
         style={{
           position: "absolute", width: 1100, height: 1100, borderRadius: "50%",
-          left: g.x + g.w / 2 - 550 + Math.sin(t * 0.5) * 20, top: g.y + g.h / 2 - 550 + Math.cos(t * 0.4) * 16,
+          left: g.x + g.w / 2 - 550 + Math.sin(t * spd * 0.5) * 20, top: g.y + g.h / 2 - 550 + Math.cos(t * spd * 0.4) * 16,
           background: `radial-gradient(circle, color-mix(in srgb, ${acc} 16%, transparent) 0%, transparent 62%)`,
-          opacity: open * (0.85 + 0.15 * Math.sin(t * 1.3)),
+          opacity: open * (0.85 + 0.15 * Math.sin(t * spd * 1.3)),
         }}
       />
 
@@ -250,19 +255,19 @@ function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
           ))}
           {items.map((label, i) => {
             const s = STARTS[i];
-            const a = fcSeg(t, s, s + 0.55);
+            const a = P(s, 0, 0.55);
             const mPop = fcOutBack(fcClamp(a * 1.4));
             // 序号块:出现时闪一下实心强调色,再退成描边
-            const flash = fcSeg(t, s, s + 0.12) * (1 - fcSeg(t, s + 0.2, s + 0.7));
+            const flash = P(s, 0, 0.12) * (1 - P(s, 0.2, 0.5));
             // 文字从遮罩里推出
-            const ta = fcEaseOut(fcSeg(t, s + 0.08, s + 0.7));
+            const ta = fcEaseOut(P(s, 0.08, 0.62));
             // 当前这条亮、下划线扫过;下一条来了就让位
             const next = i < n - 1 ? STARTS[i + 1] : Infinity;
-            const dim = fcSeg(t, next, next + 0.4);
-            const u = fcEaseOut(fcSeg(t, s + 0.35, s + 0.95));
+            const dim = P(next, 0, 0.4);
+            const u = fcEaseOut(P(s, 0.35, 0.6));
             const col = ink.map((c, k) => Math.round(fcLerp(c, dimInk[k], dim)));
             // 收尾:由下往上依次离场
-            const ex = fcEaseIn(fcSeg(t, back0 - 0.1 + (n - 1 - i) * st, back0 + 0.3 + (n - 1 - i) * st));
+            const ex = fcEaseIn(P(back0, -0.1 + (n - 1 - i) * st, 0.4));
             const top = lay.tops[i] - scroll;
             const h = lay.hs[i];
             const vis = lay.scroll ? fcClamp((top + h * 0.6) / (h * 0.6)) : 1;
@@ -323,9 +328,9 @@ function FocusCard({ params, playToken }: EffectProps<FocusCardParams>) {
       <div style={{ position: "absolute", left: g.x, top: g.y, width: g.w, height: g.h, borderRadius: g.r, zIndex: 7, pointerEvents: "none", boxShadow: "0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04)" }} />
       {/* 框线:柔光 / 描边 / 绕框光点(「显示口播落位框」关掉就不画) */}
       {p.showRing !== false && <svg viewBox={`0 0 ${SW} ${SH}`} style={{ position: "absolute", left: 0, top: 0, width: SW, height: SH, overflow: "visible", zIndex: 7, pointerEvents: "none" }}>
-        <rect {...fr(7)} fill="none" style={{ stroke: acc }} strokeOpacity={0.22} strokeWidth={10} opacity={(draw * frameOut * (0.6 + 0.4 * Math.sin(t * 1.6))).toFixed(3)} />
-        <rect {...fr(7)} fill="none" style={{ stroke: acc }} strokeWidth={2.5} pathLength={1000} strokeDasharray="1000 1000" strokeDashoffset={(1000 * (1 - draw)).toFixed(2)} opacity={(frameOut * (0.75 + 0.25 * Math.sin(t * 1.6))).toFixed(3)} />
-        <rect {...fr(7)} fill="none" style={{ stroke: comet }} strokeWidth={4} strokeLinecap="round" pathLength={1000} strokeDasharray="70 930" strokeDashoffset={(-(((t - 1.6) * 110) % 1000)).toFixed(2)} opacity={(cometOn * 0.9).toFixed(3)} />
+        <rect {...fr(7)} fill="none" style={{ stroke: acc }} strokeOpacity={0.22} strokeWidth={10} opacity={(draw * frameOut * (0.6 + 0.4 * Math.sin(t * spd * 1.6))).toFixed(3)} />
+        <rect {...fr(7)} fill="none" style={{ stroke: acc }} strokeWidth={2.5} pathLength={1000} strokeDasharray="1000 1000" strokeDashoffset={(1000 * (1 - draw)).toFixed(2)} opacity={(frameOut * (0.75 + 0.25 * Math.sin(t * spd * 1.6))).toFixed(3)} />
+        <rect {...fr(7)} fill="none" style={{ stroke: comet }} strokeWidth={4} strokeLinecap="round" pathLength={1000} strokeDasharray="70 930" strokeDashoffset={(-((Dt(1.05, 0.55) * 110) % 1000)).toFixed(2)} opacity={(cometOn * 0.9).toFixed(3)} />
       </svg>}
     </div>
   );
@@ -368,7 +373,7 @@ export const focusCardDef: EffectDef<FocusCardParams> = {
         { label: "暗色", value: "dark" },
       ],
     },
-    { key: "bgLightness", label: "主题背景深浅(0 深 / 100 浅;浅底请配深字)", type: "range", min: 0, max: 100, step: 1 },
+    { key: "bgLightness", label: "主题背景深浅(0 深 / 100 浅;浅底请配深字)（背景选主题色时生效）", type: "range", min: 0, max: 100, step: 1 },
     {
       key: "side",
       label: "口播缩到哪侧",

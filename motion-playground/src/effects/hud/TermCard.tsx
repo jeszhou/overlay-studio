@@ -1,5 +1,5 @@
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_SWATCH,
@@ -7,7 +7,6 @@ import {
   OFFSET_CONTROLS,
   OFFSET_DEFAULTS,
   offsetVars,
-  THEME_OPTIONS,
 } from "./accent";
 
 export interface TermCardParams {
@@ -172,8 +171,10 @@ function TermCard({ params, playToken }: EffectProps<TermCardParams>) {
   const extra = params as { scale?: number; __scale?: number; __start?: number; __end?: number };
   // 有 __end 才退场:卡片时长 = __end − __start,最后 0.5s 收走;没有就一直停着
   const DUR = typeof extra.__end === "number" ? Math.max(0, extra.__end - (extra.__start ?? 0)) : Infinity;
-  const OUT = DUR - TP.OUTLEN;
+  const spd = usePlateSpeed(); // 动画速度:无卡点,入场/循环用卡内时间 ts,退场按真实结束时刻
+  const OUT = DUR - TP.OUTLEN / spd;
   const t = Math.max(0, Math.min(DUR, t0));
+  const ts = t * spd;
   const acc = tAccentRgb(accent);
   const accDark: [number, number, number] = [acc[0] * 0.94, acc[1] * 0.77, acc[2] * 0.6].map(Math.round) as [number, number, number];
 
@@ -206,37 +207,37 @@ function TermCard({ params, playToken }: EffectProps<TermCardParams>) {
   // ── 退场进度 ──
   const fin = Number.isFinite(DUR);
   const o = fin ? tProg(t, OUT, DUR) : 0; // 退场进度 0→1
-  const oc = fin ? tInCubic(tProg(t, OUT, OUT + 0.32)) : 0; // 内容先走
-  const op = fin ? tInOutCubic(tProg(t, OUT + 0.12, DUR)) : 0; // 底板后收
+  const oc = fin ? tInCubic(tProg(t, OUT, OUT + 0.32 / spd)) : 0; // 内容先走
+  const op = fin ? tInOutCubic(tProg(t, OUT + 0.12 / spd, DUR)) : 0; // 底板后收
 
   // 底板:从左向右展开,退场时向左收回
-  const pIn = tOutExpo(tProg(t, 0, 0.55));
+  const pIn = tOutExpo(tProg(ts, 0, 0.55));
   const reveal = pIn * (1 - op);
-  const barK = tOutExpo(tProg(t, 0.05, 0.6)) * (1 - (fin ? tInCubic(tProg(t, OUT, OUT + 0.3)) : 0));
-  const glowOp = 0.75 + 0.25 * Math.sin(t * 1.6); // 角落暖光缓慢呼吸
+  const barK = tOutExpo(tProg(ts, 0.05, 0.6)) * (1 - (fin ? tInCubic(tProg(t, OUT, OUT + 0.3 / spd)) : 0));
+  const glowOp = 0.75 + 0.25 * Math.sin(ts * 1.6); // 角落暖光缓慢呼吸
   const cOut = 1 - oc;
   const cLift = oc * -14;
 
   // 英文小字:字距从宽收紧 + 逐字亮起
-  const ePro = tOutCubic(tProg(t, 0.12, 0.75));
+  const ePro = tOutCubic(tProg(ts, 0.12, 0.75));
   // 探测波小点:核心点弹出,之后持续向外发出探测波
-  const cp = tSpring(tProg(t, 0.08, 0.7));
+  const cp = tSpring(tProg(ts, 0.08, 0.7));
   const rings = [0, 1].map((k) => {
     const start = 0.35 + k * 0.7;
     const period = 1.4;
-    if (t < start) return null;
-    const ph = ((t - start) % period) / period;
+    if (ts < start) return null;
+    const ph = ((ts - start) % period) / period;
     return { s: 0.35 + 1.15 * tOutCubic(ph), o: (1 - ph) * 0.85 * cOut };
   });
   // 术语停留期极轻的呼吸:字距微微起伏
-  const hold = tProg(t, 0.9, 1.4) * (1 - oc);
-  const termLS = 0.06 + 0.012 * hold * Math.sin((t - 0.9) * 2.2);
-  const ruleK = tOutExpo(tProg(t, 0.34, 0.95)) * (1 - (fin ? tInCubic(tProg(t, OUT, OUT + 0.28)) : 0));
-  const dp = tOutCubic(tProg(t, 0.38, 0.9));
+  const hold = tProg(ts, 0.9, 1.4) * (1 - oc);
+  const termLS = 0.06 + 0.012 * hold * Math.sin((ts - 0.9) * 2.2);
+  const ruleK = tOutExpo(tProg(ts, 0.34, 0.95)) * (1 - (fin ? tInCubic(tProg(t, OUT, OUT + 0.28 / spd)) : 0));
+  const dp = tOutCubic(tProg(ts, 0.38, 0.9));
   // 关键词:虚线下划线画出,之后缓缓流动;颜色从白过渡到强调色
-  const lp = tInOutCubic(tProg(t, 0.8, 1.35));
-  const flow = Math.max(0, t - 1.35) * 9;
-  const kp = tProg(t, 0.75, 1.15);
+  const lp = tInOutCubic(tProg(ts, 0.8, 1.35));
+  const flow = Math.max(0, ts - 1.35) * 9;
+  const kp = tProg(ts, 0.75, 1.15);
   const keyColor = `rgb(${[0, 1, 2].map((i) => Math.round(240 + (acc[i] - 240) * kp)).join(",")})`;
   const du = defFit.fs / TP.defFs; // 下划线随字号缩放
 
@@ -308,7 +309,7 @@ function TermCard({ params, playToken }: EffectProps<TermCardParams>) {
                   <div key={li}>
                     {line.map((ch, ci) => {
                       const i = enIdx++;
-                      const p = tOutCubic(tProg(t, 0.12 + i * 0.035, 0.42 + i * 0.035));
+                      const p = tOutCubic(tProg(ts, 0.12 + i * 0.035, 0.42 + i * 0.035));
                       return (
                         <span key={ci} style={{ display: "inline-block", whiteSpace: "pre", opacity: p * cOut }}>
                           {ch.c}
@@ -333,7 +334,7 @@ function TermCard({ params, playToken }: EffectProps<TermCardParams>) {
                 {line.map((ch, ci) => {
                   const i = termIdx++;
                   const a = 0.16 + i * 0.07;
-                  const p = tProg(t, a, a + 0.6);
+                  const p = tProg(ts, a, a + 0.6);
                   const y = (1 - tSpring(p)) * 54 * (termFit.fs / TP.termFs);
                   const blur = (1 - tOutCubic(p)) * 14;
                   return (
@@ -341,7 +342,7 @@ function TermCard({ params, playToken }: EffectProps<TermCardParams>) {
                       key={ci}
                       style={{
                         display: "inline-block", whiteSpace: "pre",
-                        opacity: tOutCubic(tProg(t, a, a + 0.35)) * cOut,
+                        opacity: tOutCubic(tProg(ts, a, a + 0.35)) * cOut,
                         transform: `translateY(${(y + cLift * (1 + i * 0.15)).toFixed(2)}px)`,
                         filter: blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : "none",
                       }}
@@ -430,7 +431,6 @@ export const termCardDef: EffectDef<TermCardParams> = {
     ...OFFSET_DEFAULTS,
   },
   controls: [
-    { key: "theme", label: "底色(此卡独立生效)", type: "select", options: THEME_OPTIONS },
     {
       key: "position",
       label: "落位",

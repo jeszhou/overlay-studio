@@ -1,13 +1,12 @@
 import type { EffectDef, EffectProps } from "../types";
 import { useId, type CSSProperties } from "react";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_SWATCH,
   ACCENT_VAR,
   OFFSET_CONTROLS,
   offsetVars,
-  THEME_OPTIONS,
 } from "./accent";
 
 export interface UICalloutParams {
@@ -184,6 +183,10 @@ function UICallout({ params, playToken }: EffectProps<UICalloutParams>) {
   const DUR = typeof extra.__end === "number" ? Math.max(0, extra.__end - (extra.__start ?? 0)) : Infinity;
   const d = Number.isFinite(DUR) ? Math.max(1.2, DUR) - UC_REF_DUR : Infinity; // 退场整体平移量
   const t = Math.max(0, Math.min(DUR, t0));
+  // 动画速度:无卡点参数。进场/停留按卡内时间 te 加快;退场按「距终点多久」排,时钟 tx 让它仍在终点前走完
+  const spd = usePlateSpeed();
+  const te = t * spd;
+  const tx = Number.isFinite(DUR) ? (t - DUR) * spd + DUR - d : -Infinity;
   const acc = ucAccent(accent);
   const accHex = ucHex(acc);
   const lum = (0.299 * acc[0] + 0.587 * acc[1] + 0.114 * acc[2]) / 255;
@@ -236,14 +239,14 @@ function UICallout({ params, playToken }: EffectProps<UICalloutParams>) {
   const labelY = midY - LH / 2;
 
   // ── 圈注框:从接点向上下两路描出,收走时退回接点 ──
-  const drawIn = oQuint(ucSeg(t, 0.05, 0.55));
-  const drawOut = iCub(ucSeg(t, 3.0 + d, 3.28 + d));
+  const drawIn = oQuint(ucSeg(te, 0.05, 0.55));
+  const drawOut = iCub(ucSeg(tx, 3.0, 3.28));
   const len = drawIn * (1 - drawOut);
   // 锁定角:从外围大一圈收进来带回弹,收走时往外散开淡出(位移按圈大小封顶,大圈不会甩太远)
-  const bIn = ucSeg(t, 0, 0.42);
-  const bOut = ucSeg(t, 3.02 + d, 3.26 + d);
+  const bIn = ucSeg(te, 0, 0.42);
+  const bOut = ucSeg(tx, 3.02, 3.26);
   const bs = 1.22 - 0.22 * oBack(bIn) + 0.12 * oCub(bOut);
-  const bOp = oCub(ucSeg(t, 0, 0.18)) * (1 - oCub(bOut));
+  const bOp = oCub(ucSeg(te, 0, 0.18)) * (1 - oCub(bOut));
   const hw = rw / 2 + 14;
   const hh = rh / 2 + 14;
   const bx = hw + (bs - 1) * Math.min(hw, 184);
@@ -260,27 +263,27 @@ function UICallout({ params, playToken }: EffectProps<UICalloutParams>) {
     return `M${u2(px)},${u2(py - sy * arm)} L${u2(px)},${u2(py)} L${u2(px - sx * arm)},${u2(py)}`;
   });
   // 淡染
-  const tintOp = oCub(ucSeg(t, 0.3, 0.7)) * (1 - ucSeg(t, 2.95 + d, 3.2 + d));
+  const tintOp = oCub(ucSeg(te, 0.3, 0.7)) * (1 - ucSeg(tx, 2.95, 3.2));
   // 接点 + 引线
-  const dr = 7 * oBack(ucSeg(t, 0.18, 0.42)) * (1 - iCub(ucSeg(t, 3.05 + d, 3.25 + d)));
-  const lIn = oCub(ucSeg(t, 0.32, 0.62));
-  const lOut = oCub(ucSeg(t, 2.92 + d, 3.1 + d));
+  const dr = 7 * oBack(ucSeg(te, 0.18, 0.42)) * (1 - iCub(ucSeg(tx, 3.05, 3.25)));
+  const lIn = oCub(ucSeg(te, 0.32, 0.62));
+  const lOut = oCub(ucSeg(tx, 2.92, 3.1));
   const leadLen = UC_LEAD * lIn * (1 - lOut);
   const dirOut = fromLeft ? -1 : 1;
   // 标签:从引线一侧展开,收走时合回引线
-  const pIn = oQuint(ucSeg(t, 0.5, 0.92));
-  const pOut = iCub(ucSeg(t, 2.82 + d, 3.0 + d));
+  const pIn = oQuint(ucSeg(te, 0.5, 0.92));
+  const pOut = iCub(ucSeg(tx, 2.82, 3.0));
   const open = pIn * (1 - pOut);
   const shut = u2((1 - open) * 100);
   const labelShift = -dirOut * (12 * (1 - pIn) + 10 * pOut);
-  const kIn = oBack(ucSeg(t, 0.66, 0.98));
-  const stepP = oCub(ucSeg(t, 0.74, 1.04));
-  const tOut = ucSeg(t, 2.8 + d, 2.95 + d);
+  const kIn = oBack(ucSeg(te, 0.66, 0.98));
+  const stepP = oCub(ucSeg(te, 0.74, 1.04));
+  const tOut = ucSeg(tx, 2.8, 2.95);
   // 停留:高光沿框游走 + 呼吸环
-  const live = ucSeg(t, 0.55, 0.8) * (1 - ucSeg(t, 2.7 + d, 2.9 + d));
-  const ph = (t - 0.55) / 1.4;
-  const pt = t - 0.7;
-  const pk = pt > 0 && t < 2.85 + d ? (pt % 1.1) / 1.1 : -1;
+  const live = ucSeg(te, 0.55, 0.8) * (1 - ucSeg(tx, 2.7, 2.9));
+  const ph = (te - 0.55) / 1.4;
+  const pt = te - 0.7;
+  const pk = pt > 0 && tx < 2.85 ? (pt % 1.1) / 1.1 : -1;
   const pex = pk >= 0 ? 15.3 * oCub(pk) : 0; // 参考作品 340×180 圈:横向外扩约 15px、纵向约 14px
   const pey = pk >= 0 ? 14.4 * oCub(pk) : 0;
 
@@ -379,7 +382,7 @@ function UICallout({ params, playToken }: EffectProps<UICalloutParams>) {
               <div key={li} style={{ font: `600 ${UC_MAIN_FS}px/${UC_MAIN_LH}px ${UC_FONT}`, letterSpacing: "0.02em" }}>
                 {line.map((u, k) => {
                   const i = ui++;
-                  const c = oCub(ucSeg(t, 0.72 + i * cStep, 1.08 + i * cStep));
+                  const c = oCub(ucSeg(te, 0.72 + i * cStep, 1.08 + i * cStep));
                   return (
                     <span
                       key={k}
@@ -421,7 +424,6 @@ export const uiCalloutDef: EffectDef<UICalloutParams> = {
     offsetY: 0,
   },
   controls: [
-    { key: "theme", label: "底色(此卡独立生效)", type: "select", options: THEME_OPTIONS },
     { key: "label", label: "标签文字", type: "text" },
     { key: "ringW", label: "圈宽", type: "range", min: 80, max: 800, step: 10, unit: "px" },
     { key: "ringH", label: "圈高", type: "range", min: 60, max: 600, step: 10, unit: "px" },
@@ -437,7 +439,7 @@ export const uiCalloutDef: EffectDef<UICalloutParams> = {
     { key: "accent", label: "标注色", type: "select", options: ACCENT_OPTIONS },
     {
       key: "stepTag",
-      label: "步骤眉标(精修版)",
+      label: "步骤眉标(精修版)（标签以 ①/1. 开头时生效）",
       type: "select",
       options: [
         { label: "自动(标签以①/1. 开头时显示)", value: "auto" },

@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_VAR,
@@ -138,7 +138,9 @@ function VersusCard({ params, playToken }: EffectProps<VersusCardParams>) {
   const end = tp.__end;
   // 有 __end 才退场:卡片时长 = __end − __start,最后 0.5s 收走;没有就一直停着
   const D = typeof end === "number" ? Math.max(0, end - (tp.__start ?? 0)) : Infinity;
-  const t = Math.min(tRaw, D);
+  const spd = usePlateSpeed(); // 动画速度:无卡点参数,动作用卡内时间 t*spd,退场按真实结束时刻
+  const tr = Math.min(tRaw, D); // 真实流逝秒数(只给退场用)
+  const t = tr * spd;
 
   const roleOf = (side: "a" | "b"): VsRole => (winner === "none" ? "even" : winner === side ? "win" : "lose");
   const roleA = roleOf("a");
@@ -170,8 +172,8 @@ function VersusCard({ params, playToken }: EffectProps<VersusCardParams>) {
   const cy = bandTop + H * s * k * 0.52 - Math.max(0, bottomAt(s, k) - Math.max(SH - 48, bottomAt(1, k1)));
 
   // ── 时间轴(照搬 renderAt) ──
-  const exitK = Number.isFinite(D) ? vsInCubic(vsProg(t, D - VS_OUT, D)) : 0;
-  const exitE = Number.isFinite(D) ? vsProg(t, D - VS_OUT, D) : 0;
+  const exitK = Number.isFinite(D) ? vsInCubic(vsProg(tr, D - VS_OUT / spd, D)) : 0;
+  const exitE = Number.isFinite(D) ? vsProg(tr, D - VS_OUT / spd, D) : 0;
   const weak = vsInOut(vsProg(t, 1.25, 1.95)); // 落败方被削弱
   const win = vsSpring(vsClamp((t - 1.6) / 1.2, 0, 1), 1.3, 0.5); // 胜出:放大 + 光
   const breathe = t > 2.4 ? Math.sin(((t - 2.4) * Math.PI * 2) / 3.2) : 0; // 呼吸

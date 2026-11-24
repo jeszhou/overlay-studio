@@ -1,6 +1,6 @@
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
-import { ACCENT_SWATCH, OFFSET_CONTROLS, OFFSET_DEFAULTS, offsetVars, THEME_OPTIONS } from "./accent";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
+import { ACCENT_SWATCH, OFFSET_CONTROLS, OFFSET_DEFAULTS, offsetVars } from "./accent";
 import type { CSSProperties } from "react";
 
 export interface Terminal3DParams {
@@ -149,6 +149,11 @@ function Terminal3D({ params, playToken }: EffectProps<Terminal3DParams>) {
   const dir = right ? -1 : 1; // 朝人物侧转:左侧卡往右转,右侧卡镜像
   const dur = typeof ex.__end === "number" ? Math.max(0.5, ex.__end - (ex.__start ?? 0)) : Infinity;
   const t = Math.max(0, Math.min(dur, tRaw));
+  const spd = usePlateSpeed(); // 动画速度:lineTimes 开打时刻不动,每行开打之后的动作按它加快(打字速度 cps 是用户设的速率,不动)
+  // 以 a 为起点的动作:o 秒后开始、d 秒做完(按 1 倍速写,自动除以速度)
+  const P = (a: number, o: number, d: number) => tpProg(t, a + o / spd, a + (o + d) / spd);
+  // 脉冲:从 a 起、len 秒(按 1 倍速)的一道亮
+  const PL = (a: number, o: number, len: number) => tpPulse(t, a + o / spd, len / spd);
   const ACC = tpAccent(params.accent);
   const MUTE = "#8a9a90";
   const INK = "#eef3ef";
@@ -210,29 +215,29 @@ const availH = (SH - 80 - 2 * Math.abs(oy)) / s;
   const H = chrome + bodyH;
   // 行太多:像真终端一样往上滚,保证正在打的那行露在底部
   const excess = rowTop.map((tp, i) => Math.max(0, tp + rowH[i] - bodyH));
-  const scroll = excess.reduce((a, e, i) => a + (e - (i ? excess[i - 1] : 0)) * tpOut(tpProg(t, st[i], st[i] + 0.25)), 0);
+  const scroll = excess.reduce((a, e, i) => a + (e - (i ? excess[i - 1] : 0)) * tpOut(P(st[i], 0, 0.25)), 0);
 
   // ---- 窗口:3D 入场 / 呼吸 / 报错抖动 / 收走(参考作品原样)----
-  const inK = tpSpring(t / 0.9, 7.5, 6.2);
-  const outK = tpIn(tpProg(t, dur - TP_OUT, dur));
-  const shake = errIdx.reduce((a, i) => (t > st[i] ? a + Math.sin((t - st[i]) * 62) * 9 * Math.exp(-(t - st[i]) * 9) : a), 0);
-  const breathe = Math.sin(t * 0.9) * 1.4;
+  const inK = tpSpring((t * spd) / 0.9, 7.5, 6.2);
+  const outK = tpIn(tpProg(t, dur - TP_OUT / spd, dur));
+  const shake = errIdx.reduce((a, i) => (t > st[i] ? a + Math.sin((t - st[i]) * spd * 62) * 9 * Math.exp(-(t - st[i]) * spd * 9) : a), 0);
+  const breathe = Math.sin(t * spd * 0.9) * 1.4;
   const ry = (34 * (1 - inK) + 9 + breathe + outK * 46) * dir;
-  const rx = -6 * (1 - inK) + Math.sin(t * 0.7 + 1) * 0.8;
+  const rx = -6 * (1 - inK) + Math.sin(t * spd * 0.7 + 1) * 0.8;
   const wx = (-120 * (1 - inK) - outK * 140) * dir + shake;
-  const wy = 30 * (1 - inK) + Math.sin(t * 1.1) * 3;
+  const wy = 30 * (1 - inK) + Math.sin(t * spd * 1.1) * 3;
   const wsc = 0.9 + 0.1 * inK - outK * 0.06;
-  const winOp = tpClamp(t / 0.25) * (1 - outK);
+  const winOp = tpClamp((t * spd) / 0.25) * (1 - outK);
 
   // 边框:强调色 → 报错红 → 下一行开始后 0.8s 渐回 → 成功高光
-  const errHeat = errIdx.reduce((a, i) => Math.max(a, t < st[i] ? 0 : t < next[i] ? 1 : 1 - tpProg(t, next[i], next[i] + 0.8)), 0);
+  const errHeat = errIdx.reduce((a, i) => Math.max(a, t < st[i] ? 0 : t < next[i] ? 1 : 1 - P(next[i], 0, 0.8)), 0);
   const rimCol = tpMix(ACC, TP_RED, errHeat);
   const glow =
     0.28 +
-    errIdx.reduce((a, i) => a + 0.5 * tpPulse(t, st[i], 0.6), 0) +
-    okIdx.reduce((a, i) => a + (i === finIdx ? 0 : 0.6 * tpPulse(t, st[i], 0.7)), 0) +
-    0.9 * tpPulse(t, FIN_T + 0.3, 0.9);
-  const sw = tpProg(t, FIN_T + 0.25, FIN_T + 1.15);
+    errIdx.reduce((a, i) => a + 0.5 * PL(st[i], 0, 0.6), 0) +
+    okIdx.reduce((a, i) => a + (i === finIdx ? 0 : 0.6 * PL(st[i], 0, 0.7)), 0) +
+    0.9 * PL(FIN_T, 0.3, 0.9);
+  const sw = P(FIN_T, 0.25, 0.9);
 
   // ---- 状态灯:按已开打的行类型走 ----
   let state = "idle";
@@ -245,7 +250,7 @@ const availH = (SH - 80 - 2 * Math.abs(oy)) / s;
     else if (r.k === "✗") { state = "error"; dot = TP_RED; errOpen = true; }
     else if (r.k === "✓") { state = "done"; dot = TP_GREEN; errOpen = false; }
   });
-  const lp = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * (state === "error" ? 2.2 : 1));
+  const lp = 0.5 + 0.5 * Math.sin(t * spd * Math.PI * 2 * (state === "error" ? 2.2 : 1));
   const run = Math.min(t, T_STOP);
   const mm = Math.floor(run / 60);
   const sec = Math.floor(run % 60);
@@ -260,7 +265,7 @@ const availH = (SH - 80 - 2 * Math.abs(oy)) / s;
   const curN = L.length ? Math.min(Math.max(0, (t - st[cur]) * cps), L[cur].cs.length) : 0;
   const caretAt = Math.ceil(curN);
   const typing = L.length ? t < end[cur] + 0.05 : false;
-  const blink = typing ? 1 : Math.floor(t * 2.2) % 2 === 0 ? 1 : 0.12;
+  const blink = typing ? 1 : Math.floor(t * spd * 2.2) % 2 === 0 ? 1 : 0.12;
   const caret = (
     <span
       style={{
@@ -364,20 +369,20 @@ const anchorFix: CSSProperties = rightOrigin ? { transformOrigin: "100% 50%" } :
                 {L.map((r, i) => {
                   const s0 = st[i];
                   const shown = t >= s0;
-                  const lineOut = tpIn(tpProg(t, dur - TP_OUT + i * 0.03, dur - 0.12 + i * 0.03 * 0.3));
-                  const a = tpOut(tpProg(t, s0, s0 + 0.2));
+                  const lineOut = tpIn(tpProg(t, dur - (TP_OUT - i * 0.03) / spd, dur - (0.12 - i * 0.03 * 0.3) / spd));
+                  const a = tpOut(P(s0, 0, 0.2));
                   const n = (t - s0) * cps;
                   let bgK = 0;
                   let bgCol = TP_GREEN;
-                  const in3 = tpOut(tpProg(t, s0, s0 + 0.3));
-                  if (r.k === "✗") { bgCol = TP_RED; bgK = 0.18 * in3 + 0.12 * tpPulse(t, s0, 0.5); }
-                  if (r.k === "✓") bgK = 0.1 * in3 + 0.14 * tpPulse(t, s0, 0.6);
+                  const in3 = tpOut(P(s0, 0, 0.3));
+                  if (r.k === "✗") { bgCol = TP_RED; bgK = 0.18 * in3 + 0.12 * PL(s0, 0, 0.5); }
+                  if (r.k === "✓") bgK = 0.1 * in3 + 0.14 * PL(s0, 0, 0.6);
                   // 右侧:❯ 行打完转圈,下一行开始后显示用时(下一行是 ✗ 时用时标红)
                   let sideTx = "";
                   let sideCol = MUTE;
                   let spin = false;
                   if (r.k === "❯" && t >= end[i]) {
-                    if (t < next[i]) { sideTx = TP_SPIN[Math.floor(t * 12) % TP_SPIN.length]; sideCol = "#7fd8ff"; spin = true; }
+                    if (t < next[i]) { sideTx = TP_SPIN[Math.floor(t * spd * 12) % TP_SPIN.length]; sideCol = "#7fd8ff"; spin = true; }
                     else { sideTx = `${(next[i] - s0).toFixed(1)}s`; sideCol = L[i + 1]?.k === "✗" ? "rgba(255,90,95,0.75)" : MUTE; }
                   }
                   const [icCol, icTx] = ICON_OF[r.k];
@@ -394,7 +399,7 @@ const anchorFix: CSSProperties = rightOrigin ? { transformOrigin: "100% 50%" } :
                         <div
                           style={{
                             position: "absolute", left: -12, right: -12, top: 5, bottom: 5, borderRadius: 9, transformOrigin: "0 50%",
-                            background: tpRgba(bgCol, bgK), transform: `scaleX(${tpOut(tpProg(t, s0, s0 + 0.35)).toFixed(3)})`,
+                            background: tpRgba(bgCol, bgK), transform: `scaleX(${tpOut(P(s0, 0, 0.35)).toFixed(3)})`,
                             boxShadow: `inset 3px 0 0 ${tpRgba(bgCol, (r.k === "✗" ? 0.9 : 0.8) * in3)}`,
                           }}
                         />
@@ -403,7 +408,7 @@ const anchorFix: CSSProperties = rightOrigin ? { transformOrigin: "100% 50%" } :
                         <span
                           style={{
                             position: "absolute", left: 0, top: textTop, height: lineH, lineHeight: `${lineH}px`, fontSize: f, fontWeight: 700, color: icCol,
-                            display: "inline-block", transform: `scale(${shown ? tpBack(tpProg(t, s0, s0 + 0.28)).toFixed(3) : 0})`,
+                            display: "inline-block", transform: `scale(${shown ? tpBack(P(s0, 0, 0.28)).toFixed(3) : 0})`,
                           }}
                         >
                           {icTx}
@@ -460,20 +465,20 @@ const anchorFix: CSSProperties = rightOrigin ? { transformOrigin: "100% 50%" } :
                   let col: TpRGB = TP_GREEN;
                   if (r.k === "❯") {
                     // 执行中:琥珀色填一截;下一行开始 = 这步跑完,铺满
-                    if (t < next[li]) { fill = 0.2 + 0.25 * tpOut(tpProg(t, s0, s0 + 0.6)); col = TP_AMBER; }
+                    if (t < next[li]) { fill = 0.2 + 0.25 * tpOut(P(s0, 0, 0.6)); col = TP_AMBER; }
                     else fill = 1;
                     if (t < s0) fill = 0;
                   } else if (r.k === "✗") {
                     const rec = next[li] + 0.4;
                     fill = t < s0 ? 0 : 1;
                     col = TP_RED;
-                    if (t >= s0 && t < rec && Math.floor((t - s0) * 4) % 2 === 1) fill = 0.55;
-                    if (recovered(li) && t >= rec) col = tpMix(TP_RED, TP_GREEN, tpProg(t, rec, rec + 0.5));
+                    if (t >= s0 && t < rec && Math.floor((t - s0) * spd * 4) % 2 === 1) fill = 0.55;
+                    if (recovered(li) && t >= rec) col = tpMix(TP_RED, TP_GREEN, P(rec, 0, 0.5));
                   } else {
-                    fill = tpOut(tpProg(t, s0, s0 + 0.4));
+                    fill = tpOut(P(s0, 0, 0.4));
                     col = r.k === "$" ? ACC : TP_GREEN;
                   }
-                  const pop = (r.k === "✗" ? 0.18 * tpPulse(t, s0, 0.4) : 0) + 0.1 * tpPulse(t, firstOk + c * 0.05, 0.35);
+                  const pop = (r.k === "✗" ? 0.18 * PL(s0, 0, 0.4) : 0) + 0.1 * PL(firstOk, c * 0.05, 0.35);
                   return (
                     <div
                       key={li}
@@ -523,7 +528,6 @@ export const terminal3DDef: EffectDef<Terminal3DParams> = {
     ...OFFSET_DEFAULTS,
   },
   controls: [
-    { key: "theme", label: "底色(此卡独立生效)", type: "select", options: THEME_OPTIONS },
     {
       key: "position",
       label: "落位",

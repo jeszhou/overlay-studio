@@ -1,12 +1,11 @@
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_SWATCH,
   OFFSET_CONTROLS,
   OFFSET_DEFAULTS,
   offsetVars,
-  THEME_OPTIONS,
   GLASS_DEFAULTS,
 } from "./accent";
 
@@ -125,6 +124,8 @@ function RingMetricView({ params, t: tRaw }: { params: RingMetricParams; t: numb
   const end = (params as { __end?: number }).__end;
   const dur = typeof end === "number" ? Math.max(0, end - ((params as { __start?: number }).__start ?? 0)) : Infinity;
   const t = Math.min(Math.max(0, tRaw), dur);
+  const spd = usePlateSpeed(); // 动画速度(无卡点):动作用 ta = t*spd,退场仍对齐真实结束时刻
+  const ta = t * spd;
 
   // 颜色:警示用参考作品的正红(主题 --hud-alert 偏粉);其它预设/自定义色照用,透明度在 JS 里算
   const accHex = accent === "alert" ? "#FF4A3D" : /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : ACCENT_SWATCH[accent] ?? "#5fa0fa";
@@ -192,31 +193,31 @@ function RingMetricView({ params, t: tRaw }: { params: RingMetricParams; t: numb
   const outward = centerX(Wl, s, ox) + dx < stageW / 2 ? -1 : 1; // 进场从外侧滑入、退场往外侧收
 
   // ── 逐拍(照搬 renderAt) ──
-  const out = Number.isFinite(dur) ? rpInCubic(rpProg(t, dur - 0.04 - RP_EXIT, RP_EXIT)) : 0;
-  const pin = rpOutCubic(rpProg(t, 0, 0.45));
+  const out = Number.isFinite(dur) ? rpInCubic(rpProg(t, dur - 0.04 - RP_EXIT / spd, RP_EXIT / spd)) : 0;
+  const pin = rpOutCubic(rpProg(ta, 0, 0.45));
   const cardOp = pin * (1 - out);
   const cardTx = outward * ((1 - pin) * 28 + out * 24);
   const cardSc = 0.97 + 0.03 * pin - out * 0.03;
-  const edge = rpOutExpo(rpProg(t, 0.1, 0.8));
+  const edge = rpOutExpo(rpProg(ta, 0.1, 0.8));
 
-  const pe = rpOutCubic(rpProg(t, 0, 0.5));
-  const pm = rpProg(t, 0.2, 1.1);
+  const pe = rpOutCubic(rpProg(ta, 0, 0.5));
+  const pm = rpProg(ta, 0.2, 1.1);
   const v = rpOutExpo(pm);
-  const nIn = rpOutBack(rpProg(t, 0.2, 0.55));
-  const numOp = rpProg(t, 0.2, 0.3);
-  const subOp = 0.9 * rpOutCubic(rpProg(t, 0.5, 0.6));
+  const nIn = rpOutBack(rpProg(ta, 0.2, 0.55));
+  const numOp = rpProg(ta, 0.2, 0.3);
+  const subOp = 0.9 * rpOutCubic(rpProg(ta, 0.5, 0.6));
 
-  const settled = rpProg(t, 1.3, 0.6);
-  const breath = 0.5 + 0.5 * Math.sin(((t - 1.3) * Math.PI * 2) / 2.4 - Math.PI / 2);
+  const settled = rpProg(ta, 1.3, 0.6);
+  const breath = 0.5 + 0.5 * Math.sin(((ta - 1.3) * Math.PI * 2) / 2.4 - Math.PI / 2);
   const frac = ratio * v;
   const redN = Math.ceil(ratio * RP_N - 1e-6);
-  const scanPos = (((t - 1.6) / 4.0) % 1 + 1) % 1;
+  const scanPos = (((ta - 1.6) / 4.0) % 1 + 1) % 1;
 
   const ticks = Array.from({ length: RP_N }, (_, i) => {
     const a = -Math.PI / 2 + ((i + 0.5) / RP_N) * Math.PI * 2;
     const r0 = i % 25 === 0 ? RP_IN - 6 : RP_IN;
     const p = (i + 0.5) / RP_N;
-    const appear = rpOutCubic(rpProg(t, 0.2 + p * 0.75, 0.25));
+    const appear = rpOutCubic(rpProg(ta, 0.2 + p * 0.75, 0.25));
     let stroke = "#FFFFFF";
     let op: number;
     if (i < redN) {
@@ -226,7 +227,7 @@ function RingMetricView({ params, t: tRaw }: { params: RingMetricParams; t: numb
     } else {
       const base = i % 25 === 0 ? 0.42 : 0.2;
       let d = 0;
-      if (t > 1.6) {
+      if (ta > 1.6) {
         let dd = Math.abs(p - scanPos);
         dd = Math.min(dd, 1 - dd);
         d = Math.max(0, 1 - dd / 0.06) * settled;
@@ -245,15 +246,15 @@ function RingMetricView({ params, t: tRaw }: { params: RingMetricParams; t: numb
 
   // 光晕:参考作品 0.3s 处有个小红点瑕疵(滤镜区域按细弧的包围盒算,被切成一条扁红块;圆头还往 0 点之前漏)。
   // 这里滤镜区域改用整张环、平头,并且弧还短时按长度淡入
-  const haloOp = rpProg(t, 0.2, 0.3) * (0.28 + 0.22 * breath * settled + 0.12 * (1 - settled)) * rpClamp(frac * RP_N / 1.5, 0, 1);
+  const haloOp = rpProg(ta, 0.2, 0.3) * (0.28 + 0.22 * breath * settled + 0.12 * (1 - settled)) * rpClamp(frac * RP_N / 1.5, 0, 1);
   const a1 = -Math.PI / 2 + frac * Math.PI * 2;
-  const nOp = rpProg(t, 0.25, 0.2);
+  const nOp = rpProg(ta, 0.25, 0.2);
   const uid = `rmp${Math.round(value * 1000)}${accHex.slice(1)}`;
 
-  const ruleK = rpOutExpo(rpProg(t, 1.1, 0.7));
-  const pa = rpOutCubic(rpProg(t, 1.25, 0.5));
-  const pb = rpOutBack(rpProg(t, 1.5, 0.45));
-  const tagOp = rpProg(t, 1.5, 0.2);
+  const ruleK = rpOutExpo(rpProg(ta, 1.1, 0.7));
+  const pa = rpOutCubic(rpProg(ta, 1.25, 0.5));
+  const pb = rpOutBack(rpProg(ta, 1.5, 0.45));
+  const tagOp = rpProg(ta, 1.5, 0.2);
 
   return (
     <div
@@ -329,7 +330,7 @@ function RingMetricView({ params, t: tRaw }: { params: RingMetricParams; t: numb
                 {frac > 0.0001 && (
                   <path d={rpArc(frac)} fill="none" stroke={ACC} strokeWidth={34} strokeLinecap="butt" filter={`url(#${uid}g)`} opacity={haloOp.toFixed(3)} />
                 )}
-                <circle cx={RP_C} cy={RP_C} r={132} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={1} opacity={rpOutCubic(rpProg(t, 0.25, 0.6)).toFixed(3)} />
+                <circle cx={RP_C} cy={RP_C} r={132} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={1} opacity={rpOutCubic(rpProg(ta, 0.25, 0.6)).toFixed(3)} />
                 {ticks}
                 {/* 边界指针 */}
                 <line
@@ -429,7 +430,6 @@ export const ringMetricDef: EffectDef<RingMetricParams> = {
     ...OFFSET_DEFAULTS,
   },
   controls: [
-    { key: "theme", label: "底色(此卡独立生效)", type: "select", options: THEME_OPTIONS },
     {
       key: "position",
       label: "落位",

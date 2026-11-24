@@ -1,6 +1,6 @@
 import type { EffectDef, EffectProps } from "../types";
 import type { CSSProperties } from "react";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_VAR,
@@ -175,6 +175,7 @@ function BlurText({ params, playToken }: EffectProps<BlurTextParams>) {
   const { position, text, staggerMs, accent } = params;
   const tp = params as BlurTextParams & { __t?: number; __start?: number; __end?: number };
   const tRaw = useCardElapsed(tp, playToken);
+  const spd = usePlateSpeed(); // 卡点秒数不动,只缩放动作时长
   const dur = typeof tp.__end === "number" ? Math.max(0, tp.__end - (tp.__start ?? 0)) : null;
   const t = Math.max(0, dur == null ? tRaw : Math.min(tRaw, dur));
   const acc = ACCENT_VAR[accent] ?? ACCENT_VAR.orange;
@@ -269,31 +270,32 @@ function BlurText({ params, playToken }: EffectProps<BlurTextParams>) {
       const isAcc = u.acc >= 0;
       if (r.kind === "title") {
         const step = cnt > 1 ? Math.min(0.075, 0.9 / (cnt - 1)) : 0;
-        return { start: r.line * stagger + k * step, dur: 1.0, blur: 16, rise: 10, acc: isAcc };
+        return { start: r.line * stagger + k * step / spd, dur: 1.0 / spd, blur: 16, rise: 10, acc: isAcc };
       }
       const step = cnt > 1 ? Math.min(0.065, 0.9 / (cnt - 1)) : 0;
-      return { start: r.line * stagger + k * step, dur: isAcc ? 1.25 : 1.05, blur: isAcc ? 26 : 20, rise: 14, acc: isAcc };
+      return { start: r.line * stagger + k * step / spd, dur: (isAcc ? 1.25 : 1.05) / spd, blur: isAcc ? 26 : 20, rise: 14, acc: isAcc };
     });
   });
   const total = plans.reduce((a, p) => a + p.length, 0);
-  const exitStart = dur == null ? Infinity : dur - BP_EXIT;
-  const ex = bpProg(t, exitStart, BP_EXIT);
+  const EXIT = BP_EXIT / spd;
+  const exitStart = dur == null ? Infinity : dur - EXIT;
+  const ex = bpProg(t, exitStart, EXIT);
 
   // 整体慢呼吸:整块极轻地向前靠;收尾再放大一点点
-  const breathe = bpLerp(0.985, 1.0, bpOutCubic(bpProg(t, 0, 2.6)));
+  const breathe = bpLerp(0.985, 1.0, bpOutCubic(bpProg(t, 0, 2.6 / spd)));
   const groupScale = breathe * (1 + 0.02 * bpInCubic(ex));
 
   // 暗场:先于文字一点点亮起,收尾时最后离开
-  const sIn = bpInOut(bpProg(t, 0, 0.9));
-  const sOut = 1 - bpInOut(bpProg(t, exitStart + 0.08, BP_EXIT - 0.08));
+  const sIn = bpInOut(bpProg(t, 0, 0.9 / spd));
+  const sOut = 1 - bpInOut(bpProg(t, exitStart + 0.08 / spd, EXIT - 0.08 / spd));
   const padX = Math.max(160 * z, Math.min(288 * z, 0.35 * W));
   const shadow = `0 ${(2 * z).toFixed(2)}px ${(18 * z).toFixed(2)}px rgba(0,0,0,0.45), 0 ${z.toFixed(2)}px ${(2 * z).toFixed(2)}px rgba(0,0,0,0.35)`;
 
   // 第一行两侧短线(只在「题注 + 主句」两行时有)
-  const tk = bpOutQuint(bpProg(t, 0.35, 1.0));
-  const tOut = 1 - bpInCubic(bpProg(t, exitStart, BP_EXIT * 0.6));
+  const tk = bpOutQuint(bpProg(t, 0.35 / spd, 1.0 / spd));
+  const tOut = 1 - bpInCubic(bpProg(t, exitStart, EXIT * 0.6));
   // 关键词下划线:字落定后一笔画出(参考:关键词起点 0.42 → 1.55 落笔)
-  const rOut = 1 - bpInCubic(bpProg(t, exitStart, BP_EXIT * 0.7));
+  const rOut = 1 - bpInCubic(bpProg(t, exitStart, EXIT * 0.7));
 
   let idx = 0;
   return (
@@ -306,7 +308,7 @@ function BlurText({ params, playToken }: EffectProps<BlurTextParams>) {
             background:
               "radial-gradient(ellipse 50% 50% at 50% 50%, rgba(14,10,8,0.72) 0%, rgba(14,10,8,0.58) 40%, rgba(14,10,8,0.24) 70%, rgba(14,10,8,0) 100%)",
             opacity: +(sIn * sOut).toFixed(4),
-            transform: `scale(${bpLerp(0.92, 1, bpOutCubic(bpProg(t, 0, 1.6))).toFixed(4)})`,
+            transform: `scale(${bpLerp(0.92, 1, bpOutCubic(bpProg(t, 0, 1.6 / spd))).toFixed(4)})`,
           }}
         />
         {rows.map((r, ri) => {
@@ -361,7 +363,7 @@ function BlurText({ params, playToken }: EffectProps<BlurTextParams>) {
                   let y = p.rise * (1 - bpOutCubic(k));
                   const sc = bpLerp(p.acc ? 1.12 : 1.06, 1, bpOutCubic(k));
                   // 收尾:从左到右依次重新失焦、上飘、淡出
-                  const e = bpProg(t, exitStart + (base + i) * (0.14 / total), BP_EXIT - 0.15);
+                  const e = bpProg(t, exitStart + (base + i) * (0.14 / total / spd), EXIT - 0.15 / spd);
                   const ee = bpInCubic(e);
                   blur += 14 * ee;
                   op *= 1 - bpOutCubic(e);
@@ -369,7 +371,7 @@ function BlurText({ params, playToken }: EffectProps<BlurTextParams>) {
                   let ts = shadow;
                   if (p.acc) {
                     // 重点词:落定后亮一下,再退成余温
-                    const g = bpProg(t, p.start + p.dur * 0.55, 0.9);
+                    const g = bpProg(t, p.start + p.dur * 0.55, 0.9 / spd);
                     const glow = (Math.sin(Math.PI * g) * 0.75 + 0.22 * bpOutCubic(g)) * (1 - ee);
                     const pct = bpClamp(55 * glow, 0, 100);
                     ts = `0 0 ${((18 + 18 * glow) * z).toFixed(2)}px color-mix(in srgb, ${acc} ${pct.toFixed(1)}%, transparent), ${shadow}`;
@@ -390,8 +392,8 @@ function BlurText({ params, playToken }: EffectProps<BlurTextParams>) {
                   );
                 })}
                 {runs.map((rn, j) => {
-                  const st = plan[rn.a].start + 1.13;
-                  const rr = bpOutQuint(bpProg(t, st, 0.7));
+                  const st = plan[rn.a].start + 1.13 / spd;
+                  const rr = bpOutQuint(bpProg(t, st, 0.7 / spd));
                   const rl = xs[rn.a] + 6 * z;
                   const rw = xs[rn.b] + bpUnitW(r.units[rn.b], r.kind, r.F) - xs[rn.a] - 12 * z;
                   return (
