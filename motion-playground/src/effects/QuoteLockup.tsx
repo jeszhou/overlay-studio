@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import type { EffectDef, EffectProps } from "./types";
-import { useCardElapsed } from "./hud/useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./hud/useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_VAR,
@@ -143,10 +143,11 @@ function QuoteLockup({ params, playToken }: EffectProps<QuoteLockupParams>) {
   const { side, quote, author, accent } = params;
   const extra = params as { __t?: number; __start?: number; __end?: number; scale?: number; __scale?: number };
   const tRaw = useCardElapsed(extra, playToken);
+  const spd = usePlateSpeed(); // 卡点秒数不动,只缩放动作时长
   const acc = ACCENT_VAR[accent] ?? ACCENT_VAR.blue;
   const dur = typeof extra.__end === "number" ? Math.max(0, extra.__end - (extra.__start ?? 0)) : null;
   const t = dur == null ? tRaw : Math.min(tRaw, dur);
-  const OUT = dur == null ? Infinity : dur - 0.5; // 最后 0.5s 收走
+  const OUT = dur == null ? Infinity : dur - 0.5 / spd; // 最后 0.5s 收走
   const DUR = dur ?? Infinity;
 
   // ── 内容:最后一行是重点(粗、大),前面的是铺垫(细、小、之后变淡) ──
@@ -182,39 +183,40 @@ function QuoteLockup({ params, playToken }: EffectProps<QuoteLockupParams>) {
   const E = D + (nMain - 1) * gMain - 0.36; // 下划线/署名/高光跟着重点行最后一个字走
   const gLeadX = nLead > 1 ? Math.min(0.012, 0.1 / (nLead - 1)) : 0;
   const gMainX = nMain > 1 ? Math.min(0.014, 0.1 / (nMain - 1)) : 0;
-  const exitK = (delay: number) => qInCubic(qProg(t, OUT + delay, OUT + delay + 0.32));
+  const exitK = (delay: number) => qInCubic(qProg(t, OUT + delay / spd, OUT + (delay + 0.32) / spd));
+  const ts = t * spd; // 入场用的"1 倍速时间"
 
   // 呼吸:整卡极轻微漂浮
-  const bob = Math.sin(t * 1.6) * 2.2;
+  const bob = Math.sin(ts * 1.6) * 2.2;
   // 1) 底板:从左侧竖条展开,退场向右收走
-  const pIn = qOutQuint(qProg(t, 0, 0.55));
-  const pOut = qInCubic(qProg(t, OUT + 0.12, DUR));
-  const rIn = qOutCubic(qProg(t, 0, 0.3));
-  const rOut = qInCubic(qProg(t, OUT, OUT + 0.28));
+  const pIn = qOutQuint(qProg(ts, 0, 0.55));
+  const pOut = qInCubic(qProg(t, OUT + 0.12 / spd, DUR));
+  const rIn = qOutCubic(qProg(ts, 0, 0.3));
+  const rOut = qInCubic(qProg(t, OUT, OUT + 0.28 / spd));
   // 2) 引号:弹出
-  const qk = qSpring(qProg(t, 0.18, 0.95));
+  const qk = qSpring(qProg(ts, 0.18, 0.95));
   const qo = exitK(0);
   // 第一行在第二行到来时退成背景
-  const dim = qOutCubic(qProg(t, 1.25 + D, 1.75 + D));
+  const dim = qOutCubic(qProg(ts, 1.25 + D, 1.75 + D));
   // 4) 删除线
-  const sk = qOutQuint(qProg(t, 1.12 + D, 1.48 + D));
+  const sk = qOutQuint(qProg(ts, 1.12 + D, 1.48 + D));
   const se = exitK(0);
   // 6) 下划线 + 高光 + 呼吸光
-  const uk = qOutQuint(qProg(t, 2.05 + E, 2.5 + E));
+  const uk = qOutQuint(qProg(ts, 2.05 + E, 2.5 + E));
   const ue = exitK(0.08);
-  const sh = qProg(t, 2.55 + E, 3.15 + E);
+  const sh = qProg(ts, 2.55 + E, 3.15 + E);
   const shOp = sh > 0 && sh < 1 ? Math.sin(sh * Math.PI) : 0;
-  const glow = 0.35 + 0.25 * Math.sin((t - 2.4 - E) * 3.0);
-  const gOn = qProg(t, 2.4 + E, 2.8 + E) * (1 - ue);
+  const glow = 0.35 + 0.25 * Math.sin((ts - 2.4 - E) * 3.0);
+  const gOn = qProg(ts, 2.4 + E, 2.8 + E) * (1 - ue);
   // 7) 署名
-  const gk = qOutCubic(qProg(t, 2.35 + E, 2.85 + E));
+  const gk = qOutCubic(qProg(ts, 2.35 + E, 2.85 + E));
   const ge = exitK(0.1);
 
   const CH_SH = "0 2px 10px rgba(0,0,0,0.35)";
   let li = 0;
   const leadChar = (ch: QChar, key: number) => {
     const i = li++;
-    const k = qOutCubic(qProg(t, 0.32 + i * gLead, 0.32 + i * gLead + 0.5));
+    const k = qOutCubic(qProg(ts, 0.32 + i * gLead, 0.32 + i * gLead + 0.5));
     const e = exitK(i * gLeadX);
     return (
       <span
@@ -234,8 +236,8 @@ function QuoteLockup({ params, playToken }: EffectProps<QuoteLockupParams>) {
   const mainChar = (ch: QChar, key: number) => {
     const j = mi++;
     const a0 = 1.35 + D + j * gMain;
-    const k2 = qSpring(qProg(t, a0, a0 + 0.7));
-    const o2 = qOutCubic(qProg(t, a0, a0 + 0.22));
+    const k2 = qSpring(qProg(ts, a0, a0 + 0.7));
+    const o2 = qOutCubic(qProg(ts, a0, a0 + 0.22));
     const e2 = exitK(0.06 + j * gMainX);
     const hiOn = ch.mark === 2;
     return (
@@ -334,7 +336,7 @@ function QuoteLockup({ params, playToken }: EffectProps<QuoteLockupParams>) {
           style={{
             position: "absolute", left: 30, top: -78, fontFamily: '"Songti SC", "STSong", serif', fontSize: 230, lineHeight: 1,
             color: acc, fontWeight: 900, textShadow: "0 6px 20px rgba(0,0,0,0.25)", transformOrigin: "30% 70%",
-            opacity: +(qProg(t, 0.18, 0.35) * (1 - qo)).toFixed(4),
+            opacity: +(qProg(ts, 0.18, 0.35) * (1 - qo)).toFixed(4),
             transform: `translateY(${((1 - qk) * 30 - qo * 20).toFixed(2)}px) scale(${(0.6 + 0.4 * qk).toFixed(4)}) rotate(${((1 - qk) * -12).toFixed(2)}deg)`,
           }}
         >

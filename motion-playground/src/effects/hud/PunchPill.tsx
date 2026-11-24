@@ -1,5 +1,5 @@
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_VAR,
@@ -185,6 +185,8 @@ function PunchPill({ params, playToken }: EffectProps<PunchPillParams>) {
   const { position, text, accent } = params;
   const icon = (params.icon ?? "").trim();
   const t = useCardElapsed(params, playToken);
+  const spd = usePlateSpeed(); // 卡点秒数不动,只缩放动作时长
+  const ts = t * spd;
   const end = (params as { __end?: number }).__end;
   const DUR = typeof end === "number" ? end - (params.__start ?? 0) : null;
   const acc = ACCENT_VAR[accent] ?? ACCENT_VAR.blue;
@@ -212,45 +214,45 @@ function PunchPill({ params, playToken }: EffectProps<PunchPillParams>) {
   const d = uStart - 0.95;
 
   if (DUR != null && t >= DUR) return null;
-  const x = DUR == null ? 0 : ppClamp((t - (DUR - PP_OUT)) / PP_OUT, 0, 1); // 退场进度
+  const x = DUR == null ? 0 : ppClamp((t - (DUR - PP_OUT / spd)) / (PP_OUT / spd), 0, 1); // 退场进度
 
   // 圆章:弹簧弹出 + 转入,退场时缩没
-  const cs = ppSpring(t, 22, 0.42);
+  const cs = ppSpring(ts, 22, 0.42);
   const cIn = ppClamp(cs, 0, 1.3);
   const cOut = 1 - ppInCubic(ppProg(x, 0.35, 0.65));
   const chipTf = `scale(${(cIn * cOut).toFixed(4)}) rotate(${((1 - ppClamp(cs, 0, 1)) * -70).toFixed(2)}deg)`;
 
   // 药丸从圆章往右展开;退场往回收
-  const open = ppOutExpo(ppProg(t, 0.12, 0.62));
+  const open = ppOutExpo(ppProg(ts, 0.12, 0.62));
   const close = ppInCubic(ppProg(x, 0, 0.7));
   const vis = H1 + (W - H1) * open * (1 - close);
   const rPct = ppClamp((1 - vis / W) * 100, 0, 100);
-  const bodyAlpha = ppProg(t, 0.08, 0.12) * (1 - ppProg(x, 0.6, 0.4));
+  const bodyAlpha = ppProg(ts, 0.08, 0.12) * (1 - ppProg(x, 0.6, 0.4));
   // 整卡:轻轻上抬落定
-  const lift = (1 - ppOutCubic(ppProg(t, 0, 0.6))) * 14;
+  const lift = (1 - ppOutCubic(ppProg(ts, 0, 0.6))) * 14;
 
   // 下划线:扫入;退场从左往右抹掉
-  const uIn = ppOutExpo(ppProg(t, uStart, 0.5));
+  const uIn = ppOutExpo(ppProg(ts, uStart, 0.5));
   const uOut = ppProg(x, 0, 0.5);
   const ulTf = `scaleX(${(uIn * (1 - uOut)).toFixed(4)})`;
   const ulOrigin = uOut > 0 ? "100% 50%" : "0 50%";
 
   // 一次走光
-  const sh = ppInOut(ppProg(t, 1.25 + d, 0.8));
+  const sh = ppInOut(ppProg(ts, 1.25 + d, 0.8));
   // 圆章脉冲环两拍
   let rs = 1;
   let ro = 0;
   [1.15 + d, 3.2 + d].forEach((s0) => {
-    const q = ppProg(t, s0, 0.9);
+    const q = ppProg(ts, s0, 0.9);
     if (q > 0 && q < 1) {
       rs = 1 + ppOutCubic(q) * 0.75;
       ro = (1 - q) * 0.85;
     }
   });
   // 气泡里三个点:停留时轮流跳
-  const live = ppProg(t, 0.6, 0.3) * (1 - x);
+  const live = ppProg(ts, 0.6, 0.3) * (1 - x);
   const dots = [0, 1, 2].map((k) => {
-    const ph = ((t - 0.6) * 2 * Math.PI) / 1.1 - k * 0.9;
+    const ph = ((ts - 0.6) * 2 * Math.PI) / 1.1 - k * 0.9;
     const hop = Math.max(0, Math.sin(ph));
     return { cy: 20 - hop * 4 * live, op: 0.55 + 0.45 * hop * live + 0.45 * (1 - live) };
   });
@@ -259,8 +261,8 @@ function PunchPill({ params, playToken }: EffectProps<PunchPillParams>) {
   const charEl = (ti: number) => {
     const tk = toks[ti];
     const s = startOf(ti);
-    const pp = ppProg(t, s, 0.45);
-    const sp = ppSpring(t - s, 24, 0.55);
+    const pp = ppProg(ts, s, 0.45);
+    const sp = ppSpring(ts - s, 24, 0.55);
     const y = (1 - ppClamp(sp, 0, 1.2)) * 30 * u;
     const b = (1 - ppOutCubic(pp)) * 8 * u;
     return (
@@ -268,7 +270,7 @@ function PunchPill({ params, playToken }: EffectProps<PunchPillParams>) {
         key={ti}
         style={{
           display: "inline-block",
-          opacity: +(ppOutCubic(ppProg(t, s, 0.22)) * exitA * (tk.sep ? 0.6 : 1)).toFixed(4),
+          opacity: +(ppOutCubic(ppProg(ts, s, 0.22)) * exitA * (tk.sep ? 0.6 : 1)).toFixed(4),
           transform: `translateY(${y.toFixed(2)}px)`,
           filter: b > 0.05 ? `blur(${b.toFixed(2)}px)` : "none",
           whiteSpace: "pre",

@@ -1,6 +1,6 @@
 import { useId } from "react";
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_VAR,
@@ -130,12 +130,16 @@ const tpStep = (sameLine: boolean, prevF: number, F: number, kSame: number, kNex
 function TypeShift({ params, playToken }: EffectProps<TypeShiftParams>) {
   const { position, lines, shiftAtMs } = params;
   const t = useCardElapsed(params as { __t?: number; __start?: number }, playToken);
+  const spd = usePlateSpeed(); // 卡点秒数不动,只缩放动作时长
   const end = (params as { __end?: number }).__end;
   const dur = typeof end === "number" ? end - ((params as { __start?: number }).__start ?? 0) : null;
   const uid = useId().replace(/:/g, "");
   const acc = ACCENT_VAR[params.accent] ?? ACCENT_VAR.blue;
   const T_SHIFT = Math.max(0.3, (shiftAtMs ?? 1600) / 1000);
-  const T_OUT = dur != null ? dur - 0.5 : Infinity;
+  const T_OUT = dur != null ? dur - 0.5 / spd : Infinity;
+  // 以转折卡点为锚的「按 1 倍速计的时刻」:卡点那一刻不动,前后的蓄力/重排/扫光都按 spd 缩放;ta = 以卡起点为锚的流逝秒数
+  const ts = T_SHIFT + (t - T_SHIFT) * spd;
+  const ta = t * spd;
 
   // ── 内容:* 开头 = 大标,— 开头 = 小字,其余 = 中;大标句尾关键词(逗号后、最多 3 字)上强调色 ──
   const parsed: TpLine[] = lines
@@ -291,32 +295,32 @@ function TypeShift({ params, playToken }: EffectProps<TypeShiftParams>) {
     });
   });
 
-  const out = dur != null ? tpEio((t - T_OUT) / 0.47) : 0; // 收走进度
-  const morph = tpEio((t - (T_SHIFT - 0.1)) / 0.36); // 底板从草稿框变定稿板
-  const pre = tpClamp((t - (T_SHIFT - 0.28)) / 0.28); // 转折前的蓄力
+  const out = dur != null ? tpEio(((t - T_OUT) * spd) / 0.47) : 0; // 收走进度
+  const morph = tpEio((ts - (T_SHIFT - 0.1)) / 0.36); // 底板从草稿框变定稿板
+  const pre = tpClamp((ts - (T_SHIFT - 0.28)) / 0.28); // 转折前的蓄力
 
   // ── 底板 ──
   const R = {
     x: tpLerp(DR.x, FR.x, morph), y: tpLerp(DR.y, FR.y, morph),
     w: tpLerp(DR.w, FR.w, morph), h: tpLerp(DR.h, FR.h, morph),
   };
-  const breathe = morph >= 1 ? 1 + 0.006 * Math.sin((t - T_SHIFT - 0.5) * 2.2) : 1;
+  const breathe = morph >= 1 ? 1 + 0.006 * Math.sin((ts - T_SHIFT - 0.5) * 2.2) : 1;
   const colY = 1 - tpEi(out); // 收走时纵向压扁
-  const intro = tpEo(t / 0.3);
+  const intro = tpEo(ta / 0.3);
   const fillA = tpLerp(0.32, 0.86, morph);
   const rad = tpLerp(6, 26, morph);
-  const dashA = (1 - morph) * tpEo(t / 0.35);
-  const sw = tpClamp((t - T_SHIFT) / 0.55);
+  const dashA = (1 - morph) * tpEo(ta / 0.35);
+  const sw = tpClamp((ts - T_SHIFT) / 0.55);
   const sx = tpLerp(-300, R.w + 300, tpEio(sw));
 
   // 角标:转折时从草稿框弹向四角后淡出
-  const cm = tpClamp((t - (T_SHIFT - 0.05)) / 0.6);
-  const cornerA = t < T_SHIFT + 0.6 && intro > 0 ? (t < T_SHIFT ? 0.7 * tpEo(t / 0.4) : 0.7 * (1 - tpEo(cm))) : 0;
+  const cm = tpClamp((ts - (T_SHIFT - 0.05)) / 0.6);
+  const cornerA = ts < T_SHIFT + 0.6 && intro > 0 ? (t < T_SHIFT ? 0.7 * tpEo(ta / 0.4) : 0.7 * (1 - tpEo(cm))) : 0;
   const cex = tpEo(cm) * 22;
 
   // 光标(草稿态):跟着最后打出的字
   let lastTyped: Glyph | null = null;
-  for (const c of glyphs) if (t - c.appear >= 0 && t < T_SHIFT + 0.1) lastTyped = c;
+  for (const c of glyphs) if (t - c.appear >= 0 && ts < T_SHIFT + 0.1) lastTyped = c;
 
   // 刃线:末一个上色的半句下面,定稿后从左往右划出
   let blade: Glyph[] = [];
@@ -327,8 +331,8 @@ function TypeShift({ params, playToken }: EffectProps<TypeShiftParams>) {
       blade = accs.filter((c) => c.fcy === lastY);
     }
   }
-  const cut = tpEo((t - (T_SHIFT + 0.45)) / 0.32);
-  const cutOut = dur != null ? 1 - tpEo((t - T_OUT) / 0.25) : 1;
+  const cut = tpEo((ts - (T_SHIFT + 0.45)) / 0.32);
+  const cutOut = dur != null ? 1 - tpEo(((t - T_OUT) * spd) / 0.25) : 1;
 
   if (dur != null && t >= dur) return null;
 
@@ -368,7 +372,7 @@ function TypeShift({ params, playToken }: EffectProps<TypeShiftParams>) {
               <rect
                 x={0} y={0} width={R.w} height={R.h} rx={rad} fill="none"
                 stroke="#fff" strokeOpacity={0.55 * dashA} strokeWidth={1.5}
-                strokeDasharray="10 8" strokeDashoffset={-t * 40}
+                strokeDasharray="10 8" strokeDashoffset={-ta * 40}
               />
               {/* 基线辅助线 */}
               {dRows.map((_, j) => (
@@ -406,23 +410,23 @@ function TypeShift({ params, playToken }: EffectProps<TypeShiftParams>) {
             {glyphs.map((c) => {
               const age = t - c.appear;
               if (age < 0) return null;
-              const pIn = tpEo(age / 0.16);
-              const p = tpSpring(t - T_SHIFT - c.g * DG); // 草稿→定稿
+              const pIn = tpEo((age * spd) / 0.16);
+              const p = tpSpring(ts - T_SHIFT - c.g * DG); // 草稿→定稿
               const settle = tpClamp(p);
               const loose = (1 - settle) * (1 - 0.6 * pre); // 草稿态的松散抖动,转折时收敛到 0
-              const wob = Math.sin(t * 2.6 + c.g * 1.7);
+              const wob = Math.sin(ta * 2.6 + c.g * 1.7);
               const x = tpLerp(c.dcx + c.jx * loose, c.fcx, p);
-              const yLift = Math.sin(Math.PI * tpClamp((t - T_SHIFT - c.g * DG) / 0.5)) * -26 * k; // 跳起的弧线
+              const yLift = Math.sin(Math.PI * tpClamp((ts - T_SHIFT - c.g * DG) / 0.5)) * -26 * k; // 跳起的弧线
               const y = tpLerp(c.dcy + (c.jy + wob * 1.2) * loose, c.fcy, p) + yLift + (1 - pIn) * 14 * k;
               const rot = c.jr * loose + wob * 0.01 * loose;
               const sc = tpLerp(c.dF / c.Fr, 1, p) * (1 - 0.03 * pre * (1 - settle));
-              const o = tpClamp((t - T_OUT - c.g * EG) / 0.3); // 收走:逐字上飘淡出
+              const o = tpClamp(((t - T_OUT) * spd - c.g * EG) / 0.3); // 收走:逐字上飘淡出
               const oyy = -tpEo(o) * 24 * k;
               const oa = 1 - tpEo(o);
               const wFinal = c.comma ? 0 : tpClamp(p * 1.8);
-              const kk = c.comma ? 1 - tpEo((t - T_SHIFT) / 0.28) : 1; // 逗号在定稿时退场
+              const kk = c.comma ? 1 - tpEo((ts - T_SHIFT) / 0.28) : 1; // 逗号在定稿时退场
               if (kk <= 0 || oa <= 0) return null;
-              const accT = c.acc ? tpEo((t - T_SHIFT - 0.35 - (0.2 + c.ai * 0.04)) / 0.3) : 0;
+              const accT = c.acc ? tpEo((ts - T_SHIFT - 0.35 - (0.2 + c.ai * 0.04)) / 0.3) : 0;
               const small = parsed[c.L].role === "small";
               const boldA = wFinal * pIn * oa;
               const tf =
@@ -456,7 +460,7 @@ function TypeShift({ params, playToken }: EffectProps<TypeShiftParams>) {
             <rect
               x={lastTyped.dcx + lastTyped.dF * 0.55} y={lastTyped.dcy - lastTyped.dF * 0.85} width={4} height={lastTyped.dF}
               style={{ fill: acc }}
-              fillOpacity={(t < 0.7 ? 1 : Math.floor(t * 3) % 2 === 0 ? 1 : 0.15) * (1 - tpClamp((t - (T_SHIFT - 0.12)) / 0.12))}
+              fillOpacity={(ta < 0.7 ? 1 : Math.floor(ta * 3) % 2 === 0 ? 1 : 0.15) * (1 - tpClamp((ts - (T_SHIFT - 0.12)) / 0.12))}
             />
           )}
 

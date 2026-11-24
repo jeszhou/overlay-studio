@@ -48,7 +48,7 @@ const CH = BAR_H + 150; // 图区高度(顶上留给数字)
 const BASE = 34; // 柱底到图区底(放柱名)
 
 function GrowthBars({ params, playToken }: EffectProps<GrowthBarsParams>) {
-  const { t, act } = useNvTime(params, playToken);
+  const { t, sp, act } = useNvTime(params, playToken);
   const [aAt, bAt, stAt] = cues(params.times, [0.3, 1.0, 1.9]);
   const pts = list(params.points).slice(0, MAX_POINTS);
   const ptAt = cues(params.pointTimes, pts.map((_, i) => 2.4 + i * 0.5));
@@ -65,7 +65,7 @@ function GrowthBars({ params, playToken }: EffectProps<GrowthBarsParams>) {
 
   // 贴纸:虚线弧从前柱顶画到后柱顶,贴纸弹进来
   const arc = outCubic(act(stAt - 0.25, 0.4));
-  const st = springAt(t - stAt, 20, 8);
+  const st = springAt((t - stAt) * sp, 20, 8);
   const x1 = BAR_W / 2;
   const x2 = BAR_W + 40;
   const y1 = Math.max(70, CH - BASE - hA - 92); // 下跌时前柱最高:弧线和贴纸都别伸出图区顶

@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_SWATCH,
@@ -8,7 +8,6 @@ import {
   OFFSET_CONTROLS,
   OFFSET_DEFAULTS,
   offsetVars,
-  THEME_OPTIONS,
   GLASS_DEFAULTS,
 } from "./accent";
 
@@ -171,11 +170,13 @@ function rbLayout(rows: RbRow[], title: string, suffix: string, lead: number, W:
 function RankBars({ params, playToken }: EffectProps<RankBarsParams>) {
   const { position, title, rows, suffix, accent } = params;
   const t0 = useCardElapsed(params as RankBarsParams & { __start?: number; __t?: number }, playToken);
+  const spd = usePlateSpeed(); // 卡点秒数不动,只缩放动作时长
   const extra = params as { scale?: number; __scale?: number; __start?: number; __end?: number; centerOnStage?: boolean };
   // 有 __end 才退场:卡片时长 = __end − __start,最后 0.5s 收走;没有就一直停着
   const DUR = typeof extra.__end === "number" ? Math.max(0, extra.__end - (extra.__start ?? 0)) : Infinity;
-  const OUT = DUR - RB_EXIT;
-  const t = Math.max(0, Math.min(DUR, t0));
+  // 卡内时间 t = 真实时间 × spd;结束时刻对应 DUR×spd,退场窗口 RB_EXIT 恰好在真实结束时刻前走完
+  const OUT = DUR * spd - RB_EXIT;
+  const t = Math.max(0, Math.min(DUR * spd, t0 * spd));
   const pal = rbPalette(accent);
   const unit = String(suffix ?? "");
 
@@ -441,7 +442,6 @@ export const rankBarsDef: EffectDef<RankBarsParams> = {
     ...OFFSET_DEFAULTS,
   },
   controls: [
-    { key: "theme", label: "底色(此卡独立生效)", type: "select", options: THEME_OPTIONS },
     {
       key: "position",
       label: "落位",

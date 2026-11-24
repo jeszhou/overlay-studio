@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
-import { ACCENT_SWATCH, ACCENT_VAR, OFFSET_CONTROLS, OFFSET_DEFAULTS, offsetVars } from "./accent";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
+import { ACCENT_OPTIONS, ACCENT_SWATCH, ACCENT_VAR, OFFSET_CONTROLS, OFFSET_DEFAULTS, offsetVars } from "./accent";
 
 export interface StepTimelineParams {
   theme: "dark" | "light";
@@ -120,11 +120,12 @@ function stFit(cs0: string[], maxW: number, oneMax: number, oneMin: number, twoM
 function StepTimeline({ params, playToken }: EffectProps<StepTimelineParams>) {
   const { position, title, accent, steps, revealed } = params;
   const t0 = useCardElapsed(params as { __t?: number; __start?: number }, playToken);
+  const spd = usePlateSpeed(); // 卡点秒数不动,只缩放动作时长
   const extra = params as { scale?: number; __scale?: number; __start?: number; __end?: number;  centerOnStage?: boolean };
   // 有 __end 才退场:卡片时长 = __end − __start,最后 0.5s 收走;没有就一直停着
-  const DUR = typeof extra.__end === "number" ? Math.max(0, extra.__end - (extra.__start ?? 0)) : Infinity;
+  const DUR = typeof extra.__end === "number" ? Math.max(0, extra.__end - (extra.__start ?? 0)) * spd : Infinity; // 加速后的卡内时间轴上的结束点(对应真实结束时刻)
   const EXIT = DUR - STP_EXIT;
-  const t = Math.max(0, Math.min(DUR, t0));
+  const t = Math.max(0, Math.min(DUR, t0 * spd));
   const acc = stAccent(accent);
   const accHex = `#${acc.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
   // 药丸字色:强调色够亮用深字(参考作品黄底深字),偏暗用白字
@@ -469,15 +470,6 @@ export const stepTimelineDef: EffectDef<StepTimelineParams> = {
   },
   controls: [
     {
-      key: "theme",
-      label: "底色(此卡独立生效)",
-      type: "select",
-      options: [
-        { label: "🌞 亮底", value: "light" },
-        { label: "🌙 暗底", value: "dark" },
-      ],
-    },
-    {
       key: "position",
       label: "落位",
       type: "select",
@@ -491,12 +483,7 @@ export const stepTimelineDef: EffectDef<StepTimelineParams> = {
       key: "accent",
       label: "标题强调色",
       type: "select",
-      options: [
-        { label: "亮粉", value: "pink" },
-        { label: "钴蓝", value: "blue" },
-        { label: "宝石青", value: "teal" },
-        { label: "宝石紫", value: "violet" },
-      ],
+      options: ACCENT_OPTIONS,
     },
     { key: "steps", label: "章节(用 | 分隔)", type: "text" },
     { key: "revealed", label: "已讲到第几章", type: "range", min: 0, max: 6, step: 1 },

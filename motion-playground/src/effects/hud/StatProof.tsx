@@ -1,5 +1,5 @@
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_VAR,
@@ -193,6 +193,8 @@ function spxWidthWithin(SW: number, left: boolean, s: number, ox: number, limit:
 function StatProof({ params, playToken }: EffectProps<StatProofParams>) {
   const { position, kicker, kickerZh, prefix, footEn, footZh, accent } = params;
   const t = useCardElapsed(params as unknown as { __t?: number; __start?: number }, playToken);
+  const spd = usePlateSpeed(); // 卡点秒数不动,只缩放动作时长
+  const tl = t * spd;
   const ext = params as unknown as { __start?: number; __end?: number; scale?: number; __scale?: number };
   const END = typeof ext.__end === "number" ? ext.__end - (ext.__start ?? 0) : Infinity;
   const acc = ACCENT_VAR[accent] ?? ACCENT_VAR.orange;
@@ -227,6 +229,7 @@ function StatProof({ params, playToken }: EffectProps<StatProofParams>) {
   const C0 = 0.35;
   const C1 = C0 + Math.max(0.4, (Number(params.countMs) || 1700) / 1000);
   const dT = C1 - 2.05;
+  const tc = C1 + (t - C1) * spd; // 落定动作的时间(以落定时刻 C1 为锚;落定前的预备也一起压缩)
   const countValue = (x: number) => {
     const p = spxProg(x, C0, C1);
     return absT * (0.6 * spxInOutCubic(p) + 0.4 * spxOutCubic(p));
@@ -312,26 +315,26 @@ function StatProof({ params, playToken }: EffectProps<StatProofParams>) {
   const TW = CW; // 刻度宽(参考 440)
 
   // ── 进场 / 退场(参考原样) ──
-  const pIn = spxOutExpo(spxProg(t, 0, 0.55));
-  const pOut = Number.isFinite(END) ? spxInCubic(spxProg(t, END - SPX_OUT, END)) : 0;
+  const pIn = spxOutExpo(spxProg(tl, 0, 0.55));
+  const pOut = Number.isFinite(END) ? spxInCubic(spxProg(t, END - SPX_OUT / spd, END)) : 0;
   const wipe = pIn * (1 - pOut);
-  const railS = spxOutCubic(spxProg(t, 0, 0.4)) * (1 - pOut);
-  const dx = spxLerp(-28, 0, spxOutCubic(spxProg(t, 0, 0.6))) - 46 * pOut;
+  const railS = spxOutCubic(spxProg(tl, 0, 0.4)) * (1 - pOut);
+  const dx = spxLerp(-28, 0, spxOutCubic(spxProg(tl, 0, 0.6))) - 46 * pOut;
   // 停留期微呼吸,让画面不死
-  const drift = Math.sin(t * 1.6) * 1.2 * spxProg(t, 2.2 + dT, 2.8 + dT);
+  const drift = Math.sin(t * spd * 1.6) * 1.2 * spxProg(tc, 2.2 + dT, 2.8 + dT);
   // 角标
-  const pc = spxOutCubic(spxProg(t, 0.35, 0.75));
+  const pc = spxOutCubic(spxProg(tl, 0.35, 0.75));
   // 标签:圆点先弹出,停留期像录制灯慢闪
-  const pd = spxSpring(spxProg(t, 0.12, 0.7));
-  const dotA = t > 2.3 + dT ? 0.55 + 0.45 * (0.5 + 0.5 * Math.cos((t - 2.3 - dT) * 4.2)) : 1;
+  const pd = spxSpring(spxProg(tl, 0.12, 0.7));
+  const dotA = tc > 2.3 + dT ? 0.55 + 0.45 * (0.5 + 0.5 * Math.cos((tc - 2.3 - dT) * 4.2)) : 1;
 
   // 数字:滚轮式计数;速度 → 运动模糊;落定「顿一下」;暖光一闪
   const v = countValue(t);
-  const appear = spxOutCubic(spxProg(t, 0.2, 0.5));
+  const appear = spxOutCubic(spxProg(tl, 0.2, 0.5));
   const dv = (countValue(t + 0.01) - countValue(t - 0.01)) / 0.02; // 每秒走多少(数值单位)
-  const land = spxProg(t, C1 - 0.25, C1 + 0.45);
+  const land = spxProg(tc, C1 - 0.25, C1 + 0.45);
   const thud = land > 0 ? Math.sin(land * Math.PI) * Math.exp(-land * 2) * 0.07 : 0;
-  const g = spxProg(t, C1 - 0.35, C1 + 1.0);
+  const g = spxProg(tc, C1 - 0.35, C1 + 1.0);
   const glowA = g > 0 ? Math.sin(Math.min(g * 2.2, 1) * (Math.PI / 2)) * (1 - g * 0.55) : 0;
   // 列位置(单位:格):最低一列连续滚;高位列像里程表,只在低位整体 9→0 进位那一下跟着转
   const lowUnits = v * Math.pow(10, -lowPlace);
@@ -344,16 +347,16 @@ function StatProof({ params, playToken }: EffectProps<StatProofParams>) {
   // 高位还没轮到的列(前导 0)压暗,像没点亮的刻度;数值快到这一位时亮起
   const colOn = (place: number) => (place <= 0 ? 1 : spxClamp((v / Math.pow(10, place)) * 10 - 9));
   // 单位:数字快到时从下方弹入
-  const pu = spxSpring(spxProg(t, 1.55 + dT, 2.35 + dT));
-  const uA = spxProg(t, 1.55 + dT, 1.8 + dT);
+  const pu = spxSpring(spxProg(tc, 1.55 + dT, 2.35 + dT));
+  const uA = spxProg(tc, 1.55 + dT, 1.8 + dT);
   // 注脚
-  const pf = spxOutCubic(spxProg(t, 1.95 + dT, 2.5 + dT));
-  const pfClip = (1 - spxOutCubic(spxProg(t, 1.95 + dT, 2.6 + dT))) * 100;
+  const pf = spxOutCubic(spxProg(tc, 1.95 + dT, 2.5 + dT));
+  const pfClip = (1 - spxOutCubic(spxProg(tc, 1.95 + dT, 2.6 + dT))) * 100;
 
   // 刻度:跟着数字一格格点亮;停留期一道光扫过(扫光按参考 90 根的比例折算)
   const plan = spxTickPlan(absT, unit);
-  const sweepU = t > 2.4 + dT ? ((t - 2.4 - dT) / 1.2) * (110 / 90) - 10 / 90 : -9; // 扫光中心(0~1 = 刻度条左→右)
-  const sweepAt = (u: number) => (t > 2.4 + dT ? Math.exp(-Math.pow((u - sweepU) / (4 / 90), 2)) : 0);
+  const sweepU = tc > 2.4 + dT ? ((tc - 2.4 - dT) / 1.2) * (110 / 90) - 10 / 90 : -9; // 扫光中心(0~1 = 刻度条左→右)
+  const sweepAt = (u: number) => (tc > 2.4 + dT ? Math.exp(-Math.pow((u - sweepU) / (4 / 90), 2)) : 0);
 
   const labelChars = label.lines.flat();
   return (
@@ -441,7 +444,7 @@ function StatProof({ params, playToken }: EffectProps<StatProofParams>) {
                         )}
                         {li > 0 && <span style={{ display: "inline-block", width: 20 }} />}
                         {line.map((c, ci) => {
-                          const p = spxOutCubic(spxProg(t, 0.18 + (before + ci) * 0.028, 0.48 + (before + ci) * 0.028));
+                          const p = spxOutCubic(spxProg(tl, 0.18 + (before + ci) * 0.028, 0.48 + (before + ci) * 0.028));
                           return (
                             <span key={ci} style={{ display: "inline-block", opacity: +p.toFixed(3), transform: `translateY(${((1 - p) * 10).toFixed(2)}px)` }}>
                               {c.ch === " " ? " " : c.ch}
@@ -532,7 +535,7 @@ function StatProof({ params, playToken }: EffectProps<StatProofParams>) {
                       const sw = sweepAt(N > 1 ? i / (N - 1) : 0);
                       a = Math.min(1, a + sw * 0.5);
                       const st = (i / N) * 0.27; // 刻度从左到右依次长出(参考 90 根 × 0.003s)
-                      const sy = 0.4 + 0.6 * spxOutCubic(spxProg(t, 0.3 + st, 0.6 + st)) + sw * 0.35;
+                      const sy = 0.4 + 0.6 * spxOutCubic(spxProg(tl, 0.3 + st, 0.6 + st)) + sw * 0.35;
                       return (
                         <i
                           key={i}
@@ -549,13 +552,13 @@ function StatProof({ params, playToken }: EffectProps<StatProofParams>) {
                   : (() => {
                       // 比例条:数值太大数不出根数,只画一条随数字填满的条;两端立高刻度,扫光照样走
                       const fill = absT > 0 ? spxClamp(v / absT) : 0;
-                      const grow = 0.4 + 0.6 * spxOutCubic(spxProg(t, 0.3, 0.87));
+                      const grow = 0.4 + 0.6 * spxOutCubic(spxProg(tl, 0.3, 0.87));
                       const swX = sweepU * TW;
                       return (
                         <>
                           <div style={{ position: "absolute", left: 0, bottom: 0, width: TW, height: 10, borderRadius: 1, background: "#fff", opacity: +(0.16 * appear).toFixed(3), transformOrigin: "50% 100%", transform: `scaleY(${grow.toFixed(3)})` }} />
                           <div style={{ position: "absolute", left: 0, bottom: 0, width: TW * fill, height: 10, borderRadius: 1, background: "#fff", opacity: +(0.9 * appear).toFixed(3), transformOrigin: "50% 100%", transform: `scaleY(${grow.toFixed(3)})` }} />
-                          {t > 2.4 + dT && (
+                          {tc > 2.4 + dT && (
                             <div style={{ position: "absolute", left: swX - TW * 0.1, bottom: 0, width: TW * 0.2, height: 14, background: `linear-gradient(90deg, transparent, ${acc}, transparent)`, opacity: 0.8 }} />
                           )}
                           {[0, 1].map((e) => (

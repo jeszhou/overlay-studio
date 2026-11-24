@@ -460,12 +460,12 @@ export function ParamsPanel({
   // 再叠通用 SPEED_CONTROL 就是两个滑杆写同一个参数 + React 重复 key
   const ownKeys = new Set(own.map((c) => c.key));
   const universal = [
-    SCALE_CONTROL,
-    SPEED_CONTROL,
+    ...(effect.id === "chapter-bar" ? [] : [SCALE_CONTROL]),
+    ...(effect.id === "caption-track" ? [] : [SPEED_CONTROL]),
     SFX_CONTROL,
     ...("glass" in effect.defaults ? [
       {key:"glass",label:"玻璃底色",type:"select",options:[{value:"none",label:"关闭"},{value:"dark",label:"深色"},{value:"light",label:"浅色"}]},
-      {key:"glassAlpha",label:"底色透明度",type:"range",min:0,max:1,step:.05},
+      {key:"glassAlpha",label:"底色透明度（玻璃底色打开时生效）",type:"range",min:0,max:1,step:.05},
     ] as Control[] : []),
     {key:"shadow",label:"投影",type:"select",options:[{value:"none",label:"无"},{value:"soft",label:"柔和"},{value:"hard",label:"清晰"},{value:"outline",label:"描边"}]} as Control,
     ...(card && editMode && !BREATH_STILL.has(effect.id) ? [BREATH_CONTROL] : []),

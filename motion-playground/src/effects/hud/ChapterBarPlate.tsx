@@ -1,6 +1,6 @@
 import type { EffectProps } from "../types";
 import { STAGE } from "../../stage";
-import { useTimelineTime } from "./useTimelineTime";
+import { useTimelineTime, usePlateSpeed } from "./useTimelineTime";
 import { ACCENT_VAR, offsetVars } from "./accent";
 import type { ChapterBarParams } from "./ChapterBar";
 
@@ -62,10 +62,12 @@ export function ChapterBarPlate({ params, playToken }: EffectProps<ChapterBarPar
   const { accent, showProgress, progMode, progAccent, progAlpha, hideAt, theme } = params;
   const { w: SW } = STAGE;
   const tAbs = useTimelineTime(params, playToken); // 章节起始秒、隐藏时段都是时间轴绝对秒
+  const spd = usePlateSpeed(); // 卡点秒数不动,只缩放动作时长
   const items = parseChapters(params.chapters);
   if (!items.length) return null;
   const T = Math.max(0, Number.isFinite(tAbs) ? tAbs : 0);
   const te = Math.max(0, T - (params.__start ?? 0)); // 进场按卡内已过秒数
+  const teS = te * spd; // 进场按 1 倍速计的秒数
   const n = items.length;
 
   // ---------- 整期结尾:用卡片自己的结束时间;没有/早于最后一章时给最后一章一个默认长度 ----------
@@ -113,17 +115,17 @@ export function ChapterBarPlate({ params, playToken }: EffectProps<ChapterBarPar
   for (const seg of (hideAt ?? "").split("|")) {
     const [a, b] = seg.split("-").map((x) => parseFloat(x.trim()));
     if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) continue;
-    hidden = Math.max(hidden, c01((T - a) / 0.25) - c01((T - b) / 0.25));
+    hidden = Math.max(hidden, c01(((T - a) * spd) / 0.25) - c01(((T - b) * spd) / 0.25));
   }
 
   // ---------- 进场:从顶部滑入 ----------
-  const e = easeOutCubic(prog(te, 0, ENTER));
+  const e = easeOutCubic(prog(teS, 0, ENTER));
 
   let cur = 0;
   for (let i = 0; i < n; i++) if (T >= items[i].start) cur = i;
   const curStart = items[cur].start;
   const sinceSwitch = cur > 0 ? T - curStart : Infinity; // 第一章没有交接
-  const h = cur > 0 ? easeInOutCubic(prog(T, curStart, curStart + HANDOFF)) : 1;
+  const h = cur > 0 ? easeInOutCubic(prog(T, curStart, curStart + HANDOFF / spd)) : 1;
 
   const light = theme === "light" && true;
   const ink = light ? "20,20,24" : "255,255,255";
@@ -147,7 +149,7 @@ export function ChapterBarPlate({ params, playToken }: EffectProps<ChapterBarPar
     x1 = lerp(A.x + A.w, B.x + B.w, lead);
     x0 = lerp(A.x, B.x, tail);
   }
-  const indIn = easeOutCubic(prog(te, 0.2, 0.55));
+  const indIn = easeOutCubic(prog(teS, 0.2, 0.55));
   const cx = (x0 + x1) / 2;
   const indW = (x1 - x0) * indIn;
 
@@ -185,15 +187,15 @@ export function ChapterBarPlate({ params, playToken }: EffectProps<ChapterBarPar
       {items.map((c, i) => {
         const L = labels[i];
         let p = clamp((T - c.start) / durs[i], 0, 1);
-        if (i === 0) p *= easeOutCubic(prog(te, 0.15, 0.6)); // 首章填充随进场轻轻长出
+        if (i === 0) p *= easeOutCubic(prog(teS, 0.15, 0.6)); // 首章填充随进场轻轻长出
         // 刚讲完的章:交接瞬间整格轻微提亮再回落
-        const flash = i === cur - 1 && sinceSwitch < 0.9 ? Math.sin(Math.PI * prog(sinceSwitch, 0, 0.9)) : 0;
+        const flash = i === cur - 1 && sinceSwitch * spd < 0.9 ? Math.sin(Math.PI * prog(sinceSwitch * spd, 0, 0.9)) : 0;
         const isCur = i === cur;
         const headOp = isCur && p > 0.002 ? 0.85 * (i === 0 ? e : h) : 0;
         const on = i === cur ? h : i === cur - 1 ? 1 - h : 0;
         const done = i < cur;
         const baseA = Math.min(0.92, (done ? 0.74 : 0.6));
-        const a = easeOutCubic(prog(te, 0.1 + i * 0.05, 0.4 + i * 0.05)); // 标签错峰浮起
+        const a = easeOutCubic(prog(teS, 0.1 + i * 0.05, 0.4 + i * 0.05)); // 标签错峰浮起
         // 编号:当前章转成强调色(用强调色叠一层),否则淡白
         const numBase = Math.min(0.85, (done ? 0.5 : 0.42));
         const showFill = showProgress && (isFill || isCur);

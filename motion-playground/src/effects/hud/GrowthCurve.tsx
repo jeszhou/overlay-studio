@@ -1,7 +1,7 @@
 import { useId } from "react";
 import type { CSSProperties } from "react";
 import type { EffectDef, EffectProps } from "../types";
-import { useCardElapsed } from "./useTimelineTime";
+import { useCardElapsed, usePlateSpeed } from "./useTimelineTime";
 import {
   ACCENT_OPTIONS,
   ACCENT_SWATCH,
@@ -9,7 +9,6 @@ import {
   OFFSET_CONTROLS,
   OFFSET_DEFAULTS,
   offsetVars,
-  THEME_OPTIONS,
 } from "./accent";
 
 export interface GrowthCurveParams {
@@ -209,6 +208,8 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
   // 有 __end 才退场:卡片时长 = __end − __start,最后 0.5s 收走;没有就一直停着
   const END = typeof tp.__end === "number" ? Math.max(0, tp.__end - (tp.__start ?? 0)) : Infinity;
   const t = Math.max(0, Math.min(END, tRaw));
+  const spd = usePlateSpeed(); // 动画速度:动作按它加快,退场仍在结束时刻收完
+  const ts = t * spd;
 
   const onStage = tp.centerOnStage === true; // 「换卡居中」交给 hud.css 的中心缩放
   const side = onStage || position === "center" ? "center" : position === "right" ? "right" : "left";
@@ -354,7 +355,7 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
   const drawA = 0.62;
   const drawB = drawA + Math.max(0.4, (Number(drawMs) || 1600) / 1000);
   const countB = drawB + 0.93;
-  const outA = END - GC_OUT;
+  const outA = END - GC_OUT / spd;
   const drawEase = (x: number) => gcIOCubic(x) * 0.25 + (1 - Math.pow(1 - x, 2.2)) * 0.75;
   const headXAt = (tt: number) => gcLerp(P[0].x, LAST.x, drawEase(gcProg(tt, drawA, drawB)));
   const reach = P.map((p, i) => {
@@ -371,40 +372,40 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
   const ex = (delay: number) => gcICubic(gcProg(t, outA + delay, END - 0.12 + delay * 0.4));
 
   // 卡身:横向揭开 + 外侧滑入
-  const ci = gcOQuint(gcProg(t, 0, 0.62));
+  const ci = gcOQuint(gcProg(ts, 0, 0.62));
   const ce = ex(0.12);
   const cardOp = gcClamp(ci * 1.6) * (1 - ce);
   const cardX = dir * ((1 - ci) * 46 + ce * 36);
   const cardS = 0.96 + 0.04 * ci;
-  const wipe = (1 - gcOCubic(gcProg(t, 0, 0.55))) * 100;
+  const wipe = (1 - gcOCubic(gcProg(ts, 0, 0.55))) * 100;
   const clip = side === "right" ? `inset(0 0 0 ${wipe.toFixed(2)}% round 28px)` : `inset(0 ${wipe.toFixed(2)}% 0 0 round 28px)`;
-  const edgeS = gcOCubic(gcProg(t, 0.1, 0.6));
+  const edgeS = gcOCubic(gcProg(ts, 0.1, 0.6));
 
   // 眉题:逐字打出
-  const kp = gcProg(t, 0.18, 0.7);
+  const kp = gcProg(ts, 0.18, 0.7);
   const kAll = kLines.join("\n");
   const kN = Math.round(Array.from(kAll).length * kp);
   const kShown = Array.from(kAll).slice(0, kN).join("");
   const kOp = gcClamp(kp * 4) * (1 - ex(0));
 
   // 网格 / 图表整体
-  const gp = gcOCubic(gcProg(t, 0.35, 0.95));
+  const gp = gcOCubic(gcProg(ts, 0.35, 0.95));
   const chartOut = ex(0);
 
   // 曲线揭开 + 笔尖
-  const drawing = t >= drawA;
-  const hx = headXAt(t);
+  const drawing = ts >= drawA;
+  const hx = headXAt(ts);
   const hy = yAtX(hx);
-  const revealW = drawing ? hx + 20 + (t >= drawB ? 20 : 0) : 0;
-  const settle = gcProg(t, drawB, drawB + 0.25);
-  const breathe = 0.5 + 0.5 * Math.sin((t - drawB) * Math.PI * 1.6);
+  const revealW = drawing ? hx + 20 + (ts >= drawB ? 20 : 0) : 0;
+  const settle = gcProg(ts, drawB, drawB + 0.25);
+  const breathe = 0.5 + 0.5 * Math.sin((ts - drawB) * Math.PI * 1.6);
   const headR = drawing ? gcLerp(6, 8, settle) : 0;
   const haloR = gcLerp(20, 26 + 6 * breathe * settle, settle);
   const haloOp = (drawing ? 1 : 0) * gcLerp(0.9, 0.6 + 0.4 * breathe, settle);
 
   // 停留:面积呼吸 + 高光扫一次
   const areaTop = 0.34 + 0.1 * breathe * settle;
-  const sp = gcProg(t, countB - 0.1, countB + 1.1);
+  const sp = gcProg(ts, countB - 0.1, countB + 1.1);
   const so = gcLerp(-0.2, 1.1, gcIOCubic(sp));
   const shineOp = sp > 0 && sp < 1 ? 0.85 : 0;
   const glowOp = 0.45 + 0.2 * breathe * settle;
@@ -412,7 +413,7 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
   // 重点波纹:到达时一圈,之后慢心跳
   const ringAt = fi === n - 1 ? drawB - 0.05 : reach[fi] - 0.05;
   const ring = (start: number, period: number) => {
-    const local = t - start;
+    const local = ts - start;
     if (local < 0 || (!period && local > 0.9)) return { r: 0, o: 0 };
     const ph = period ? (local % period) / period : gcClamp(local / 0.9);
     return { r: 8 + 34 * gcOCubic(ph), o: (1 - ph) * 0.8 };
@@ -421,13 +422,13 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
   const r2 = ring(Math.max(ringAt, drawB) + 0.4, 1.25);
 
   // 大字滚动
-  const cp = gcProg(t, drawB, countB);
+  const cp = gcProg(ts, drawB, countB);
   const shownTxt = gcFmt(fp.v * (1 - Math.pow(1 - cp, 3)), fp);
-  const lin = gcOCubic(gcProg(t, drawB - 0.15, drawB + 0.3));
-  const punch = t >= countB ? Math.exp(-Math.max(0, t - countB) * 7) : 0;
+  const lin = gcOCubic(gcProg(ts, drawB - 0.15, drawB + 0.3));
+  const punch = ts >= countB ? Math.exp(-Math.max(0, ts - countB) * 7) : 0;
   const peakS = (0.9 + 0.1 * lin) * (1 + 0.06 * punch);
-  const dpv = gcOBack(gcProg(t, countB - 0.05, countB + 0.35));
-  const footP = gcOCubic(gcProg(t, countB, countB + 0.5));
+  const dpv = gcOBack(gcProg(ts, countB - 0.05, countB + 0.35));
+  const footP = gcOCubic(gcProg(ts, countB, countB + 0.5));
 
   const txtF: CSSProperties = {};
   const dimC = (c: string) => (c);
@@ -475,7 +476,7 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
             {tLines.length > 0 && (
               <div data-fx-role="label" data-small-text="kickerZh" style={{ ...abs, left: GC_PAD_L, top: tTop, width: textW, fontSize: 30, fontWeight: 600, lineHeight: "40.5px", letterSpacing: "0.02em", ...txtF }}>
                 {tLines.map((ln, i) => {
-                  const a = gcOQuint(gcProg(t, 0.28 + i * 0.1, 0.85 + i * 0.1));
+                  const a = gcOQuint(gcProg(ts, 0.28 + i * 0.1, 0.85 + i * 0.1));
                   const e = ex(0.02 + i * 0.03);
                   return (
                     <span key={i} style={{ display: "block", overflow: "hidden", whiteSpace: "nowrap" }}>
@@ -515,7 +516,7 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
                 </defs>
                 <g>
                   {gridY.map((gy, i) => (
-                    <line key={i} x1={0} y1={gy.toFixed(2)} y2={gy.toFixed(2)} x2={(GC_CW * gcOCubic(gcProg(t, 0.35 + i * 0.06, 0.95 + i * 0.06))).toFixed(2)} stroke={pal.grid} strokeWidth={1} strokeDasharray="2 6" />
+                    <line key={i} x1={0} y1={gy.toFixed(2)} y2={gy.toFixed(2)} x2={(GC_CW * gcOCubic(gcProg(ts, 0.35 + i * 0.06, 0.95 + i * 0.06))).toFixed(2)} stroke={pal.grid} strokeWidth={1} strokeDasharray="2 6" />
                   ))}
                   <line x1={0} y1={BASE} y2={BASE} x2={(GC_CW * gp).toFixed(2)} stroke={gcCss(pal.base, 0.35)} strokeWidth={1} />
                 </g>
@@ -529,14 +530,14 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
                 )}
                 <g>
                   {P.map((p, i) => {
-                    const dp = gcOCubic(gcProg(t, reach[i], reach[i] + 0.4));
+                    const dp = gcOCubic(gcProg(ts, reach[i], reach[i] + 0.4));
                     const foc = i === fi;
                     return <line key={i} x1={p.x} x2={p.x} y1={BASE} y2={gcLerp(BASE, p.y + (foc ? 10 : 8), dp).toFixed(2)} opacity={dp.toFixed(3)} stroke={foc ? pal.dropHi : pal.drop} strokeWidth={1} strokeDasharray="3 4" />;
                   })}
                 </g>
                 <g>
                   {P.map((p, i) => {
-                    const pp = gcProg(t, reach[i] - 0.02, reach[i] + 0.34);
+                    const pp = gcProg(ts, reach[i] - 0.02, reach[i] + 0.34);
                     const sc = pp > 0 ? gcOBack(pp) : 0;
                     const foc = i === fi;
                     // 最后一点被笔尖盖住,不另画
@@ -552,7 +553,7 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
               {/* 数值(重点的数值由大字显示) */}
               {P.map((p, i) => {
                 if (i === fi) return null;
-                const lp = gcOCubic(gcProg(t, reach[i] + 0.04, reach[i] + 0.44));
+                const lp = gcOCubic(gcProg(ts, reach[i] + 0.04, reach[i] + 0.44));
                 return (
                   <div key={i} style={{ ...abs, left: p.x, top: p.y - 44, transform: `translate(-50%, ${((1 - lp) * 10).toFixed(2)}px)`, opacity: lp.toFixed(3), fontFamily: GC_NUM, fontSize: 20, fontWeight: 600, color: pal.vl, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", ...txtF }}>
                     {pts[i].raw}
@@ -561,7 +562,7 @@ function GrowthCurve({ params, playToken }: EffectProps<GrowthCurveParams>) {
               })}
               {/* 横轴标签 */}
               {P.map((p, i) => {
-                const lp = gcOCubic(gcProg(t, reach[i] + 0.04, reach[i] + 0.44));
+                const lp = gcOCubic(gcProg(ts, reach[i] + 0.04, reach[i] + 0.44));
                 const left = Math.max(-28, Math.min(GC_CW + 28 - xlW, p.x - xlW / 2));
                 return (
                   <div key={i} style={{ ...abs, left, top: CH, width: xlW, textAlign: "center", fontSize: 18, lineHeight: "22px", letterSpacing: "0.04em", color: i === fi ? (pal.xlHi) : dimC(pal.xl), fontWeight: i === fi ? 600 : 400, opacity: (gcClamp(gp * 1.5) * (0.35 + 0.65 * lp)).toFixed(3), ...txtF }}>
@@ -619,7 +620,6 @@ export const growthCurveDef: EffectDef<GrowthCurveParams> = {
     ...OFFSET_DEFAULTS,
   },
   controls: [
-    { key: "theme", label: "底色(此卡独立生效)", type: "select", options: THEME_OPTIONS },
     {
       key: "position",
       label: "落位",
