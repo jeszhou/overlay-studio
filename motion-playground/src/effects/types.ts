@@ -13,6 +13,8 @@ export type Control =
       max: number;
       step: number;
       unit?: string;
+      /** 滑杆旁再给一个数字输入框,可按精确值手填(滑杆宽度有限,大范围下拖不到小值) */
+      precise?: boolean;
     }
   | { key: string; label: string; type: "text" }
   | {
